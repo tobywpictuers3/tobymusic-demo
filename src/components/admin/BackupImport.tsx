@@ -6,15 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Upload, Download, RefreshCw, Server, HardDrive, Cloud } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { workerApi } from '@/lib/workerApi';
 
 const BackupImport = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [server2Url, setServer2Url] = useState('');
   const [lastBackupTime, setLastBackupTime] = useState<string>('');
-
-  // Secure Dropbox proxy - no tokens exposed to client
-  const SECURE_PROXY_URL = 'https://lovable-secure-proxy.vercel.app';
 
   useEffect(() => {
     // טעינה אוטומטית משרת 1 בעת פתיחת האפליקציה
@@ -86,45 +84,49 @@ const BackupImport = () => {
     try {
       const data = gatherAllData();
       
-      // Save to Dropbox via secure proxy - admin only
-      const response = await fetch(`${SECURE_PROXY_URL}/save-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          code: 'toby2026', // Admin code
-          data: data 
-        })
-      });
-
-      if (!response.ok) throw new Error('Backup to Dropbox failed');
+      const result = await workerApi.saveData(data);
       
-      setLastBackupTime(new Date().toLocaleString('he-IL'));
-      console.info('✅ Backup to Dropbox completed successfully (via secure proxy)');
+      if (result.success) {
+        setLastBackupTime(new Date().toLocaleString('he-IL'));
+        console.info('✅ Backup to Dropbox completed successfully');
+      } else {
+        throw new Error(result.error || 'Backup failed');
+      }
     } catch (error) {
       console.error('❌ Error backing up to Dropbox:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'שגיאה בשמירת גיבוי',
+        variant: 'destructive'
+      });
     }
   };
 
   const loadFromServer1 = async () => {
     setIsLoading(true);
     try {
-      // Load from Dropbox via secure proxy - admin sees all data
-      const response = await fetch(`${SECURE_PROXY_URL}/get-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: 'toby2026' }) // Admin code to get all data
-      });
+      const result = await workerApi.loadData();
       
-      if (!response.ok) throw new Error('Failed to load from Dropbox');
-      
-      const data = await response.json();
-      Object.keys(data).forEach(key => {
-        localStorage.setItem(key, typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]));
-      });
-      
-      console.info('✅ Data loaded from Dropbox successfully (via secure proxy)');
+      if (result.success && result.data) {
+        Object.keys(result.data).forEach(key => {
+          localStorage.setItem(key, typeof result.data[key] === 'string' ? result.data[key] : JSON.stringify(result.data[key]));
+        });
+        
+        console.info('✅ Data loaded from Dropbox successfully');
+        toast({
+          title: 'הצלחה',
+          description: 'הנתונים נטענו בהצלחה'
+        });
+      } else {
+        throw new Error(result.error || 'Load failed');
+      }
     } catch (error) {
       console.error('❌ Error loading from Dropbox:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'שגיאה בטעינת נתונים',
+        variant: 'destructive'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -289,9 +291,8 @@ const BackupImport = () => {
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground">
             <p>📁 תיקייה: LOVABLE</p>
-            <p>🔒 גישה: דרך proxy מאובטח בלבד</p>
-            <p>🚫 לא נראה ב-F12</p>
-            {lastBackupTime && <p>גיבוי אחרון: {lastBackupTime}</p>}
+            <p>🔒 גישה: דרך Cloudflare Worker API</p>
+            {lastBackupTime && <p>⏰ גיבוי אחרון: {lastBackupTime}</p>}
           </div>
           <div className="flex gap-2">
             <Button onClick={handleManualSync1} disabled={isLoading}>
