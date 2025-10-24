@@ -24,21 +24,21 @@ const LessonHistory = ({ student }: LessonHistoryProps) => {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const lessons = getLessons()
+    const allStudentLessons = getLessons()
       .filter(lesson => lesson.studentId === student.id)
-      .filter(lesson => lesson.status !== 'cancelled' && !lesson.notes?.includes('דילוג מיספור'))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .map((lesson) => {
-        const result = calculateEnhancedLessonNumber(student.id, lesson.date, lesson.id);
-        return {
-          ...lesson,
-          lessonNumber: result.lessonNumber,
-          isSkippedLesson: result.isSkippedLesson,
-          isBankTimeLesson: result.isBankTimeLesson
-        };
-      });
+      .filter(lesson => lesson.status === 'completed')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    setAllLessons(lessons);
+    const lessonsWithNumbers = allStudentLessons.map((lesson, index) => {
+      return {
+        ...lesson,
+        lessonNumber: index + (student.startingLessonNumber || 1),
+        isSkippedLesson: false,
+        isBankTimeLesson: lesson.notes?.includes('בנק זמן') || false
+      };
+    });
+
+    setAllLessons(lessonsWithNumbers.reverse());
     setCurrentPage(1);
   }, [student]);
 

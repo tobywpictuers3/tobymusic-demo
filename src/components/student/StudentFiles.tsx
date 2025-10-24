@@ -97,48 +97,29 @@ const StudentFiles = ({ studentId }: StudentFilesProps) => {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>העלאת קובץ חדש</DialogTitle>
+                  <DialogTitle>הוספת קובץ חדש</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="file-type">סוג קובץ</Label>
-                    <Select 
-                      value={uploadForm.type} 
-                      onValueChange={(value: FileUpload['type']) => setUploadForm({...uploadForm, type: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="image">תמונה</SelectItem>
-                        <SelectItem value="pdf">PDF</SelectItem>
-                        <SelectItem value="audio">קובץ שמע</SelectItem>
-                        <SelectItem value="drive_link">קישור לדרייב</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="file-name">שם הקובץ</Label>
+                    <Label htmlFor="file-name">כותרת הקובץ</Label>
                     <Input
                       id="file-name"
                       value={uploadForm.name}
                       onChange={(e) => setUploadForm({...uploadForm, name: e.target.value})}
-                      placeholder="הכנסי שם לקובץ"
+                      placeholder="לדוגמה: תווים שיעור 5, הקלטה יד ימין"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="file-url">
-                      {uploadForm.type === 'drive_link' ? 'קישור' : 'כתובת הקובץ'}
-                    </Label>
+                    <Label htmlFor="file-url">קישור לקובץ</Label>
                     <Input
                       id="file-url"
                       value={uploadForm.url}
                       onChange={(e) => setUploadForm({...uploadForm, url: e.target.value})}
-                      placeholder={uploadForm.type === 'drive_link' ? 'הדביקי כאן את הקישור מהדרייב' : 'כתובת הקובץ'}
+                      placeholder="הדביקי כאן את הקישור לקובץ (Google Drive, Dropbox וכו')"
                     />
                   </div>
                   <Button onClick={handleUpload} className="w-full hero-gradient">
-                    העלה קובץ
+                    הוסף קובץ
                   </Button>
                 </div>
               </DialogContent>
@@ -158,24 +139,21 @@ const StudentFiles = ({ studentId }: StudentFilesProps) => {
         ) : (
           <div className="space-y-3">
             {files.map((file) => (
-              <div key={file.id} className="flex justify-between items-center p-4 bg-secondary/30 rounded-lg">
-                <div className="flex items-center gap-3">
-                  {getFileIcon(file.name)}
-                  <div>
-                    <div className="font-medium">{file.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      הועלה ב-{new Date(file.uploadDate).toLocaleDateString('he-IL')}
+              <div key={file.id} className="p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors">
+                <button
+                  onClick={() => handleOpenFile(file.webViewLink)}
+                  className="w-full text-right"
+                >
+                  <div className="flex items-center gap-3">
+                    {getFileIcon(file.name)}
+                    <div className="flex-1">
+                      <div className="font-medium hover:text-primary transition-colors">{file.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        הועלה ב-{new Date(file.uploadDate).toLocaleDateString('he-IL')}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <Button
-                  onClick={() => handleOpenFile(file.webViewLink)}
-                  size="sm"
-                  className="hero-gradient"
-                >
-                  <Download className="h-3 w-3 mr-1" />
-                  פתח
-                </Button>
+                </button>
               </div>
             ))}
           </div>

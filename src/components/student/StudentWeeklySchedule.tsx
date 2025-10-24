@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, ArrowRight, ArrowLeft } from 'lucide-react';
-import { getLessons, getStudents, calculateLessonNumber } from '@/lib/storage';
+import { getLessons, getStudents } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
-import { calculateEnhancedLessonNumber } from '@/lib/lessonNumbering';
 
 interface StudentWeeklyScheduleProps {
   studentId: string;
@@ -99,6 +98,7 @@ const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
         <div className="space-y-4">
           {weekDates.map((date, index) => {
             const dayLessons = getLessonsForDay(date);
+
             if (dayLessons.length === 0) return null;
 
             return (
@@ -112,12 +112,10 @@ const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
                 <div className="space-y-2">
                   {dayLessons
                     .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                    .map((lesson, lessonIndex) => {
+                    .map((lesson) => {
                       const currentDate = new Date().toISOString().split('T')[0];
                       const isFuture = lesson.date > currentDate;
                       const isCompleted = lesson.status === 'completed';
-                      
-                      const lessonResult = calculateEnhancedLessonNumber(studentId, lesson.date, lesson.id);
                       
                       return (
                         <div
@@ -131,18 +129,6 @@ const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
                           }`}
                         >
                           <div className="space-y-1">
-                            <div className={`font-medium flex items-center gap-2 ${isFuture ? 'text-muted-foreground' : isCompleted ? 'text-blue-800' : ''}`}>
-                              {lessonResult.isSkippedLesson ? (
-                                <Badge variant="secondary">שיעור דולג</Badge>
-                              ) : (
-                                <span>שיעור #{lessonResult.lessonNumber}</span>
-                              )}
-                              {lessonResult.isBankTimeLesson && (
-                                <Badge variant="outline" className="text-xs">
-                                  בנק זמן
-                                </Badge>
-                              )}
-                            </div>
                             <div className={`text-sm ${isFuture ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                               {lesson.startTime} - {lesson.endTime}
                             </div>
