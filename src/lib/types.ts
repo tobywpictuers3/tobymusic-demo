@@ -31,6 +31,7 @@ export interface Lesson {
   isOneOff?: boolean; // for makeup lessons or special sessions
   lockedNumber?: number; // locked lesson number that won't change
   isFromTemplate?: boolean; // indicates lesson was generated from active template
+  grade?: number; // lesson grade 1-5 (homework grade)
 }
 
 export interface Payment {
@@ -89,6 +90,7 @@ export interface FileEntry {
   id: string;
   studentId: string;
   name: string;
+  description?: string; // optional description/explanation for the file
   webViewLink: string;
   uploadDate: string;
 }

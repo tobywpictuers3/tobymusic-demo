@@ -6,16 +6,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Grid, List, UserPlus, Edit, Trash2, Users } from 'lucide-react';
+import { Grid, List, UserPlus, Edit, Trash2, Users, History } from 'lucide-react';
 import { getStudents, addStudent, updateStudent, deleteStudent } from '@/lib/storage';
 import { Student } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
+import StudentLessonHistory from './StudentLessonHistory';
 
 const StudentsManagement = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showDialog, setShowDialog] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
 
   // Form states
   const [studentForm, setStudentForm] = useState({
@@ -239,6 +242,16 @@ const StudentsManagement = () => {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => {
+                            setHistoryStudent(student);
+                            setShowHistoryDialog(true);
+                          }}
+                        >
+                          <History className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => handleEditStudent(student)}
                         >
                           <Edit className="h-3 w-3" />
@@ -296,6 +309,16 @@ const StudentsManagement = () => {
                       <TableCell>₪{student.annualAmount}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setHistoryStudent(student);
+                              setShowHistoryDialog(true);
+                            }}
+                          >
+                            <History className="h-3 w-3" />
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
@@ -575,6 +598,15 @@ const StudentsManagement = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Lesson History Dialog */}
+      {historyStudent && (
+        <StudentLessonHistory
+          student={historyStudent}
+          open={showHistoryDialog}
+          onOpenChange={setShowHistoryDialog}
+        />
+      )}
     </div>
   );
 };

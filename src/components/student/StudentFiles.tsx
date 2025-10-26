@@ -15,8 +15,8 @@ interface StudentFilesProps {
 }
 
 interface FileUpload {
-  type: 'image' | 'pdf' | 'audio' | 'drive_link';
   name: string;
+  description: string;
   url: string;
 }
 
@@ -24,8 +24,8 @@ const StudentFiles = ({ studentId }: StudentFilesProps) => {
   const [files] = useState(getFiles().filter(f => f.studentId === studentId));
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadForm, setUploadForm] = useState<FileUpload>({
-    type: 'image',
     name: '',
+    description: '',
     url: ''
   });
 
@@ -49,21 +49,12 @@ const StudentFiles = ({ studentId }: StudentFilesProps) => {
     return <FileText className="h-5 w-5 text-primary" />;
   };
 
-  const getFileTypeLabel = (type: FileUpload['type']) => {
-    const labels = {
-      image: 'תמונה',
-      pdf: 'PDF',
-      audio: 'קובץ שמע',
-      drive_link: 'קישור לדרייב'
-    };
-    return labels[type];
-  };
 
   const handleUpload = () => {
     if (!uploadForm.name || !uploadForm.url) {
       toast({
         title: 'שגיאה',
-        description: 'יש למלא את כל השדות',
+        description: 'יש למלא את שדות כותרת וקישור',
         variant: 'destructive',
       });
       return;
@@ -75,7 +66,7 @@ const StudentFiles = ({ studentId }: StudentFilesProps) => {
       description: 'הקובץ הועלה בהצלחה',
     });
 
-    setUploadForm({ type: 'image', name: '', url: '' });
+    setUploadForm({ name: '', description: '', url: '' });
     setShowUploadDialog(false);
   };
 
@@ -107,6 +98,15 @@ const StudentFiles = ({ studentId }: StudentFilesProps) => {
                       value={uploadForm.name}
                       onChange={(e) => setUploadForm({...uploadForm, name: e.target.value})}
                       placeholder="לדוגמה: תווים שיעור 5, הקלטה יד ימין"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="file-description">הסבר / תיאור (אופציונלי)</Label>
+                    <Input
+                      id="file-description"
+                      value={uploadForm.description}
+                      onChange={(e) => setUploadForm({...uploadForm, description: e.target.value})}
+                      placeholder="הסבר קצר על הקובץ"
                     />
                   </div>
                   <div>
@@ -144,11 +144,16 @@ const StudentFiles = ({ studentId }: StudentFilesProps) => {
                   onClick={() => handleOpenFile(file.webViewLink)}
                   className="w-full text-right"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     {getFileIcon(file.name)}
                     <div className="flex-1">
                       <div className="font-medium hover:text-primary transition-colors">{file.name}</div>
-                      <div className="text-sm text-muted-foreground">
+                      {file.description && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {file.description}
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground mt-2">
                         הועלה ב-{new Date(file.uploadDate).toLocaleDateString('he-IL')}
                       </div>
                     </div>

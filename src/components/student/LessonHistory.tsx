@@ -86,6 +86,7 @@ const LessonHistory = ({ student }: LessonHistoryProps) => {
                   <TableHead>מספר שיעור</TableHead>
                   <TableHead>תאריך</TableHead>
                   <TableHead>שעה</TableHead>
+                  <TableHead>ציון ש"ב</TableHead>
                   <TableHead>סטטוס</TableHead>
                   <TableHead>הערות</TableHead>
                 </TableRow>
@@ -117,6 +118,13 @@ const LessonHistory = ({ student }: LessonHistoryProps) => {
                       </TableCell>
                       <TableCell className={isFuture ? 'text-muted-foreground' : isCompleted ? 'text-blue-800 dark:text-blue-300' : ''}>
                         {lesson.startTime} - {lesson.endTime}
+                      </TableCell>
+                      <TableCell className={isFuture ? 'text-muted-foreground' : isCompleted ? 'text-blue-800 dark:text-blue-300' : ''}>
+                        {lesson.grade ? (
+                          <Badge variant="secondary" className="text-sm">
+                            {lesson.grade}/5
+                          </Badge>
+                        ) : '-'}
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(lesson.status)}
