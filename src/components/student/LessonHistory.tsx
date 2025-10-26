@@ -121,9 +121,14 @@ const LessonHistory = ({ student }: LessonHistoryProps) => {
                       </TableCell>
                       <TableCell className={isFuture ? 'text-muted-foreground' : isCompleted ? 'text-blue-800 dark:text-blue-300' : ''}>
                         {lesson.grade ? (
-                          <Badge variant="secondary" className="text-sm">
-                            {lesson.grade}/5
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="secondary" className="text-sm w-fit">
+                              {lesson.grade}/5
+                            </Badge>
+                            {lesson.gradeNotes && (
+                              <p className="text-xs text-muted-foreground">{lesson.gradeNotes}</p>
+                            )}
+                          </div>
                         ) : '-'}
                       </TableCell>
                       <TableCell>

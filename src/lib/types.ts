@@ -32,6 +32,7 @@ export interface Lesson {
   lockedNumber?: number; // locked lesson number that won't change
   isFromTemplate?: boolean; // indicates lesson was generated from active template
   grade?: number; // lesson grade 1-5 (homework grade)
+  gradeNotes?: string; // optional text notes for the grade
 }
 
 export interface Payment {
