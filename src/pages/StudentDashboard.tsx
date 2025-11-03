@@ -19,6 +19,7 @@ import PaymentSummary from '@/components/student/PaymentSummary';
 import LessonHistory from '@/components/student/LessonHistory';
 import PracticeTracking from '@/components/student/PracticeTracking';
 import MedalCollection from '@/components/student/MedalCollection';
+import MedalStore from '@/components/student/MedalStore';
 import BackButton from '@/components/ui/back-button';
 import { SaveButton } from '@/components/ui/save-button';
 
@@ -99,9 +100,6 @@ const StudentDashboard = () => {
         {/* Payment Alerts */}
         <PaymentAlert studentId={studentId!} />
 
-        {/* Payment Summary */}
-        <PaymentSummary studentId={studentId!} />
-
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-7 bg-secondary/20 backdrop-blur">
@@ -115,7 +113,11 @@ const StudentDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="medals" className="flex items-center gap-2 text-card-foreground data-[state=active]:text-primary">
               <Calendar className="h-4 w-4" />
-              🏆 רכוש מדליות
+              🏆 המדליות שלי
+            </TabsTrigger>
+            <TabsTrigger value="store" className="flex items-center gap-2 text-card-foreground data-[state=active]:text-primary">
+              <Calendar className="h-4 w-4" />
+              🛒 חנות
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2 text-card-foreground data-[state=active]:text-primary">
               <Calendar className="h-4 w-4" />
@@ -123,7 +125,7 @@ const StudentDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="details" className="flex items-center gap-2 text-card-foreground data-[state=active]:text-primary">
               <User className="h-4 w-4" />
-              פרטי תלמידה
+              הפרטים שלי
             </TabsTrigger>
             <TabsTrigger value="contacts" className="flex items-center gap-2 text-card-foreground data-[state=active]:text-primary">
               <Phone className="h-4 w-4" />
@@ -150,7 +152,6 @@ const StudentDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-            <StudentWeeklySchedule studentId={studentId!} />
           </TabsContent>
 
           <TabsContent value="practice" className="space-y-6">
@@ -161,11 +162,16 @@ const StudentDashboard = () => {
             <MedalCollection studentId={studentId!} />
           </TabsContent>
 
+          <TabsContent value="store" className="space-y-6">
+            <MedalStore studentId={studentId!} />
+          </TabsContent>
+
           <TabsContent value="history" className="space-y-6">
             <LessonHistory student={student} />
           </TabsContent>
 
           <TabsContent value="details" className="space-y-6">
+            <PaymentSummary studentId={studentId!} />
             <EditableStudentDetails student={student} onUpdate={() => {
               const students = getStudents();
               const updatedStudent = students.find(s => s.id === studentId);

@@ -574,7 +574,7 @@ const StudentsManagement = () => {
             <div>
               <Label>תשלום חודשי (מחושב)</Label>
               <div className="p-3 bg-muted rounded-lg font-bold">
-                ₪{((studentForm.calculatedAmount || studentForm.annualAmount) / studentForm.paymentMonths).toFixed(2)}
+                ₪{((studentForm.calculatedAmount || studentForm.annualAmount) / studentForm.paymentMonths).toFixed(1)}
               </div>
             </div>
             

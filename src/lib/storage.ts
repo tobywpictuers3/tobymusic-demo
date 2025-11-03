@@ -720,6 +720,24 @@ export const addMedalRecord = (record: Omit<MedalRecord, 'id' | 'createdAt'>): M
   return newRecord;
 };
 
+export const updateMedalAsUsed = (medalId: string, usedForItem: string): boolean => {
+  const records = getMedalRecords();
+  const medalIndex = records.findIndex(m => m.id === medalId);
+  
+  if (medalIndex === -1) return false;
+  
+  records[medalIndex] = {
+    ...records[medalIndex],
+    used: true,
+    usedDate: new Date().toISOString().split('T')[0],
+    usedForItem
+  };
+  
+  localStorage.setItem('musicSystem_medalRecords', JSON.stringify(records));
+  hybridSync.onDataChange();
+  return true;
+};
+
 export const getStudentBestAchievements = (studentId: string): {
   bestDailyAverage: number;
   bestDailyMinutes: number;

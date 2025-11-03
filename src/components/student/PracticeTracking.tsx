@@ -345,11 +345,47 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
       durationMinutes,
     });
 
-    loadSessions();
+    // Reload sessions and recalculate stats after adding manual entry
+    const allSessions = getStudentPracticeSessions(studentId);
+    const allMedals = getStudentMedalRecords(studentId);
+    
+    // Group by date
+    const grouped = allSessions.reduce((acc, session) => {
+      if (!acc[session.date]) acc[session.date] = [];
+      acc[session.date].push(session);
+      return acc;
+    }, {} as Record<string, PracticeSession[]>);
+    
+    const stats = Object.entries(grouped)
+      .map(([date, daySessions]) => {
+        const totalMinutes = daySessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+        const medals: string[] = [];
+        
+        allMedals.filter(m => m.earnedDate === date).forEach(m => {
+          if (m.medalType === 'duration') {
+            if (m.level === 'diamond') medals.push('💠 יהלום');
+            else if (m.level === 'platinum') medals.push('💎 פלטינום');
+            else if (m.level === 'gold') medals.push('🥇 זהב');
+            else if (m.level === 'silver') medals.push('🥈 כסף');
+            else if (m.level === 'bronze') medals.push('🥉 נחושת');
+          } else if (m.medalType === 'streak') {
+            if (m.level === 'streak7') medals.push('👑 מרצפת');
+            else if (m.level === 'streak5') medals.push('⚡ מרוצף');
+            else if (m.level === 'streak3') medals.push('🔥 רצוף');
+          }
+        });
+        
+        return { date, sessions: daySessions, totalMinutes, medals };
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    setDailyStats(stats);
+    checkStreaks(stats);
+    
     setManualStartTime('');
     setManualEndTime('');
+    setManualDate('');
     
-    // Check for duration milestones - for THIS session only, not total
     showDurationCongrats(durationMinutes);
 
     toast({

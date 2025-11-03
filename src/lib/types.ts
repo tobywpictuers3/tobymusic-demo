@@ -156,6 +156,9 @@ export interface MedalRecord {
   streakDays?: number; // for streak medals
   earnedDate: string; // YYYY-MM-DD
   createdAt: string;
+  used?: boolean; // whether medal was used for store purchase
+  usedDate?: string; // when medal was used
+  usedForItem?: string; // what item was purchased
 }
 
 export interface MonthlyAchievement {
