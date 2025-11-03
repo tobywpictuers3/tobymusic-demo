@@ -1,5 +1,5 @@
 import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord } from './types';
-import { syncManager } from './syncManager';
+import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 
 // Utility function to simulate server-side ID generation
@@ -21,7 +21,7 @@ export const addStudent = (student: Omit<Student, 'id'>): Student => {
   };
   students.push(newStudent);
   localStorage.setItem('musicSystem_students', JSON.stringify(students));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newStudent;
 };
 
@@ -36,7 +36,7 @@ export const updateStudent = (id: string, updatedFields: Partial<Student>): Stud
   // Update the student with the provided fields
   students[studentIndex] = { ...students[studentIndex], ...updatedFields };
   localStorage.setItem('musicSystem_students', JSON.stringify(students));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return students[studentIndex];
 };
 
@@ -47,7 +47,7 @@ export const deleteStudent = (id: string): boolean => {
     return false; // No student was deleted
   }
   localStorage.setItem('musicSystem_students', JSON.stringify(updatedStudents));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return true;
 };
 
@@ -71,7 +71,7 @@ export const addLesson = (lesson: Omit<Lesson, 'id'>): Lesson => {
   };
   lessons.push(newLesson);
   localStorage.setItem('musicSystem_lessons', JSON.stringify(lessons));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newLesson;
 };
 
@@ -85,7 +85,7 @@ export const updateLesson = (id: string, updatedFields: Partial<Lesson>): Lesson
 
   lessons[lessonIndex] = { ...lessons[lessonIndex], ...updatedFields };
   localStorage.setItem('musicSystem_lessons', JSON.stringify(lessons));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return lessons[lessonIndex];
 };
 
@@ -96,7 +96,7 @@ export const deleteLesson = (id: string): boolean => {
     return false; // No lesson was deleted
   }
   localStorage.setItem('musicSystem_lessons', JSON.stringify(updatedLessons));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return true;
 };
 
@@ -108,7 +108,7 @@ export const getPayments = (): Payment[] => {
 
 export const savePayments = (payments: Payment[]): void => {
   localStorage.setItem('musicSystem_payments', JSON.stringify(payments));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
 };
 
 export const addPayment = (payment: Omit<Payment, 'id'>): Payment => {
@@ -119,7 +119,7 @@ export const addPayment = (payment: Omit<Payment, 'id'>): Payment => {
   };
   payments.push(newPayment);
   localStorage.setItem('musicSystem_payments', JSON.stringify(payments));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newPayment;
 };
 
@@ -140,13 +140,13 @@ export const updatePayment = (studentId: string, month: string, updatedFields: P
     };
     payments.push(newPayment);
     localStorage.setItem('musicSystem_payments', JSON.stringify(payments));
-    syncManager.onUserAction('update');
+    hybridSync.onDataChange();
     return newPayment;
   }
 
   payments[paymentIndex] = { ...payments[paymentIndex], ...updatedFields };
   localStorage.setItem('musicSystem_payments', JSON.stringify(payments));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return payments[paymentIndex];
 };
 
@@ -157,7 +157,7 @@ export const deletePayment = (id: string): boolean => {
     return false; // No payment was deleted
   }
   localStorage.setItem('musicSystem_payments', JSON.stringify(updatedPayments));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return true;
 };
 
@@ -175,7 +175,7 @@ export const addSwapRequest = (swapRequest: Omit<SwapRequest, 'id'>) => {
   };
   requests.push(newRequest);
   localStorage.setItem('musicSystem_swapRequests', JSON.stringify(requests));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newRequest;
 };
 
@@ -194,7 +194,7 @@ export const updateSwapRequest = (requestId: string, updates: Partial<SwapReques
   }
   
   localStorage.setItem('musicSystem_swapRequests', JSON.stringify(requests));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
 };
 
 export const updateSwapRequestStatus = (requestId: string, status: 'approved' | 'rejected') => {
@@ -269,7 +269,7 @@ const performLessonSwap = (swapRequest: SwapRequest) => {
     
     localStorage.setItem('musicSystem_lessons', JSON.stringify(lessons));
     // שמירה לדרופבוקס אחרי swap
-    syncManager.onUserAction('update');
+    hybridSync.onDataChange();
   }
 };
 
@@ -296,7 +296,7 @@ export const addFile = (file: Omit<FileEntry, 'id'>): FileEntry => {
   };
   files.push(newFile);
   localStorage.setItem('musicSystem_files', JSON.stringify(files));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newFile;
 };
 
@@ -310,7 +310,7 @@ export const updateFile = (id: string, updatedFields: Partial<FileEntry>): FileE
 
   files[fileIndex] = { ...files[fileIndex], ...updatedFields };
   localStorage.setItem('musicSystem_files', JSON.stringify(files));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return files[fileIndex];
 };
 
@@ -321,7 +321,7 @@ export const deleteFile = (id: string): boolean => {
     return false; // No file was deleted
   }
   localStorage.setItem('musicSystem_files', JSON.stringify(updatedFiles));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return true;
 };
 
@@ -345,7 +345,7 @@ export const addScheduleTemplate = (template: Omit<ScheduleTemplate, 'id' | 'cre
   };
   templates.push(newTemplate);
   localStorage.setItem('musicSystem_scheduleTemplates', JSON.stringify(templates));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newTemplate;
 };
 
@@ -373,7 +373,7 @@ export const activateScheduleTemplate = (id: string): ScheduleTemplate | undefin
   };
   
   localStorage.setItem('musicSystem_scheduleTemplates', JSON.stringify(templates));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return templates[templateIndex];
 };
 
@@ -387,7 +387,7 @@ export const updateScheduleTemplate = (id: string, updatedFields: Partial<Schedu
 
   templates[templateIndex] = { ...templates[templateIndex], ...updatedFields };
   localStorage.setItem('musicSystem_scheduleTemplates', JSON.stringify(templates));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return templates[templateIndex];
 };
 
@@ -398,7 +398,7 @@ export const deleteScheduleTemplate = (id: string): boolean => {
     return false; // No template was deleted
   }
   localStorage.setItem('musicSystem_scheduleTemplates', JSON.stringify(updatedTemplates));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return true;
 };
 
@@ -435,7 +435,7 @@ export const getIntegrationSettings = (): IntegrationSettings | null => {
 
 export const saveIntegrationSettings = (settings: IntegrationSettings): void => {
   localStorage.setItem('musicSystem_integrationSettings', JSON.stringify(settings));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
 };
 
 // User Authentication
@@ -486,7 +486,7 @@ export const addPerformance = (performance: Omit<Performance, 'id' | 'createdAt'
   };
   performances.push(newPerformance);
   localStorage.setItem('musicSystem_performances', JSON.stringify(performances));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newPerformance;
 };
 
@@ -500,7 +500,7 @@ export const updatePerformance = (id: string, updatedFields: Partial<Performance
 
   performances[performanceIndex] = { ...performances[performanceIndex], ...updatedFields };
   localStorage.setItem('musicSystem_performances', JSON.stringify(performances));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return performances[performanceIndex];
 };
 
@@ -511,7 +511,7 @@ export const deletePerformance = (id: string): boolean => {
     return false;
   }
   localStorage.setItem('musicSystem_performances', JSON.stringify(updatedPerformances));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return true;
 };
 
@@ -523,7 +523,7 @@ export const getOneTimePayments = (): OneTimePayment[] => {
 
 export const saveOneTimePayments = (payments: OneTimePayment[]): void => {
   localStorage.setItem('oneTimePayments', JSON.stringify(payments));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
 };
 
 // Holidays
@@ -542,7 +542,7 @@ export const addHoliday = (date: string, description?: string): Holiday => {
   };
   holidays.push(newHoliday);
   localStorage.setItem('musicSystem_holidays', JSON.stringify(holidays));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newHoliday;
 };
 
@@ -553,7 +553,7 @@ export const deleteHoliday = (date: string): boolean => {
     return false;
   }
   localStorage.setItem('musicSystem_holidays', JSON.stringify(updatedHolidays));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return true;
 };
 
@@ -584,7 +584,7 @@ export const addPracticeSession = (session: Omit<PracticeSession, 'id' | 'create
   };
   sessions.push(newSession);
   localStorage.setItem('musicSystem_practiceSessions', JSON.stringify(sessions));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newSession;
 };
 
@@ -595,7 +595,7 @@ export const updatePracticeSession = (id: string, updatedFields: Partial<Practic
   
   sessions[index] = { ...sessions[index], ...updatedFields };
   localStorage.setItem('musicSystem_practiceSessions', JSON.stringify(sessions));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return sessions[index];
 };
 
@@ -606,7 +606,7 @@ export const deletePracticeSession = (id: string): boolean => {
     return false;
   }
   localStorage.setItem('musicSystem_practiceSessions', JSON.stringify(updatedSessions));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return true;
 };
 
@@ -664,7 +664,7 @@ export const updateMonthlyAchievement = (
   }
   
   localStorage.setItem('musicSystem_monthlyAchievements', JSON.stringify(achievements));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
 };
 
 export const getCurrentMonthLeaderboard = (): LeaderboardEntry[] => {
@@ -716,7 +716,7 @@ export const addMedalRecord = (record: Omit<MedalRecord, 'id' | 'createdAt'>): M
   };
   records.push(newRecord);
   localStorage.setItem('musicSystem_medalRecords', JSON.stringify(records));
-  syncManager.onUserAction('update');
+  hybridSync.onDataChange();
   return newRecord;
 };
 

@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LogOut, Users, Calendar, CreditCard, MessageSquare, FileText, Settings, Music } from 'lucide-react';
+import { LogOut, Users, Calendar, CreditCard, MessageSquare, FileText, Settings, Music, History } from 'lucide-react';
 import { setCurrentUser, getCurrentUser } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
-import { syncManager } from '@/lib/syncManager';
+import { hybridSync } from '@/lib/hybridSync';
 import { PrintPDFButton } from '@/components/ui/print-pdf-button';
 import { SaveButton } from '@/components/ui/save-button';
 
@@ -17,6 +17,7 @@ import PaymentManagement from '@/components/admin/PaymentManagement';
 import PerformancesManagement from '@/components/admin/PerformancesManagement';
 import SwapRequests from '@/components/admin/SwapRequests';
 import BackupImport from '@/components/admin/BackupImport';
+import BackupHistory from '@/components/admin/BackupHistory';
 
 import FixedScheduleTab from '@/components/admin/FixedScheduleTab';
 
@@ -32,7 +33,8 @@ const AdminDashboard = () => {
       payments: 'תשלומים',
       performances: 'הופעות',
       swaps: 'בקשות החלפה',
-      backup: 'גיבוי'
+      backup: 'גיבוי',
+      history: 'היסטוריה'
     };
     return tabNames[tab] || 'תצוגה';
   };
@@ -80,7 +82,7 @@ const AdminDashboard = () => {
 
           {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7 royal-card royal-shadow">
+            <TabsList className="grid w-full grid-cols-8 royal-card royal-shadow">
               <TabsTrigger value="students" className="flex items-center gap-2 royal-tab">
                 <Users className="h-4 w-4" />
                 תלמידות
@@ -108,6 +110,10 @@ const AdminDashboard = () => {
               <TabsTrigger value="backup" className="flex items-center gap-2 royal-tab">
                 <FileText className="h-4 w-4" />
                 גיבוי
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex items-center gap-2 royal-tab">
+                <History className="h-4 w-4" />
+                היסטוריה
               </TabsTrigger>
             </TabsList>
 
@@ -137,6 +143,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="backup">
               <BackupImport />
+            </TabsContent>
+
+            <TabsContent value="history">
+              <BackupHistory />
             </TabsContent>
           </Tabs>
         </div>

@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import { syncManager } from './lib/syncManager';
+import { hybridSync } from './lib/hybridSync';
 import { logger } from './lib/logger';
 
 // Show loading screen
@@ -34,7 +34,7 @@ if ('serviceWorker' in navigator) {
 async function initializeApp() {
   try {
     logger.info('Starting app initialization...');
-    await syncManager.loadDataOnInit();
+    await hybridSync.loadDataOnInit();
     logger.info('Data loaded successfully');
   } catch (error) {
     logger.info('Continuing with local data');
