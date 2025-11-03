@@ -305,13 +305,8 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     setStartTime(null);
     loadSessions();
 
-    // Check for duration milestones
-    const today = new Date().toISOString().split('T')[0];
-    const todayTotal = sessions
-      .filter(s => s.date === today)
-      .reduce((sum, s) => sum + s.durationMinutes, 0) + durationMinutes;
-    
-    showDurationCongrats(todayTotal);
+    // Check for duration milestones - for THIS session only, not total
+    showDurationCongrats(durationMinutes);
 
     toast({
       title: 'אימון הושלם!',
@@ -354,11 +349,8 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     setManualStartTime('');
     setManualEndTime('');
     
-    const dayTotal = sessions
-      .filter(s => s.date === manualDate)
-      .reduce((sum, s) => sum + s.durationMinutes, 0) + durationMinutes;
-    
-    showDurationCongrats(dayTotal);
+    // Check for duration milestones - for THIS session only, not total
+    showDurationCongrats(durationMinutes);
 
     toast({
       title: 'אימון נרשם!',
