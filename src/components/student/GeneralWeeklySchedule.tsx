@@ -5,12 +5,18 @@ import { Calendar, ArrowRight, ArrowLeft } from 'lucide-react';
 import { getLessons, getStudents, getActiveScheduleTemplate } from '@/lib/storage';
 import { Lesson, Student } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { calculateEnhancedLessonNumber } from '@/lib/lessonNumbering';
+import StudentsSwapRequestDialog from '@/components/students/StudentsSwapRequestDialog';
 
-const GeneralWeeklySchedule = () => {
+interface GeneralWeeklyScheduleProps {
+  studentId?: string;
+}
+
+const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId }) => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
 
   useEffect(() => {
     const lessonsData = getLessons();
@@ -149,6 +155,14 @@ const GeneralWeeklySchedule = () => {
     return lesson.notes?.includes('שיעור שהוחלף') || lesson.notes?.includes('החלפה');
   };
 
+  const handleLessonDoubleClick = (lesson: Lesson) => {
+    const currentDate = new Date().toISOString().split('T')[0];
+    if (lesson.date >= currentDate) {
+      setSelectedLesson(lesson);
+      setSwapDialogOpen(true);
+    }
+  };
+
   const currentDate = new Date().toISOString().split('T')[0];
 
   return (
@@ -158,6 +172,9 @@ const GeneralWeeklySchedule = () => {
           <Calendar className="h-6 w-6" />
           מערכת שיעורים שבועית
         </CardTitle>
+        <p className="text-sm text-muted-foreground mt-2">
+          לחיצה כפולה על שיעור לבקשת החלפה
+        </p>
       </CardHeader>
       <CardContent>
         {/* Week Navigation */}
@@ -197,57 +214,42 @@ const GeneralWeeklySchedule = () => {
                       const isFuture = lesson.date > currentDate;
                       const isCompleted = lesson.status === 'completed';
                       const isSwapped = isSwappedLesson(lesson);
-                      
-                      const lessonResult = isCompleted ? calculateEnhancedLessonNumber(lesson.studentId, lesson.date, lesson.id) : null;
 
                       return (
                         <div
                           key={lesson.id}
-                          className={`p-2 border rounded text-xs transition-all duration-200 ${
+                          className={`p-2 border-2 rounded-lg text-xs cursor-pointer transition-all duration-200 hover:shadow-md ${
                             isSwapped 
-                              ? 'bg-orange-50 border-orange-200 text-orange-900' 
+                              ? 'bg-[#8B4513]/10 border-[#8B4513] text-[#8B4513]' 
                               : isFuture 
-                                ? 'bg-muted/50 text-muted-foreground border-muted/30' 
+                                ? 'bg-white/50 text-gray-700 border-gray-300' 
                                 : isCompleted 
-                                  ? 'bg-blue-50 border-blue-200 text-blue-900' 
-                                  : 'bg-primary/10 border-primary/20 text-black'
+                                  ? 'bg-[#FFD700]/10 border-[#FFD700] text-gray-900' 
+                                  : 'bg-white border-gray-400 text-black'
                           }`}
+                          onDoubleClick={() => handleLessonDoubleClick(lesson)}
+                          title="לחץ פעמיים לבקשת החלפה"
                         >
                           <div className="space-y-1">
-                            <div className="font-semibold text-sm">
+                            <div className="font-bold text-base text-black">
                               {studentDetails.name}
                             </div>
-                            <div className="text-[10px] text-muted-foreground">
+                            <div className="text-sm font-medium text-gray-900">
                               {studentDetails.email}
                             </div>
-                            <div className="text-[10px] text-muted-foreground">
+                            <div className="text-sm font-medium text-gray-900">
                               {studentDetails.phone}
                             </div>
-                            <div className="text-[11px] font-medium mt-1">
+                            <div className="text-sm font-bold mt-2 text-black">
                               {lesson.startTime} - {lesson.endTime}
                             </div>
-                            {lessonResult && !lessonResult.isSkippedLesson && (
-                              <div className="text-[10px] flex items-center gap-1">
-                                <span>שיעור #{lessonResult.lessonNumber}</span>
-                                {lessonResult.isBankTimeLesson && (
-                                  <Badge variant="outline" className="text-[9px] px-1 py-0">
-                                    בנק זמן
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                            {lessonResult?.isSkippedLesson && (
-                              <Badge variant="secondary" className="text-[9px] px-1 py-0">
-                                שיעור דולג
-                              </Badge>
-                            )}
                             {isSwapped && (
-                              <Badge variant="outline" className="text-[9px] px-1 py-0 bg-orange-100">
+                              <Badge className="text-[10px] px-1.5 py-0.5 bg-[#8B4513] text-white border-[#8B4513]">
                                 מוחלף
                               </Badge>
                             )}
                             {lesson.isOneOff && (
-                              <Badge variant="outline" className="text-[9px] px-1 py-0">
+                              <Badge className="text-[10px] px-1.5 py-0.5 bg-[#FFD700] text-black border-[#FFD700]">
                                 חד פעמי
                               </Badge>
                             )}
@@ -262,14 +264,22 @@ const GeneralWeeklySchedule = () => {
         </div>
 
         {/* Info */}
-        <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-          <div className="text-sm text-muted-foreground space-y-1">
-            <p>🔄 <strong>שיעורים מוחלפים בכתום</strong> - שיעורים שהוחלפו בין תלמידות</p>
-            <p>🔵 <strong>שיעורים שהושלמו בכחול</strong> - שיעורים שכבר התקיימו</p>
-            <p>⚪ <strong>שיעורי עתיד באפור</strong> - שיעורים מתוכננים</p>
+        <div className="mt-6 p-4 bg-gray-100 rounded-lg border-2 border-gray-300">
+          <div className="text-sm text-gray-900 space-y-1 font-medium">
+            <p>🔄 <strong className="text-[#8B4513]">שיעורים מוחלפים</strong> - שיעורים שהוחלפו בין תלמידות</p>
+            <p>🏆 <strong className="text-[#FFD700]">שיעורים שהושלמו</strong> - שיעורים שכבר התקיימו</p>
+            <p>⚪ <strong>שיעורי עתיד</strong> - שיעורים מתוכננים</p>
+            <p>💡 <strong>לחיצה כפולה על שיעור עתידי</strong> - לבקשת החלפה עם אימות קוד אישי</p>
           </div>
         </div>
       </CardContent>
+
+      {/* Swap Request Dialog */}
+      <StudentsSwapRequestDialog
+        open={swapDialogOpen}
+        onOpenChange={setSwapDialogOpen}
+        selectedLesson={selectedLesson}
+      />
     </Card>
   );
 };
