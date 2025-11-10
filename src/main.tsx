@@ -3,7 +3,7 @@ import App from './App.tsx'
 import './index.css'
 import { hybridSync } from './lib/hybridSync';
 import { logger } from './lib/logger';
-
+import { clearPracticeAndMedalData } from './lib/storage';
 // Show loading screen
 const root = document.getElementById("root")!;
 root.innerHTML = `

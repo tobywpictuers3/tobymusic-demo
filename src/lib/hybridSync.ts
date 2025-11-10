@@ -91,53 +91,64 @@ class HybridSyncManager {
    * Always loads from Worker on every page load/refresh
    */
   async loadDataOnInit(): Promise<void> {
+    const emptyData = {
+      musicSystem_students: [],
+      musicSystem_lessons: [],
+      musicSystem_payments: [],
+      musicSystem_swapRequests: [],
+      musicSystem_files: [],
+      musicSystem_scheduleTemplates: [],
+      musicSystem_performances: [],
+      musicSystem_holidays: [],
+      musicSystem_practiceSessions: [],
+      musicSystem_monthlyAchievements: [],
+      musicSystem_medalRecords: [],
+      oneTimePayments: [],
+    };
+
     try {
       logger.info('🔄 Loading from Worker...');
 
       if (!this.syncState.isOnline) {
-        logger.warn('📡 Offline - cannot load from Worker');
-        throw new Error('Offline - cannot load data');
+        logger.warn('📡 Offline - initializing empty local state');
+        this.updateInMemoryStorage(emptyData);
+        return;
       }
 
-      const result = await workerApi.downloadLatest();
+      // Add timeout protection so app doesn't hang on loading screen
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT_LOADING_WORKER')), 8000)
+      );
 
-      if (result.success && result.data) {
-        // 🛡️ VALIDATION: Check that data is not empty
+      const result = (await Promise.race([
+        workerApi.downloadLatest(),
+        timeout,
+      ])) as any;
+
+      if (result && result.success && result.data) {
+        // 🛡️ VALIDATION: Check that data is not empty/invalid
         const dataKeys = Object.keys(result.data);
-        const hasData = dataKeys.length > 1; // More than just timestamp
+        const hasMeaningfulData = dataKeys.some((k) => k.startsWith('musicSystem_')) || dataKeys.length > 1;
         
-        if (!hasData) {
-          logger.error('❌ Loaded empty data from Worker - refusing to initialize');
-          throw new Error('Empty data received from Worker');
+        if (!hasMeaningfulData) {
+          logger.warn('⚠️ Loaded empty/invalid data from Worker - initializing fresh state');
+          this.updateInMemoryStorage(emptyData);
+          this.syncState.lastSyncTime = null;
+        } else {
+          logger.info('✅ Data loaded from Worker');
+          this.updateInMemoryStorage(result.data);
+          this.syncState.lastSyncTime = new Date().toISOString();
         }
-        
-        logger.info('✅ Data loaded from Worker');
-        this.updateInMemoryStorage(result.data);
-        this.syncState.lastSyncTime = new Date().toISOString();
-      } else if (result.error === 'NO_VERSION_FOUND') {
+      } else if (result && result.error === 'NO_VERSION_FOUND') {
         logger.info('ℹ️ No version found on Worker - starting fresh (first use)');
-        // Initialize empty storage for first use
-        this.updateInMemoryStorage({
-          musicSystem_students: [],
-          musicSystem_lessons: [],
-          musicSystem_payments: [],
-          musicSystem_swapRequests: [],
-          musicSystem_files: [],
-          musicSystem_scheduleTemplates: [],
-          musicSystem_performances: [],
-          musicSystem_holidays: [],
-          musicSystem_practiceSessions: [],
-          musicSystem_monthlyAchievements: [],
-          musicSystem_medalRecords: [],
-          oneTimePayments: [],
-        });
+        this.updateInMemoryStorage(emptyData);
       } else {
-        logger.error('❌ Worker load failed:', result.error);
-        throw new Error('Failed to load from Worker');
+        logger.warn('⚠️ Worker load failed or timed out - initializing empty local state');
+        this.updateInMemoryStorage(emptyData);
       }
     } catch (error) {
-      logger.error('❌ Load error:', error);
-      throw error; // Throw error so main.tsx can handle it
+      logger.warn('⚠️ Load error - initializing empty local state:', error);
+      this.updateInMemoryStorage(emptyData);
     }
   }
 
