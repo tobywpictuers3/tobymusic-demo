@@ -21,12 +21,16 @@ const Homepage = () => {
       // Enable dev mode for 1234E
       if (adminCode === '1234E') {
         setDevMode(true);
+        // 🔒 CRITICAL: Mark dev mode in sessionStorage
+        sessionStorage.setItem('musicSystem_devMode', 'true');
         toast({
           title: '🔧 מצב מפתחים',
           description: 'נכנסת למצב מפתחים מבודד (ללא Worker)',
         });
       } else {
         setDevMode(false);
+        // Clear dev mode flag
+        sessionStorage.removeItem('musicSystem_devMode');
       }
       
       setCurrentUser({ type: 'admin', adminCode });

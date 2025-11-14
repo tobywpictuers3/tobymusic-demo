@@ -1,10 +1,10 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { LogOut, Users, Calendar, CreditCard, MessageSquare, FileText, Settings, Music, History } from 'lucide-react';
-import { setCurrentUser, getCurrentUser, clearPracticeAndMedalData } from '@/lib/storage';
+import { setCurrentUser, getCurrentUser, clearPracticeAndMedalData, setDevMode } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { hybridSync } from '@/lib/hybridSync';
 import { PrintPDFButton } from '@/components/ui/print-pdf-button';
@@ -24,6 +24,14 @@ import FixedScheduleTab from '@/components/admin/FixedScheduleTab';
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('students');
+
+  // 🔒 CRITICAL: Check and restore dev mode on every mount
+  useEffect(() => {
+    const isDevMode = sessionStorage.getItem('musicSystem_devMode') === 'true';
+    if (isDevMode) {
+      setDevMode(true);
+    }
+  }, []);
 
   const getTabName = (tab: string) => {
     const tabNames: Record<string, string> = {
@@ -47,6 +55,9 @@ const AdminDashboard = () => {
   }
 
   const handleLogout = () => {
+    // Clear dev mode flag on logout
+    sessionStorage.removeItem('musicSystem_devMode');
+    setDevMode(false);
     setCurrentUser(null);
     navigate('/');
     toast({
