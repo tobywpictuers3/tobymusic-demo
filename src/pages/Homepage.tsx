@@ -17,8 +17,8 @@ const Homepage = () => {
   const { setAccessMode } = useAccessMode();
 
   const handleAdminLogin = async () => {
-    if (adminCode === 'toby2026') {
-      setCurrentUser({ type: 'admin' });
+    if (adminCode === 'toby2026' || adminCode === '1234E') {
+      setCurrentUser({ type: 'admin', adminCode });
       navigate('/admin');
       toast({
         title: 'ברוך הבא!',

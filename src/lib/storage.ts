@@ -493,11 +493,17 @@ export const saveIntegrationSettings = (settings: IntegrationSettings): void => 
 };
 
 // User Authentication - Only stored in sessionStorage
-export const setCurrentUser = (user: { type: string; studentId?: string; adminId?: string } | null): void => {
+export const setCurrentUser = (user: { type: string; studentId?: string; adminId?: string; adminCode?: string } | null): void => {
   sessionStorage.setItem('musicSystem_currentUser', JSON.stringify(user));
+  // Also store in localStorage for Worker API access
+  if (user) {
+    localStorage.setItem('musicSystem_currentUser', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('musicSystem_currentUser');
+  }
 };
 
-export const getCurrentUser = (): { type: string; studentId?: string; adminId?: string } | null => {
+export const getCurrentUser = (): { type: string; studentId?: string; adminId?: string; adminCode?: string } | null => {
   const storedUser = sessionStorage.getItem('musicSystem_currentUser');
   return storedUser ? JSON.parse(storedUser) : null;
 };

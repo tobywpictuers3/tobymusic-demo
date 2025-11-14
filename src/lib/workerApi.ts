@@ -15,6 +15,33 @@ interface VersionInfo {
   content_hash?: string;
 }
 
+// Get manager code from storage
+const getManagerCode = (): string => {
+  try {
+    const currentUser = localStorage.getItem('musicSystem_currentUser');
+    if (currentUser) {
+      const user = JSON.parse(currentUser);
+      if (user.type === 'admin' && user.adminCode) {
+        return user.adminCode;
+      }
+    }
+  } catch (error) {
+    logger.warn('Failed to get manager code:', error);
+  }
+  return '';
+};
+
+// Get common headers with manager code
+const getHeaders = (additionalHeaders: Record<string, string> = {}): Record<string, string> => {
+  const managerCode = getManagerCode();
+  return {
+    'Accept': 'application/json',
+    'Cache-Control': 'no-store',
+    'X-Sonata-Manager-Code': managerCode,
+    ...additionalHeaders,
+  };
+};
+
 export const workerApi = {
   /**
    * Download latest version from Worker
@@ -24,10 +51,7 @@ export const workerApi = {
     try {
       const response = await fetch(`${WORKER_BASE_URL}?action=download_latest`, {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-store',
-        },
+        headers: getHeaders(),
         mode: 'cors',
         cache: 'no-store',
       });
@@ -60,11 +84,7 @@ export const workerApi = {
     try {
       const response = await fetch(`${WORKER_BASE_URL}?action=upload_versioned`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-store',
-        },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(data),
         mode: 'cors',
         cache: 'no-store',
@@ -93,9 +113,7 @@ export const workerApi = {
     try {
       const response = await fetch(`${WORKER_BASE_URL}?action=list_versions`, {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers: getHeaders(),
         mode: 'cors',
         cache: 'no-store',
       });
@@ -123,10 +141,7 @@ export const workerApi = {
     try {
       const response = await fetch(`${WORKER_BASE_URL}?action=download_by_path`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ path }),
         mode: 'cors',
         cache: 'no-store',
