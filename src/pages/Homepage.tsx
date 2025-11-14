@@ -17,35 +17,42 @@ const Homepage = () => {
   const { setAccessMode } = useAccessMode();
 
   const handleAdminLogin = async () => {
-    if (adminCode === 'toby2026' || adminCode === '1234E') {
-      // Enable dev mode for 1234E
-      if (adminCode === '1234E') {
-        setDevMode(true);
-        // 🔒 CRITICAL: Mark dev mode in sessionStorage
-        sessionStorage.setItem('musicSystem_devMode', 'true');
-        toast({
-          title: '🔧 מצב מפתחים',
-          description: 'נכנסת למצב מפתחים מבודד (ללא Worker)',
-        });
-      } else {
-        setDevMode(false);
-        // Clear dev mode flag
-        sessionStorage.removeItem('musicSystem_devMode');
-      }
+    if (adminCode === 'toby2026') {
+      setDevMode(false);
+      sessionStorage.removeItem('musicSystem_devMode');
       
       setCurrentUser({ type: 'admin', adminCode });
       navigate('/admin');
       
-      if (adminCode !== '1234E') {
-        toast({
-          title: 'ברוך הבא!',
-          description: 'התחברת כמנהל מערכת',
-        });
-      }
+      toast({
+        title: 'ברוך הבא!',
+        description: 'התחברת כמנהל מערכת',
+      });
     } else {
       toast({
         title: 'שגיאה',
         description: 'קוד מנהל שגוי',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDevAdminLogin = async () => {
+    if (adminCode === '1234E') {
+      setDevMode(true);
+      sessionStorage.setItem('musicSystem_devMode', 'true');
+      
+      setCurrentUser({ type: 'admin', adminCode });
+      navigate('/dev-admin');
+      
+      toast({
+        title: '🔧 מצב מפתחים',
+        description: 'נכנסת למצב מפתחים מבודד (ללא Worker)',
+      });
+    } else {
+      toast({
+        title: 'שגיאה',
+        description: 'קוד מפתחים שגוי',
         variant: 'destructive',
       });
     }
@@ -270,6 +277,33 @@ const Homepage = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Developer Login - Bottom of Page */}
+        <div className="mt-12 max-w-md mx-auto">
+          <Card className="relative overflow-hidden bg-black/60 backdrop-blur-md border border-muted/40 hover:border-muted/60 transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-muted/5 to-transparent"></div>
+            <CardContent className="pt-6 space-y-3 relative z-10">
+              <p className="text-xs text-muted-foreground text-center mb-2">כניסת מפתחים</p>
+              <div>
+                <Input
+                  type="password"
+                  value={adminCode}
+                  onChange={(e) => setAdminCode(e.target.value)}
+                  placeholder="קוד מפתחים"
+                  className="bg-black/50 border-muted/30 text-foreground text-sm"
+                  onKeyPress={(e) => e.key === 'Enter' && handleDevAdminLogin()}
+                />
+              </div>
+              <Button 
+                onClick={handleDevAdminLogin}
+                variant="outline"
+                className="w-full text-sm border-muted/40 hover:bg-muted/10"
+              >
+                כניסה למצב מפתחים
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AccessModeProvider } from "@/contexts/AccessModeContext";
 import Homepage from "./pages/Homepage";
 import AdminDashboard from "./pages/AdminDashboard";
+import DevAdminDashboard from "./pages/DevAdminDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import StudentsSystem from "./pages/StudentsSystem";
 import StudentsViewSystem from "./pages/StudentsViewSystem";
@@ -24,6 +25,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Homepage />} />
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/dev-admin" element={<DevAdminDashboard />} />
             <Route path="/student/:studentId" element={<StudentDashboard />} />
             <Route path="/students-system" element={<StudentsSystem />} />
             <Route path="/students-view" element={<StudentsViewSystem />} />
