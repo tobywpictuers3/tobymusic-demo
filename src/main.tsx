@@ -52,11 +52,18 @@ async function initializeApp() {
   try {
     logger.info('Starting app initialization...');
     
-    // 🔒 CRITICAL: Restore dev mode BEFORE loading any data
-    const isDevMode = sessionStorage.getItem('musicSystem_devMode') === 'true';
-    if (isDevMode) {
+    // 🔒 CRITICAL: Ensure dev mode BEFORE loading any data
+    const forceDevByRoute = window.location.pathname.startsWith('/dev-admin');
+    if (forceDevByRoute) {
       setDevMode(true);
-      logger.info('🔧 Dev mode restored - NO data will be loaded from Worker');
+      sessionStorage.setItem('musicSystem_devMode', 'true');
+      logger.info('🔧 Dev mode forced by route - NO data will be loaded from Worker');
+    }
+
+    const isDevModeActive = sessionStorage.getItem('musicSystem_devMode') === 'true';
+    if (isDevModeActive) {
+      setDevMode(true);
+      logger.info('🔧 Dev mode active - NO data will be loaded from Worker');
     }
     
     await hybridSync.loadDataOnInit();
