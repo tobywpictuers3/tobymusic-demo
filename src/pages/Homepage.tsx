@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Shield, GraduationCap, ArrowRight, Mail, Phone, MessageCircle } from 'lucide-react';
-import { getStudents, setCurrentUser } from '@/lib/storage';
+import { getStudents, setCurrentUser, setDevMode } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { useAccessMode } from '@/contexts/AccessModeContext';
 
@@ -18,12 +18,26 @@ const Homepage = () => {
 
   const handleAdminLogin = async () => {
     if (adminCode === 'toby2026' || adminCode === '1234E') {
+      // Enable dev mode for 1234E
+      if (adminCode === '1234E') {
+        setDevMode(true);
+        toast({
+          title: '🔧 מצב מפתחים',
+          description: 'נכנסת למצב מפתחים מבודד (ללא Worker)',
+        });
+      } else {
+        setDevMode(false);
+      }
+      
       setCurrentUser({ type: 'admin', adminCode });
       navigate('/admin');
-      toast({
-        title: 'ברוך הבא!',
-        description: 'התחברת כמנהל מערכת',
-      });
+      
+      if (adminCode !== '1234E') {
+        toast({
+          title: 'ברוך הבא!',
+          description: 'התחברת כמנהל מערכת',
+        });
+      }
     } else {
       toast({
         title: 'שגיאה',

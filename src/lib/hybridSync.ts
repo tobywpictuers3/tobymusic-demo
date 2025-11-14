@@ -1,6 +1,6 @@
 import { workerApi } from './workerApi';
 import { logger } from './logger';
-import { exportAllData, initializeStorage } from './storage';
+import { exportAllData, initializeStorage, isDevMode } from './storage';
 
 /**
  * Hybrid Sync Manager - Worker as source of truth, localStorage as cache
@@ -91,6 +91,12 @@ class HybridSyncManager {
    * Always loads from Worker on every page load/refresh
    */
   async loadDataOnInit(): Promise<void> {
+    // Skip Worker in dev mode
+    if (isDevMode()) {
+      logger.info('🔧 DEV MODE: Skipping Worker data load');
+      return;
+    }
+
     const emptyData = {
       musicSystem_students: [],
       musicSystem_lessons: [],
@@ -169,6 +175,11 @@ class HybridSyncManager {
    * On data change - immediately sync to Worker
    */
   async onDataChange(): Promise<{ success: boolean; message: string }> {
+    // Skip Worker sync in dev mode
+    if (isDevMode()) {
+      return { success: true, message: 'נשמר במצב מפתחים' };
+    }
+
     this.syncState.pendingChanges++;
 
     if (!this.syncState.isOnline) {
@@ -198,6 +209,12 @@ class HybridSyncManager {
    * Sync all data to Worker
    */
   private async syncToWorker(): Promise<boolean> {
+    // Skip Worker sync in dev mode
+    if (isDevMode()) {
+      logger.info('🔧 DEV MODE: Worker sync disabled');
+      return true;
+    }
+
     if (this.syncState.isSyncing) {
       logger.info('⏳ Sync already in progress');
       return false;
@@ -268,6 +285,11 @@ class HybridSyncManager {
    * Manual sync trigger
    */
   async manualSync(): Promise<boolean> {
+    // Skip Worker sync in dev mode
+    if (isDevMode()) {
+      logger.info('🔧 DEV MODE: Manual sync disabled');
+      return true;
+    }
     return await this.syncToWorker();
   }
 

@@ -5,6 +5,37 @@ import { logger } from './logger';
 // In-Memory Storage - No localStorage for sensitive data
 const inMemoryStorage: Record<string, any> = {};
 
+// Dev Mode: Completely isolated in-memory storage (no Worker, no sync)
+let devModeActive = false;
+const devData: Record<string, any> = {
+  students: [],
+  lessons: [],
+  calendar: [],
+  payments: [],
+  scheduleTemplates: [],
+  swapRequests: [],
+  files: [],
+  integrationSettings: {},
+  performances: [],
+  oneTimePayments: [],
+  holidays: [],
+  practiceSessions: [],
+  monthlyAchievements: [],
+  leaderboard: [],
+  medals: []
+};
+
+export const setDevMode = (isActive: boolean) => {
+  devModeActive = isActive;
+  if (isActive) {
+    logger.info('🔧 DEV MODE ACTIVATED - Using isolated in-memory storage');
+  } else {
+    logger.info('✅ PRODUCTION MODE - Using Worker sync');
+  }
+};
+
+export const isDevMode = (): boolean => devModeActive;
+
 // Initialize data from Worker
 export const initializeStorage = (data: any) => {
   if (!data || typeof data !== 'object') {
@@ -70,6 +101,7 @@ const generateId = (): string => {
 
 // Students
 export const getStudents = (): Student[] => {
+  if (devModeActive) return devData['students'] || [];
   return inMemoryStorage['students'] || [];
 };
 
@@ -80,8 +112,12 @@ export const addStudent = (student: Omit<Student, 'id'>): Student => {
     id: generateId(),
   };
   students.push(newStudent);
-  inMemoryStorage['students'] = students;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['students'] = students;
+  } else {
+    inMemoryStorage['students'] = students;
+    hybridSync.onDataChange();
+  }
   return newStudent;
 };
 
@@ -95,8 +131,12 @@ export const updateStudent = (id: string, updatedFields: Partial<Student>): Stud
 
   // Update the student with the provided fields
   students[studentIndex] = { ...students[studentIndex], ...updatedFields };
-  inMemoryStorage['students'] = students;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['students'] = students;
+  } else {
+    inMemoryStorage['students'] = students;
+    hybridSync.onDataChange();
+  }
   return students[studentIndex];
 };
 
@@ -106,8 +146,12 @@ export const deleteStudent = (id: string): boolean => {
   if (updatedStudents.length === students.length) {
     return false; // No student was deleted
   }
-  inMemoryStorage['students'] = updatedStudents;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['students'] = updatedStudents;
+  } else {
+    inMemoryStorage['students'] = updatedStudents;
+    hybridSync.onDataChange();
+  }
   return true;
 };
 
@@ -119,6 +163,7 @@ export const updateStudentBankTime = (studentId: string, changeInMinutes: number
 
 // Lessons
 export const getLessons = (): Lesson[] => {
+  if (devModeActive) return devData['lessons'] || [];
   return inMemoryStorage['lessons'] || [];
 };
 
@@ -129,8 +174,12 @@ export const addLesson = (lesson: Omit<Lesson, 'id'>): Lesson => {
     id: generateId(),
   };
   lessons.push(newLesson);
-  inMemoryStorage['lessons'] = lessons;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['lessons'] = lessons;
+  } else {
+    inMemoryStorage['lessons'] = lessons;
+    hybridSync.onDataChange();
+  }
   return newLesson;
 };
 
@@ -143,8 +192,12 @@ export const updateLesson = (id: string, updatedFields: Partial<Lesson>): Lesson
   }
 
   lessons[lessonIndex] = { ...lessons[lessonIndex], ...updatedFields };
-  inMemoryStorage['lessons'] = lessons;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['lessons'] = lessons;
+  } else {
+    inMemoryStorage['lessons'] = lessons;
+    hybridSync.onDataChange();
+  }
   return lessons[lessonIndex];
 };
 
@@ -154,19 +207,28 @@ export const deleteLesson = (id: string): boolean => {
   if (updatedLessons.length === lessons.length) {
     return false; // No lesson was deleted
   }
-  inMemoryStorage['lessons'] = updatedLessons;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['lessons'] = updatedLessons;
+  } else {
+    inMemoryStorage['lessons'] = updatedLessons;
+    hybridSync.onDataChange();
+  }
   return true;
 };
 
 // Payments
 export const getPayments = (): Payment[] => {
+  if (devModeActive) return devData['payments'] || [];
   return inMemoryStorage['payments'] || [];
 };
 
 export const savePayments = (payments: Payment[]): void => {
-  inMemoryStorage['payments'] = payments;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['payments'] = payments;
+  } else {
+    inMemoryStorage['payments'] = payments;
+    hybridSync.onDataChange();
+  }
 };
 
 export const addPayment = (payment: Omit<Payment, 'id'>): Payment => {
@@ -176,8 +238,12 @@ export const addPayment = (payment: Omit<Payment, 'id'>): Payment => {
     id: generateId(),
   };
   payments.push(newPayment);
-  inMemoryStorage['payments'] = payments;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['payments'] = payments;
+  } else {
+    inMemoryStorage['payments'] = payments;
+    hybridSync.onDataChange();
+  }
   return newPayment;
 };
 
@@ -186,25 +252,16 @@ export const updatePayment = (studentId: string, month: string, updatedFields: P
   const paymentIndex = payments.findIndex(payment => payment.studentId === studentId && payment.month === month);
 
   if (paymentIndex === -1) {
-    // Create new payment if it doesn't exist
-    const newPayment: Payment = {
-      id: generateId(),
-      studentId,
-      month,
-      amount: 400,
-      status: 'pending',
-      paymentMethod: 'bank',
-      ...updatedFields,
-    };
-    payments.push(newPayment);
-    inMemoryStorage['payments'] = payments;
-    hybridSync.onDataChange();
-    return newPayment;
+    return undefined;
   }
 
   payments[paymentIndex] = { ...payments[paymentIndex], ...updatedFields };
-  inMemoryStorage['payments'] = payments;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['payments'] = payments;
+  } else {
+    inMemoryStorage['payments'] = payments;
+    hybridSync.onDataChange();
+  }
   return payments[paymentIndex];
 };
 
@@ -221,6 +278,7 @@ export const deletePayment = (id: string): boolean => {
 
 // Swap Requests
 export const getSwapRequests = (): SwapRequest[] => {
+  if (devModeActive) return devData['swapRequests'] || [];
   return inMemoryStorage['swapRequests'] || [];
 };
 
@@ -341,6 +399,7 @@ const calculateEndTime = (startTime: string, duration: number): string => {
 
 // Files
 export const getFiles = (): FileEntry[] => {
+  if (devModeActive) return devData['files'] || [];
   return inMemoryStorage['files'] || [];
 };
 
@@ -351,8 +410,12 @@ export const addFile = (file: Omit<FileEntry, 'id'>): FileEntry => {
     id: generateId(),
   };
   files.push(newFile);
-  inMemoryStorage['files'] = files;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['files'] = files;
+  } else {
+    inMemoryStorage['files'] = files;
+    hybridSync.onDataChange();
+  }
   return newFile;
 };
 
@@ -365,8 +428,12 @@ export const updateFile = (id: string, updatedFields: Partial<FileEntry>): FileE
   }
 
   files[fileIndex] = { ...files[fileIndex], ...updatedFields };
-  inMemoryStorage['files'] = files;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['files'] = files;
+  } else {
+    inMemoryStorage['files'] = files;
+    hybridSync.onDataChange();
+  }
   return files[fileIndex];
 };
 
@@ -376,13 +443,18 @@ export const deleteFile = (id: string): boolean => {
   if (updatedFiles.length === files.length) {
     return false; // No file was deleted
   }
-  inMemoryStorage['files'] = updatedFiles;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['files'] = updatedFiles;
+  } else {
+    inMemoryStorage['files'] = updatedFiles;
+    hybridSync.onDataChange();
+  }
   return true;
 };
 
 // Schedule Templates
 export const getScheduleTemplates = (): ScheduleTemplate[] => {
+  if (devModeActive) return devData['scheduleTemplates'] || [];
   return inMemoryStorage['scheduleTemplates'] || [];
 };
 
@@ -399,8 +471,12 @@ export const addScheduleTemplate = (template: Omit<ScheduleTemplate, 'id' | 'cre
     createdAt: new Date().toISOString(),
   };
   templates.push(newTemplate);
-  inMemoryStorage['scheduleTemplates'] = templates;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['scheduleTemplates'] = templates;
+  } else {
+    inMemoryStorage['scheduleTemplates'] = templates;
+    hybridSync.onDataChange();
+  }
   return newTemplate;
 };
 
@@ -427,8 +503,12 @@ export const activateScheduleTemplate = (id: string): ScheduleTemplate | undefin
     activatedAt: new Date().toISOString()
   };
   
-  inMemoryStorage['scheduleTemplates'] = templates;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['scheduleTemplates'] = templates;
+  } else {
+    inMemoryStorage['scheduleTemplates'] = templates;
+    hybridSync.onDataChange();
+  }
   return templates[templateIndex];
 };
 
@@ -441,8 +521,12 @@ export const updateScheduleTemplate = (id: string, updatedFields: Partial<Schedu
   }
 
   templates[templateIndex] = { ...templates[templateIndex], ...updatedFields };
-  inMemoryStorage['scheduleTemplates'] = templates;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['scheduleTemplates'] = templates;
+  } else {
+    inMemoryStorage['scheduleTemplates'] = templates;
+    hybridSync.onDataChange();
+  }
   return templates[templateIndex];
 };
 
@@ -452,8 +536,12 @@ export const deleteScheduleTemplate = (id: string): boolean => {
   if (updatedTemplates.length === templates.length) {
     return false; // No template was deleted
   }
-  inMemoryStorage['scheduleTemplates'] = updatedTemplates;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['scheduleTemplates'] = updatedTemplates;
+  } else {
+    inMemoryStorage['scheduleTemplates'] = updatedTemplates;
+    hybridSync.onDataChange();
+  }
   return true;
 };
 
@@ -484,12 +572,17 @@ export const syncStudentWithTemplate = (studentId: string, dayOfWeek: number, ti
 
 // Integration Settings
 export const getIntegrationSettings = (): IntegrationSettings | null => {
+  if (devModeActive) return devData['integrationSettings'] || null;
   return inMemoryStorage['integrationSettings'] || null;
 };
 
 export const saveIntegrationSettings = (settings: IntegrationSettings): void => {
-  inMemoryStorage['integrationSettings'] = settings;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['integrationSettings'] = settings;
+  } else {
+    inMemoryStorage['integrationSettings'] = settings;
+    hybridSync.onDataChange();
+  }
 };
 
 // User Authentication - Only stored in sessionStorage
@@ -533,6 +626,7 @@ export const calculateLessonNumber = (studentId: string, lessonDate: string, les
 
 // Performances
 export const getPerformances = (): Performance[] => {
+  if (devModeActive) return devData['performances'] || [];
   return inMemoryStorage['performances'] || [];
 };
 
@@ -544,8 +638,12 @@ export const addPerformance = (performance: Omit<Performance, 'id' | 'createdAt'
     createdAt: new Date().toISOString(),
   };
   performances.push(newPerformance);
-  inMemoryStorage['performances'] = performances;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['performances'] = performances;
+  } else {
+    inMemoryStorage['performances'] = performances;
+    hybridSync.onDataChange();
+  }
   return newPerformance;
 };
 
@@ -558,8 +656,12 @@ export const updatePerformance = (id: string, updatedFields: Partial<Performance
   }
 
   performances[performanceIndex] = { ...performances[performanceIndex], ...updatedFields };
-  inMemoryStorage['performances'] = performances;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['performances'] = performances;
+  } else {
+    inMemoryStorage['performances'] = performances;
+    hybridSync.onDataChange();
+  }
   return performances[performanceIndex];
 };
 
@@ -569,23 +671,33 @@ export const deletePerformance = (id: string): boolean => {
   if (updatedPerformances.length === performances.length) {
     return false;
   }
-  inMemoryStorage['performances'] = updatedPerformances;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['performances'] = updatedPerformances;
+  } else {
+    inMemoryStorage['performances'] = updatedPerformances;
+    hybridSync.onDataChange();
+  }
   return true;
 };
 
 // One Time Payments
 export const getOneTimePayments = (): OneTimePayment[] => {
+  if (devModeActive) return devData['oneTimePayments'] || [];
   return inMemoryStorage['oneTimePayments'] || [];
 };
 
 export const saveOneTimePayments = (payments: OneTimePayment[]): void => {
-  inMemoryStorage['oneTimePayments'] = payments;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['oneTimePayments'] = payments;
+  } else {
+    inMemoryStorage['oneTimePayments'] = payments;
+    hybridSync.onDataChange();
+  }
 };
 
 // Holidays
 export const getHolidays = (): Holiday[] => {
+  if (devModeActive) return devData['holidays'] || [];
   return inMemoryStorage['holidays'] || [];
 };
 
@@ -598,8 +710,12 @@ export const addHoliday = (date: string, description?: string): Holiday => {
     createdAt: new Date().toISOString(),
   };
   holidays.push(newHoliday);
-  inMemoryStorage['holidays'] = holidays;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['holidays'] = holidays;
+  } else {
+    inMemoryStorage['holidays'] = holidays;
+    hybridSync.onDataChange();
+  }
   return newHoliday;
 };
 
@@ -609,8 +725,12 @@ export const deleteHoliday = (date: string): boolean => {
   if (updatedHolidays.length === holidays.length) {
     return false;
   }
-  inMemoryStorage['holidays'] = updatedHolidays;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['holidays'] = updatedHolidays;
+  } else {
+    inMemoryStorage['holidays'] = updatedHolidays;
+    hybridSync.onDataChange();
+  }
   return true;
 };
 
@@ -621,6 +741,7 @@ export const isHoliday = (date: string): boolean => {
 
 // Practice Sessions
 export const getPracticeSessions = (): PracticeSession[] => {
+  if (devModeActive) return devData['practiceSessions'] || [];
   return inMemoryStorage['practiceSessions'] || [];
 };
 
@@ -639,8 +760,12 @@ export const addPracticeSession = (session: Omit<PracticeSession, 'id' | 'create
     createdAt: new Date().toISOString(),
   };
   sessions.push(newSession);
-  inMemoryStorage['practiceSessions'] = sessions;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['practiceSessions'] = sessions;
+  } else {
+    inMemoryStorage['practiceSessions'] = sessions;
+    hybridSync.onDataChange();
+  }
   return newSession;
 };
 
@@ -650,8 +775,12 @@ export const updatePracticeSession = (id: string, updatedFields: Partial<Practic
   if (index === -1) return undefined;
   
   sessions[index] = { ...sessions[index], ...updatedFields };
-  inMemoryStorage['practiceSessions'] = sessions;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['practiceSessions'] = sessions;
+  } else {
+    inMemoryStorage['practiceSessions'] = sessions;
+    hybridSync.onDataChange();
+  }
   return sessions[index];
 };
 
@@ -661,13 +790,18 @@ export const deletePracticeSession = (id: string): boolean => {
   if (updatedSessions.length === sessions.length) {
     return false;
   }
-  inMemoryStorage['practiceSessions'] = updatedSessions;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['practiceSessions'] = updatedSessions;
+  } else {
+    inMemoryStorage['practiceSessions'] = updatedSessions;
+    hybridSync.onDataChange();
+  }
   return true;
 };
 
 // Monthly Achievements
 export const getMonthlyAchievements = (): MonthlyAchievement[] => {
+  if (devModeActive) return devData['monthlyAchievements'] || [];
   return inMemoryStorage['monthlyAchievements'] || [];
 };
 
@@ -713,8 +847,12 @@ export const updateMonthlyAchievement = (
     achievements.push(newAchievement);
   }
   
-  inMemoryStorage['monthlyAchievements'] = achievements;
-  hybridSync.onDataChange();
+  if (devModeActive) {
+    devData['monthlyAchievements'] = achievements;
+  } else {
+    inMemoryStorage['monthlyAchievements'] = achievements;
+    hybridSync.onDataChange();
+  }
 };
 
 export const getCurrentMonthLeaderboard = (): LeaderboardEntry[] => {
