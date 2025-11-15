@@ -220,26 +220,9 @@ const StudentsManagement = () => {
                         {student.firstName} {student.lastName}
                       </h3>
                       <div className="text-sm space-y-1 text-muted-foreground">
+                        <p>🔑 קוד: {student.personalCode}</p>
                         <p>📞 {student.phone}</p>
-                        {student.additionalPhones && student.additionalPhones.length > 0 && (
-                          <div className="pr-4">
-                            {student.additionalPhones.map((phone, idx) => (
-                              <p key={idx}>📞 {phone}</p>
-                            ))}
-                          </div>
-                        )}
-                        {student.email && <p>📧 {student.email}</p>}
-                        {student.additionalEmails && student.additionalEmails.length > 0 && (
-                          <div className="pr-4">
-                            {student.additionalEmails.map((email, idx) => (
-                              <p key={idx}>📧 {email}</p>
-                            ))}
-                          </div>
-                        )}
-                        <p>📅 תחילה: {new Date(student.startDate).toLocaleDateString('he-IL')}</p>
-                        <p>💰 ₪{student.monthlyAmount}/חודש</p>
                       </div>
-                      <PracticeStats studentId={student.id} />
                       <div className="flex gap-2 pt-2">
                         <Button
                           size="sm"
