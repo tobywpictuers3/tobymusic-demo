@@ -11,21 +11,24 @@ const BackupImport = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleManualSync = async () => {
+  const handleDownloadFromWorker = async () => {
     setIsLoading(true);
     try {
-      const result = await hybridSync.onDataChange();
+      await hybridSync.loadDataOnInit();
       
       toast({
-        title: result.success ? '✅ סנכרון הושלם' : '❌ שגיאה בסנכרון',
-        description: result.message,
-        variant: result.success ? 'default' : 'destructive',
+        title: '✅ הורדה הושלמה',
+        description: 'הנתונים עודכנו מהדרופבוקס',
       });
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
-      logger.error('Manual sync error:', error);
+      logger.error('Download from worker error:', error);
       toast({
-        title: '❌ שגיאה בסנכרון',
-        description: 'שמירה נכשלה, בדקי חיבור לאינטרנט',
+        title: '❌ שגיאה בהורדה',
+        description: 'הורדה נכשלה, בדקי חיבור לאינטרנט',
         variant: 'destructive',
       });
     } finally {
@@ -102,7 +105,7 @@ const BackupImport = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Cloud className="h-5 w-5" />
-            סנכרון Worker - מקור האמת
+            הורדה מדרופבוקס
             {syncState.isOnline ? (
               <Badge variant="default">🟢 מקוון</Badge>
             ) : (
@@ -116,35 +119,33 @@ const BackupImport = () => {
               <strong>🔒 מקור האמת:</strong> כל הנתונים נשמרים ב-Worker החיצוני שלך בלבד
             </p>
             <p className="text-sm text-muted-foreground">
-              <strong>📱 localStorage:</strong> משמש רק כמטמון זמני לעבודה מהירה
+              <strong>💾 מטמון מקומי:</strong> הדפדפן שומר עותק זמני לעבודה מהירה
             </p>
             <p className="text-sm text-muted-foreground">
-              <strong>🔄 סנכרון אוטומטי:</strong> מיידי אחרי כל שינוי
+              <strong>📥 הורדה:</strong> לחצי כאן כדי להוריד את הנתונים האחרונים מהדרופבוקס
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <strong>💾 שמירה:</strong> השתמשי בכפתור השמירה בראש המסך כדי להעלות שינויים לדרופבוקס
             </p>
             {syncState.lastSyncTime && (
               <p className="text-sm text-muted-foreground">
-                <strong>⏰ סנכרון אחרון:</strong>{' '}
+                <strong>🕐 סנכרון אחרון:</strong>{' '}
                 {new Date(syncState.lastSyncTime).toLocaleString('he-IL')}
-              </p>
-            )}
-            {syncState.pendingChanges > 0 && (
-              <p className="text-sm text-yellow-600">
-                <strong>⚠️ שינויים ממתינים:</strong> {syncState.pendingChanges}
               </p>
             )}
           </div>
 
           <div className="flex gap-2">
             <Button 
-              onClick={handleManualSync} 
+              onClick={handleDownloadFromWorker} 
               disabled={isLoading || !syncState.isOnline}
             >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin ml-2" />
               ) : (
-                <Cloud className="h-4 w-4 ml-2" />
+                <Download className="h-4 w-4 ml-2" />
               )}
-              סנכרון ידני
+              הורדה מדרופבוקס
             </Button>
           </div>
 
