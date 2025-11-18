@@ -118,30 +118,43 @@ const StudentDashboard = () => {
 
   return (
     <div className="min-h-screen musical-gradient">
-      <div className="container mx-auto p-4 space-y-6">
-        {/* Header */}
-        <Card className="card-gradient card-shadow">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div className="flex gap-2">
-                <BackButton to="/" label="חזור לדף הבית" />
-                {!isPublicMode && <SaveButton />}
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-sm border-b border-primary/20 shadow-lg">
+        <div className="container mx-auto p-4">
+          <Card className="card-gradient card-shadow">
+            <CardHeader className="py-3">
+              <div className="flex justify-between items-center">
+                <div className="flex gap-2">
+                  <BackButton to="/" label="חזור לדף הבית" />
+                  {!isPublicMode && (
+                    <div className="relative">
+                      <SaveButton />
+                      <div className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <CardTitle className="text-2xl md:text-3xl flex items-center gap-3 text-primary crown-glow">
+                  <User className="h-6 w-6 md:h-8 md:w-8" />
+                  {isPublicMode ? 'מצב תצוגה כללית' : `אזור אישי - ${student.firstName} ${student.lastName}`}
+                </CardTitle>
+                <Button 
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="flex items-center gap-2 text-card-foreground"
+                >
+                  <LogOut className="h-4 w-4" />
+                  התנתק
+                </Button>
               </div>
-              <CardTitle className="text-3xl flex items-center gap-3 text-primary crown-glow">
-                <User className="h-8 w-8" />
-                {isPublicMode ? 'מצב תצוגה כללית' : `אזור אישי - ${student.firstName} ${student.lastName}`}
-              </CardTitle>
-              <Button 
-                onClick={handleLogout}
-                variant="outline"
-                className="flex items-center gap-2 text-card-foreground"
-              >
-                <LogOut className="h-4 w-4" />
-                התנתק
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+
+      <div className="container mx-auto p-4 space-y-6 pt-2">
 
         {/* Payment Alerts - Hide in public mode */}
         {!isPublicMode && <PaymentAlert studentId={studentId!} />}

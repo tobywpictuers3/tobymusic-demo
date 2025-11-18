@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LogOut, Users, Calendar, CreditCard, MessageSquare, FileText, Settings, Music, History } from 'lucide-react';
+import { LogOut, Users, Calendar, CreditCard, MessageSquare, FileText, Settings, Music, History, Trophy } from 'lucide-react';
 import { setCurrentUser, getCurrentUser, clearPracticeAndMedalData, setDevMode } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { hybridSync } from '@/lib/hybridSync';
@@ -18,6 +18,7 @@ import PerformancesManagement from '@/components/admin/PerformancesManagement';
 import SwapRequests from '@/components/admin/SwapRequests';
 import BackupImport from '@/components/admin/BackupImport';
 import BackupHistory from '@/components/admin/BackupHistory';
+import AdminPracticeStats from '@/components/admin/AdminPracticeStats';
 
 import FixedScheduleTab from '@/components/admin/FixedScheduleTab';
 
@@ -41,6 +42,7 @@ const AdminDashboard = () => {
       payments: 'תשלומים',
       performances: 'הופעות',
       swaps: 'בקשות החלפה',
+      practice: 'נתוני אימונים',
       backup: 'גיבוי',
       history: 'היסטוריה'
     };
@@ -96,16 +98,22 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen royal-gradient overflow-hidden">
-      <div className="max-h-screen overflow-y-auto">
-        <div id="main-content" className="container mx-auto p-4 space-y-6">
-          {/* Header */}
-          <div className="royal-card royal-shadow p-6">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-sm border-b border-primary/20 shadow-lg">
+        <div className="container mx-auto p-4">
+          <div className="royal-card royal-shadow p-4">
             <div className="flex justify-between items-center">
-              <h1 className="text-3xl font-bold text-royal-gold royal-glow">
+              <h1 className="text-2xl md:text-3xl font-bold text-royal-gold royal-glow">
                 דשבורד ניהול - מערכת שיעורי נגינה
               </h1>
               <div className="flex gap-2">
-                <SaveButton />
+                <div className="relative">
+                  <SaveButton />
+                  <div className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                  </div>
+                </div>
                 <PrintPDFButton contentId="main-content" tabName={getTabName(activeTab)} />
                 <Button
                   onClick={handleLogout}
@@ -118,10 +126,15 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="max-h-screen overflow-y-auto">
+        <div id="main-content" className="container mx-auto p-4 space-y-6 pt-2">
 
           {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-8 royal-card royal-shadow">
+            <TabsList className="grid w-full grid-cols-9 royal-card royal-shadow">
               <TabsTrigger value="students" className="flex items-center gap-2 royal-tab">
                 <Users className="h-4 w-4" />
                 תלמידות
@@ -145,6 +158,10 @@ const AdminDashboard = () => {
               <TabsTrigger value="swaps" className="flex items-center gap-2 royal-tab">
                 <MessageSquare className="h-4 w-4" />
                 בקשות החלפה
+              </TabsTrigger>
+              <TabsTrigger value="practice" className="flex items-center gap-2 royal-tab">
+                <Trophy className="h-4 w-4" />
+                נתוני אימונים
               </TabsTrigger>
               <TabsTrigger value="backup" className="flex items-center gap-2 royal-tab">
                 <FileText className="h-4 w-4" />
@@ -178,6 +195,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="swaps">
               <SwapRequests />
+            </TabsContent>
+
+            <TabsContent value="practice">
+              <AdminPracticeStats />
             </TabsContent>
 
             <TabsContent value="backup">

@@ -13,6 +13,8 @@ import confetti from 'canvas-confetti';
 import { CelebrationToast } from './CelebrationToast';
 import PracticeLeaderboard from './PracticeLeaderboard';
 import MonthlyAchievements from './MonthlyAchievements';
+import YearlyAchievements from './YearlyAchievements';
+import StreakProgress from './StreakProgress';
 
 interface PracticeTrackingProps {
   studentId: string;
@@ -634,10 +636,14 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
         </Card>
       </div>
 
-      {/* Leaderboard */}
-      <PracticeLeaderboard />
+      {/* Leaderboard & Progress */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <PracticeLeaderboard />
+        <StreakProgress studentId={studentId} />
+      </div>
 
-      {/* Monthly Achievements */}
+      {/* Achievements */}
+      <YearlyAchievements studentId={studentId} />
       <MonthlyAchievements studentId={studentId} />
 
       {/* Daily History */}
