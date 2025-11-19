@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, ArrowRight, ArrowLeft } from 'lucide-react';
 import { getLessons, getStudents } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
-import { toast } from '@/hooks/use-toast';
-import LessonSwapInterface from './LessonSwapInterface';
+import StudentSwapPanel from './lessonSwap/StudentSwapPanel';
 import { Lesson } from '@/lib/types';
 
 interface StudentWeeklyScheduleProps {
@@ -198,9 +197,9 @@ const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
         </CardContent>
       </Card>
 
-      <LessonSwapInterface 
+      <StudentSwapPanel 
         studentId={studentId}
-        onLessonSelect={handleRegisterCallback}
+        onLessonClick={handleRegisterCallback}
       />
     </>
   );

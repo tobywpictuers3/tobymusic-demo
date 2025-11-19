@@ -58,6 +58,7 @@ const StudentDashboard = () => {
         phone: '',
         email: '',
         personalCode: '',
+        swapCode: '',
         startDate: '',
         startingLessonNumber: 1,
         annualAmount: 0,
