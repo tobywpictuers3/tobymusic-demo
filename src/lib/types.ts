@@ -10,6 +10,7 @@ export interface Student {
   additionalPhones?: string[]; // Additional phone numbers
   additionalEmails?: string[]; // Additional email addresses
   personalCode: string; // 4-digit personal code
+  swapCode?: string; // 4-digit swap code for automatic swap approvals (default: random)
   startDate: string; // ISO date string (default: September 1st)
   endDate?: string; // Optional end date - when student stops lessons
   startingLessonNumber: number; // Starting lesson number (default: 1)
@@ -189,7 +190,11 @@ export interface Message {
   content: string;
   createdAt: string;
   expiresAt?: string; // optional expiration date
+  scheduledFor?: string; // scheduled send time
   isRead?: { [studentId: string]: boolean }; // track read status per recipient
+  isStarred?: { [studentId: string]: boolean }; // track starred status per recipient
+  isDeleted?: { [studentId: string]: boolean }; // track deleted status per recipient
+  isDraft?: boolean; // draft status
   inReplyTo?: string; // ID of message being replied to
   type: 'general' | 'swap_request' | 'swap_approval' | 'swap_rejection';
 }

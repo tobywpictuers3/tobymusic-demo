@@ -17,8 +17,10 @@ interface EditableStudentDetailsProps {
 
 const EditableStudentDetails = ({ student, onUpdate }: EditableStudentDetailsProps) => {
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showSwapCodeDialog, setShowSwapCodeDialog] = useState(false);
   const [editedEmail, setEditedEmail] = useState(student.email);
   const [editedPhone, setEditedPhone] = useState(student.phone);
+  const [editedSwapCode, setEditedSwapCode] = useState(student.swapCode || '');
   const [additionalEmails, setAdditionalEmails] = useState<string[]>(student.additionalEmails || []);
   const [additionalPhones, setAdditionalPhones] = useState<string[]>(student.additionalPhones || []);
   const [newEmail, setNewEmail] = useState('');
@@ -97,6 +99,33 @@ const EditableStudentDetails = ({ student, onUpdate }: EditableStudentDetailsPro
       title: 'הפרטים עודכנו',
       description: 'השינויים נשמרו בהצלחה'
     });
+  };
+
+  const handleSaveSwapCode = () => {
+    if (editedSwapCode.length !== 4 || !/^\d{4}$/.test(editedSwapCode)) {
+      toast({
+        title: 'שגיאה',
+        description: 'קוד החלפה חייב להיות 4 ספרות',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    updateStudent(student.id, {
+      swapCode: editedSwapCode
+    });
+    
+    setShowSwapCodeDialog(false);
+    onUpdate();
+    toast({
+      title: 'קוד ההחלפה עודכן',
+      description: 'הקוד החדש נשמר בהצלחה'
+    });
+  };
+
+  const generateRandomSwapCode = () => {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setEditedSwapCode(code);
   };
 
   const handleAddEmail = () => {
@@ -223,14 +252,49 @@ const EditableStudentDetails = ({ student, onUpdate }: EditableStudentDetailsPro
 
           {/* Additional Info */}
           <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <h4 className="font-semibold mb-2">מידע נוסף</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold">קוד החלפה אישי</h4>
+              <Button variant="outline" size="sm" onClick={() => setShowSwapCodeDialog(true)}>
+                ערוך קוד
+              </Button>
+            </div>
             <div className="text-sm text-muted-foreground space-y-1">
-              <p>• כל שיעור נספר החל מתאריך ההתחלה שלך</p>
-              <p>• ניתן לבקש החלפות שיעור דרך המערכת</p>
+              <p>• קוד נוכחי: <span className="font-mono font-bold">{student.swapCode || 'לא הוגדר'}</span></p>
+              <p>• שתפי קוד זה עם חברה כדי לאשר החלפה אוטומטית</p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Swap Code Dialog */}
+      <Dialog open={showSwapCodeDialog} onOpenChange={setShowSwapCodeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>עריכת קוד החלפה</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>קוד החלפה (4 ספרות)</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={editedSwapCode}
+                  onChange={(e) => setEditedSwapCode(e.target.value)}
+                  maxLength={4}
+                  placeholder="0000"
+                  className="font-mono text-lg"
+                />
+                <Button variant="outline" onClick={generateRandomSwapCode}>
+                  קוד אקראי
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSwapCodeDialog(false)}>ביטול</Button>
+            <Button onClick={handleSaveSwapCode}>שמור</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>

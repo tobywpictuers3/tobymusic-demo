@@ -15,7 +15,6 @@ import StudentsManagement from '@/components/admin/StudentsManagement';
 import LessonJournal from '@/components/admin/LessonJournal';
 import PaymentManagement from '@/components/admin/PaymentManagement';
 import PerformancesManagement from '@/components/admin/PerformancesManagement';
-import SwapRequests from '@/components/admin/SwapRequests';
 import BackupImport from '@/components/admin/BackupImport';
 import BackupHistory from '@/components/admin/BackupHistory';
 import AdminPracticeStats from '@/components/admin/AdminPracticeStats';
@@ -42,7 +41,6 @@ const AdminDashboard = () => {
       'fixed-schedule': 'מערכת קבועה',
       payments: 'תשלומים',
       performances: 'הופעות',
-      swaps: 'בקשות החלפה',
       practice: 'נתוני אימונים',
       messages: 'תקשורת',
       backup: 'גיבוי',
@@ -195,19 +193,15 @@ const AdminDashboard = () => {
               <PaymentManagement />
             </TabsContent>
 
-            <TabsContent value="performances">
-              <PerformancesManagement />
-            </TabsContent>
+          <TabsContent value="performances">
+            <PerformancesManagement />
+          </TabsContent>
 
-            <TabsContent value="swaps">
-              <SwapRequests />
-            </TabsContent>
+          <TabsContent value="practice">
+            <AdminPracticeStats />
+          </TabsContent>
 
-            <TabsContent value="practice">
-              <AdminPracticeStats />
-            </TabsContent>
-
-            <TabsContent value="messages">
+          <TabsContent value="messages">
               <MessagingTab />
             </TabsContent>
 

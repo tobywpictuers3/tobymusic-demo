@@ -34,7 +34,7 @@ const StudentLessonHistory = ({ student, open, onOpenChange }: StudentLessonHist
   const [deletingLesson, setDeletingLesson] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
+    if (open && student) {
       const studentLessons = getLessons()
         .filter(lesson => lesson.studentId === student.id)
         .filter(lesson => lesson.status === 'completed')
@@ -42,7 +42,7 @@ const StudentLessonHistory = ({ student, open, onOpenChange }: StudentLessonHist
       
       setLessons(studentLessons);
     }
-  }, [student.id, open]);
+  }, [student?.id, open]);
 
   const handleGrade = (lessonId: string, grade: number) => {
     const lesson = lessons.find(l => l.id === lessonId);

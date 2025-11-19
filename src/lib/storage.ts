@@ -22,7 +22,8 @@ const devData: Record<string, any> = {
   practiceSessions: [],
   monthlyAchievements: [],
   leaderboard: [],
-  medals: []
+  medals: [],
+  messages: []
 };
 
 export const setDevMode = (isActive: boolean) => {
