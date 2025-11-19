@@ -22,14 +22,22 @@ export const saveMessages = (messages: Message[]): void => {
 
 export const addMessage = (message: Omit<Message, 'id' | 'createdAt'>): Message => {
   const messages = getMessages();
+  const now = new Date();
   const newMessage: Message = {
     ...message,
     id: Date.now().toString(),
-    createdAt: new Date().toISOString(),
+    createdAt: now.toISOString(),
     // Teacher messages are starred by default for students
+    // Student messages to 'all' are starred by default for all recipients
     isStarred: message.senderId === 'admin' && !message.recipientIds.includes('admin')
       ? message.recipientIds.reduce((acc, id) => ({ ...acc, [id]: true }), {})
+      : message.senderId !== 'admin' && message.recipientIds.includes('all')
+      ? { ...message.recipientIds.reduce((acc, id) => id !== 'admin' ? { ...acc, [id]: true } : acc, {}) }
       : {},
+    // Student messages to 'all' expire after 48 hours
+    expiresAt: message.senderId !== 'admin' && message.recipientIds.includes('all')
+      ? new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString()
+      : message.expiresAt,
   };
   messages.push(newMessage);
   saveMessages(messages);

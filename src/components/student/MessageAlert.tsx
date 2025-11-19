@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getStarredMessages, markMessageAsRead } from "@/lib/messages";
+import { getStarredMessages, toggleMessageStar } from "@/lib/messages";
 import { Message } from "@/lib/types";
 import { Mail, X } from "lucide-react";
 import { format } from "date-fns";
@@ -27,7 +27,7 @@ export default function MessageAlert({ studentId }: MessageAlertProps) {
   };
 
   const handleDismiss = (messageId: string) => {
-    markMessageAsRead(messageId, studentId, true);
+    toggleMessageStar(messageId, studentId);
     loadMessages();
   };
 

@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { hybridSync } from '@/lib/hybridSync';
 import { PrintPDFButton } from '@/components/ui/print-pdf-button';
 import { SaveButton } from '@/components/ui/save-button';
+import { UnreadMessagesBadge } from '@/components/ui/unread-messages-badge';
 
 // Import components
 import StudentsManagement from '@/components/admin/StudentsManagement';
@@ -106,7 +107,8 @@ const AdminDashboard = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-royal-gold royal-glow">
                 דשבורד ניהול - מערכת שיעורי נגינה
               </h1>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <UnreadMessagesBadge userId="admin" />
                 <div className="relative">
                   <SaveButton />
                   <div className="absolute -top-1 -right-1 flex h-3 w-3">
