@@ -1,18 +1,15 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, ArrowRight, ArrowLeft, MousePointer2 } from 'lucide-react';
+import { Calendar, ArrowRight, ArrowLeft } from 'lucide-react';
 import { getLessons, getStudents } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
-import { Lesson } from '@/lib/types';
-import { toast } from '@/hooks/use-toast';
 
 interface StudentWeeklyScheduleProps {
   studentId: string;
-  onLessonDoubleClick?: (lesson: Lesson) => void;
 }
 
-const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick }: StudentWeeklyScheduleProps) => {
+const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const allLessons = getLessons();
   const lessons = allLessons.filter(lesson => 
@@ -66,38 +63,6 @@ const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick }: StudentWeekly
     setCurrentWeek(nextWeek);
   };
 
-
-  const handleLessonDoubleClick = (lesson: Lesson) => {
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (lesson.date < today) {
-      toast({
-        title: 'שיעור בעבר',
-        description: 'לא ניתן לבקש החלפה לשיעור שכבר עבר',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (lesson.status !== 'scheduled') {
-      toast({
-        title: 'שיעור לא זמין',
-        description: 'ניתן לבקש החלפה רק לשיעורים מתוכננים',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    toast({
-      title: 'שיעור נבחר ✓',
-      description: `נבחר: ${new Date(lesson.date).toLocaleDateString('he-IL')} בשעה ${lesson.startTime}`,
-    });
-
-    if (onLessonDoubleClick) {
-      onLessonDoubleClick(lesson);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const variants = {
       scheduled: 'secondary',
@@ -127,13 +92,6 @@ const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick }: StudentWeekly
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-          <p className="text-sm text-muted-foreground flex items-center gap-2">
-            <MousePointer2 className="h-4 w-4" />
-            לחצי לחיצה כפולה על שיעור כדי לבקש החלפה
-          </p>
-        </div>
-
         {/* Week Navigation */}
         <div className="flex justify-between items-center mb-6">
           <Button onClick={handlePrevWeek} variant="outline" size="sm">
@@ -185,15 +143,14 @@ const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick }: StudentWeekly
                         <div
                           key={lesson.id}
                           className={`flex justify-between items-center p-3 border rounded-lg transition-all ${
-                            isFuture && lesson.status === 'scheduled'
-                              ? 'bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 shadow-sm cursor-pointer hover:border-primary' 
+                            isFuture 
+                              ? 'bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 shadow-sm' 
                               : isCompleted 
                                 ? 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800' 
                                 : isCancelled
                                   ? 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800'
                                   : 'bg-muted/50 border-muted'
                           }`}
-                          onDoubleClick={() => handleLessonDoubleClick(lesson)}
                         >
                           <div className="space-y-1">
                             <div className={`font-medium ${isFuture ? 'text-primary' : ''}`}>
