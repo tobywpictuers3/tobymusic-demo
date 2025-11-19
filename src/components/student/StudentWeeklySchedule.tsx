@@ -136,16 +136,16 @@ const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick }: StudentWeekly
 
         {/* Week Navigation */}
         <div className="flex justify-between items-center mb-6">
-          <Button onClick={handleNextWeek} variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 ml-2" />
-            שבוע הבא
+          <Button onClick={handlePrevWeek} variant="outline" size="sm">
+            <ArrowRight className="h-4 w-4" />
+            שבוע קודם
           </Button>
           <h3 className="text-lg font-semibold">
             {weekDates[0].toLocaleDateString('he-IL')} - {weekDates[6].toLocaleDateString('he-IL')}
           </h3>
-          <Button onClick={handlePrevWeek} variant="outline" size="sm">
-            שבוע קודם
-            <ArrowRight className="h-4 w-4 mr-2" />
+          <Button onClick={handleNextWeek} variant="outline" size="sm">
+            שבוע הבא
+            <ArrowLeft className="h-4 w-4 mr-2" />
           </Button>
         </div>
 
@@ -195,19 +195,19 @@ const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick }: StudentWeekly
                           }`}
                           onDoubleClick={() => handleLessonDoubleClick(lesson)}
                         >
-                          <div className="space-y-1 flex-1 min-w-0">
-                            <div className={`font-medium ${isFuture ? 'text-primary' : ''} truncate`}>
+                          <div className="space-y-1">
+                            <div className={`font-medium ${isFuture ? 'text-primary' : ''}`}>
                               {lesson.startTime} - {lesson.endTime}
                             </div>
                             {lesson.notes && (
-                              <div className="text-sm text-muted-foreground line-clamp-2 break-words">
+                              <div className="text-sm text-muted-foreground">
                                 {lesson.notes}
                               </div>
                             )}
                           </div>
-                          <div className="flex gap-2 flex-shrink-0">
+                          <div className="flex gap-2">
                             {lesson.isOneOff && (
-                              <Badge variant="outline" className="text-xs whitespace-nowrap">
+                              <Badge variant="outline" className="text-xs">
                                 חד פעמי
                               </Badge>
                             )}
