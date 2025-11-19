@@ -9,9 +9,7 @@ import { getCurrentUser, setCurrentUser, getStudents } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { Student } from '@/lib/types';
 import { useAccessMode } from '@/contexts/AccessModeContext';
-import GeneralWeeklySchedule from '@/components/student/GeneralWeeklySchedule';
-import SwapRequestForm from '@/components/student/SwapRequestForm';
-import SwapRequestsStatus from '@/components/student/SwapRequestsStatus';
+import StudentWeeklySchedule from '@/components/student/StudentWeeklySchedule';
 import EditableStudentDetails from '@/components/student/EditableStudentDetails';
 import ContactsList from '@/components/student/ContactsList';
 import StudentFiles from '@/components/student/StudentFiles';
@@ -218,7 +216,7 @@ const StudentDashboard = () => {
                 </CardContent>
               </Card>
             ) : (
-              <GeneralWeeklySchedule />
+              <StudentWeeklySchedule studentId={studentId!} />
             )}
           </TabsContent>
 

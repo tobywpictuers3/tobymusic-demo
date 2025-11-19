@@ -233,12 +233,10 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
     return null;
   }
 
-  console.log('StudentSwapPanel rendered for student:', studentId);
-
   return (
     <Card className="card-gradient card-shadow mt-8">
       <CardHeader>
-        <CardTitle className="text-2xl">החלפת שיעורים</CardTitle>
+        <CardTitle className="text-2xl">🔄 החלפת שיעורים - בדיקה</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid md:grid-cols-2 gap-6">
@@ -316,30 +314,29 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
                 )}
 
                 <div>
-                  <Label>קוד החלפה שלי</Label>
+                  <Label>הקוד שלך</Label>
                   <Input 
                     type="text"
-                    maxLength={4}
                     value={mySwapCode}
                     onChange={(e) => setMySwapCode(e.target.value)}
-                    placeholder="הזיני קוד"
+                    placeholder="הזיני קוד החלפה"
                   />
                 </div>
 
                 <Button 
                   onClick={handleVerify}
-                  disabled={!myLessonDate || !myLessonTime || !mySwapCode}
+                  disabled={!myLessonId || !mySwapCode}
                   className="w-full"
                 >
                   <Lock className="h-4 w-4 ml-2" />
-                  אימות ומעבר לשלב הבא
+                  אמת ועבור לשלב 2
                 </Button>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Check className="h-12 w-12 text-green-500 mx-auto mb-2" />
-                <p className="text-muted-foreground">השיעור שלך נבחר ואומת</p>
-                <p className="text-sm font-medium mt-2">{new Date(myLessonDate).toLocaleDateString('he-IL')} - {myLessonTime}</p>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>✓ תאריך: {new Date(myLessonDate).toLocaleDateString('he-IL')}</p>
+                <p>✓ שעה: {myLessonTime}</p>
+                <p className="text-green-600 font-semibold">אומת!</p>
               </div>
             )}
           </div>
@@ -347,61 +344,63 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
           {/* Step 2: Target Lesson */}
           <div className={`p-6 rounded-lg border-2 ${currentStep === 'target-lesson' && isVerified ? 'border-primary bg-primary/5' : 'border-border bg-muted/30'}`}>
             <div className="flex items-center gap-2 mb-4">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'target-lesson' ? 'bg-primary' : 'bg-muted'}`}>
-                <span className={`font-bold ${currentStep === 'target-lesson' ? 'text-white' : 'text-muted-foreground'}`}>2</span>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isVerified ? 'bg-primary' : 'bg-muted'}`}>
+                <span className="text-white font-bold">2</span>
               </div>
               <h3 className="text-lg font-semibold">השיעור המבוקש</h3>
             </div>
 
             {!isVerified ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Lock className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>השלימי את השלב הראשון</p>
+              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                <p>השלימי קודם שלב 1</p>
               </div>
             ) : (
               <div className="space-y-4">
-                <div>
-                  <Label>תלמידה</Label>
-                  <Select value={targetStudentId} onValueChange={setTargetStudentId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחרי תלמידה" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {otherStudents.map(student => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.firstName} {student.lastName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {targetStudentId && !manualTargetLesson ? (
+                {!manualTargetLesson ? (
                   <>
                     <div>
-                      <Label>בחרי שיעור</Label>
-                      <Select value={targetLessonId} onValueChange={(val) => {
-                        const lesson = allLessons.find(l => l.id === val);
-                        if (lesson) {
-                          setTargetLessonId(val);
-                          setTargetLessonDate(lesson.date);
-                          setTargetLessonTime(lesson.startTime);
-                        }
-                      }}>
+                      <Label>תלמידה</Label>
+                      <Select value={targetStudentId} onValueChange={setTargetStudentId}>
                         <SelectTrigger>
-                          <SelectValue placeholder="בחרי שיעור" />
+                          <SelectValue placeholder="בחרי תלמידה" />
                         </SelectTrigger>
                         <SelectContent>
-                          {allLessons
-                            .filter(l => l.studentId === targetStudentId && l.date >= today && l.status === 'scheduled')
-                            .map(lesson => (
-                              <SelectItem key={lesson.id} value={lesson.id}>
-                                {new Date(lesson.date).toLocaleDateString('he-IL')} - {lesson.startTime}
-                              </SelectItem>
-                            ))}
+                          {otherStudents.map(student => (
+                            <SelectItem key={student.id} value={student.id}>
+                              {student.firstName} {student.lastName}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {targetStudentId && (
+                      <div>
+                        <Label>שיעור</Label>
+                        <Select value={targetLessonId} onValueChange={(val) => {
+                          const lesson = allLessons.find(l => l.id === val);
+                          if (lesson) {
+                            setTargetLessonId(val);
+                            setTargetLessonDate(lesson.date);
+                            setTargetLessonTime(lesson.startTime);
+                          }
+                        }}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="בחרי שיעור" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allLessons
+                              .filter(l => l.studentId === targetStudentId && l.date >= today && l.status === 'scheduled')
+                              .map(lesson => (
+                                <SelectItem key={lesson.id} value={lesson.id}>
+                                  {new Date(lesson.date).toLocaleDateString('he-IL')} - {lesson.startTime}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -411,7 +410,7 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
                       הזנה ידנית
                     </Button>
                   </>
-                ) : targetStudentId ? (
+                ) : (
                   <>
                     <div>
                       <Label>תאריך</Label>
@@ -438,22 +437,20 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
                       בחירה מהרשימה
                     </Button>
                   </>
-                ) : null}
+                )}
 
                 <div>
-                  <Label>קוד החלפה שלה (אופציונלי)</Label>
+                  <Label>קוד החלפה של התלמידה השנייה (אופציונלי)</Label>
                   <Input 
                     type="text"
-                    maxLength={4}
                     value={targetSwapCode}
                     onChange={(e) => setTargetSwapCode(e.target.value)}
                     placeholder="לאישור אוטומטי"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">עם קוד נכון - אישור מיידי</p>
                 </div>
 
                 <div>
-                  <Label>סיבה (אופציונלי)</Label>
+                  <Label>סיבה להחלפה</Label>
                   <Textarea 
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -461,26 +458,28 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
                     rows={3}
                   />
                 </div>
-
-                <div className="flex gap-2 pt-2">
-                  <Button 
-                    onClick={handleSubmit}
-                    disabled={!targetStudentId || !targetLessonDate || !targetLessonTime}
-                    className="flex-1"
-                  >
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                    שלחי בקשה
-                  </Button>
-                  <Button 
-                    onClick={resetForm}
-                    variant="outline"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
               </div>
             )}
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-4 mt-6 justify-center">
+          <Button 
+            onClick={resetForm}
+            variant="outline"
+          >
+            <RefreshCw className="h-4 w-4 ml-2" />
+            איפוס
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={!isVerified || !targetLessonId}
+            className="min-w-[200px]"
+          >
+            <ArrowRight className="h-4 w-4 ml-2" />
+            שלח בקשת החלפה
+          </Button>
         </div>
       </CardContent>
     </Card>
