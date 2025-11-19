@@ -32,7 +32,7 @@ const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState('schedule');
   const [student, setStudent] = useState<Student | null>(null);
   const { isPublicMode, setAccessMode } = useAccessMode();
-  const [selectedLessonHandler, setSelectedLessonHandler] = useState<((lesson: any) => void) | null>(null);
+  const [lessonClickCallback, setLessonClickCallback] = useState<((lesson: any) => void) | null>(null);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -220,12 +220,12 @@ const StudentDashboard = () => {
             ) : (
               <>
                 <StudentWeeklySchedule 
-                  studentId={studentId!} 
-                  onLessonClick={selectedLessonHandler}
+                  studentId={studentId!}
+                  onLessonClick={lessonClickCallback}
                 />
                 <StudentSwapPanel 
                   studentId={studentId!}
-                  onLessonClick={(handler) => setSelectedLessonHandler(() => handler)}
+                  onLessonClick={(callback) => setLessonClickCallback(() => callback)}
                 />
               </>
             )}
