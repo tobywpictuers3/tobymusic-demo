@@ -21,7 +21,8 @@ const SwapRequestForm = ({ studentId, prefilledLesson }: SwapRequestFormProps) =
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [targetStudentId, setTargetStudentId] = useState('');
-  const [swapCode, setSwapCode] = useState('');
+  const [mySwapCode, setMySwapCode] = useState('');
+  const [targetSwapCode, setTargetSwapCode] = useState('');
   const [reason, setReason] = useState('');
   
   const students = getStudents().filter(s => s.id !== studentId);
@@ -66,9 +67,14 @@ const SwapRequestForm = ({ studentId, prefilledLesson }: SwapRequestFormProps) =
     }
 
     const targetStudent = students.find(s => s.id === targetStudentId);
+    const requesterStudent = students.find(s => s.id === studentId);
     
-    // Check if swap code is correct for auto-approval
-    const isAutoApproved = swapCode.trim() && targetStudent?.swapCode === swapCode.trim();
+    // Check if both swap codes are provided and correct for auto-approval
+    const isAutoApproved = 
+      mySwapCode.trim() && 
+      targetSwapCode.trim() && 
+      requesterStudent?.swapCode === mySwapCode.trim() &&
+      targetStudent?.swapCode === targetSwapCode.trim();
 
     if (isAutoApproved) {
       // Auto-approve the swap
@@ -142,7 +148,8 @@ const SwapRequestForm = ({ studentId, prefilledLesson }: SwapRequestFormProps) =
     setSelectedDate('');
     setSelectedTime('');
     setTargetStudentId('');
-    setSwapCode('');
+    setMySwapCode('');
+    setTargetSwapCode('');
     setReason('');
   };
 
@@ -217,11 +224,32 @@ const SwapRequestForm = ({ studentId, prefilledLesson }: SwapRequestFormProps) =
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="swap-code" className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4" />קוד החלפה (אופציונלי)
+            <Label htmlFor="my-swap-code" className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />הקוד האישי שלי
             </Label>
-            <Input id="swap-code" type="text" value={swapCode} onChange={(e) => setSwapCode(e.target.value)} placeholder="קוד החלפה לאישור מיידי" maxLength={10} />
-            <p className="text-xs text-muted-foreground">קוד נכון = אישור אוטומטי</p>
+            <Input 
+              id="my-swap-code" 
+              type="text" 
+              value={mySwapCode} 
+              onChange={(e) => setMySwapCode(e.target.value)} 
+              placeholder="הזיני את הקוד האישי שלך" 
+              maxLength={10} 
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="target-swap-code" className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />קוד החלפה של התלמידה המוחלפת (אופציונלי)
+            </Label>
+            <Input 
+              id="target-swap-code" 
+              type="text" 
+              value={targetSwapCode} 
+              onChange={(e) => setTargetSwapCode(e.target.value)} 
+              placeholder="קוד החלפה לאישור אוטומטי" 
+              maxLength={10} 
+            />
+            <p className="text-xs text-muted-foreground">שני הקודים נכונים = אישור אוטומטי</p>
           </div>
 
           <div className="space-y-2">

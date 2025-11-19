@@ -9,7 +9,6 @@ import { getCurrentUser, setCurrentUser, getStudents } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { Student } from '@/lib/types';
 import { useAccessMode } from '@/contexts/AccessModeContext';
-import GeneralWeeklySchedule from '@/components/student/GeneralWeeklySchedule';
 import StudentWeeklySchedule from '@/components/student/StudentWeeklySchedule';
 import SwapRequestForm from '@/components/student/SwapRequestForm';
 import SwapRequestsStatus from '@/components/student/SwapRequestsStatus';
@@ -231,7 +230,6 @@ const StudentDashboard = () => {
                     setActiveTab('swap');
                   }}
                 />
-                <GeneralWeeklySchedule />
                 <SwapRequestsStatus studentId={studentId!} />
               </>
             )}
