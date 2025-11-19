@@ -17,6 +17,11 @@ const StudentWeeklySchedule = ({ studentId, onLessonClick: externalOnLessonClick
   const [lessonSelectCallback, setLessonSelectCallback] = useState<((lesson: Lesson) => void) | null>(null);
   
   const allLessons = getLessons();
+  // Filter lessons for this specific student
+  const studentLessons = allLessons.filter(lesson => 
+    lesson.studentId === studentId && 
+    lesson.status !== 'no_show' // Hide no-show lessons from student view
+  );
   const students = getStudents();
   const student = students.find(s => s.id === studentId);
 
@@ -42,8 +47,8 @@ const StudentWeeklySchedule = ({ studentId, onLessonClick: externalOnLessonClick
     const dateStr = date.toISOString().split('T')[0];
     const today = new Date().toISOString().split('T')[0];
     
-    return allLessons
-      .filter(lesson => lesson.date === dateStr && lesson.status !== 'no_show')
+    return studentLessons
+      .filter(lesson => lesson.date === dateStr)
       .sort((a, b) => {
         // Show future lessons first, then completed
         if (a.date >= today && b.date < today) return -1;

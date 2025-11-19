@@ -218,7 +218,7 @@ const StudentDashboard = () => {
                 </CardContent>
               </Card>
             ) : (
-              <>
+              <div className="space-y-6">
                 <StudentWeeklySchedule 
                   studentId={studentId!}
                   onLessonClick={lessonClickCallback}
@@ -227,7 +227,7 @@ const StudentDashboard = () => {
                   studentId={studentId!}
                   onLessonClick={(callback) => setLessonClickCallback(() => callback)}
                 />
-              </>
+              </div>
             )}
           </TabsContent>
 
