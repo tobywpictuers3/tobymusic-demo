@@ -68,15 +68,21 @@ export const markLessonsAsSwapped = (req: SwapRequest): void => {
     return;
   }
   
-  // Swap the studentIds and add notes
+  // Swap the studentIds and mark as swapped
   updateLesson(req.requesterLessonId, {
     studentId: req.targetStudentId,
-    notes: `הוחלף (${new Date().toLocaleDateString('he-IL')})`,
+    isSwapped: true,
+    notes: requesterLesson.notes 
+      ? `${requesterLesson.notes} | הוחלף (${new Date().toLocaleDateString('he-IL')})` 
+      : `הוחלף (${new Date().toLocaleDateString('he-IL')})`,
   });
   
   updateLesson(req.targetLessonId, {
     studentId: req.requesterStudentId,
-    notes: `הוחלף (${new Date().toLocaleDateString('he-IL')})`,
+    isSwapped: true,
+    notes: targetLesson.notes 
+      ? `${targetLesson.notes} | הוחלף (${new Date().toLocaleDateString('he-IL')})` 
+      : `הוחלף (${new Date().toLocaleDateString('he-IL')})`,
   });
   
   logger.info(`✅ Lessons swapped: ${req.requesterLessonId} ↔ ${req.targetLessonId}`);

@@ -34,6 +34,7 @@ export interface Lesson {
   isFromTemplate?: boolean; // indicates lesson was generated from active template
   grade?: number; // lesson grade 1-5 (homework grade)
   gradeNotes?: string; // optional text notes for the grade
+  isSwapped?: boolean; // indicates lesson was swapped
 }
 
 export interface Payment {

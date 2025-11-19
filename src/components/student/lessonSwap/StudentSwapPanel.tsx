@@ -162,8 +162,19 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
       return;
     }
     
-    // Determine status
-    const status = determineSwapStatus(requestData, students);
+    // Check if target swap code is valid for auto-approval
+    let status: 'auto_approved' | 'pending_manager' = 'pending_manager';
+    
+    if (targetSwapCode && targetSwapCode.trim()) {
+      const targetStudent = students.find(s => s.id === targetStudentId);
+      if (targetStudent) {
+        const expectedTargetCode = targetStudent.swapCode || targetStudent.personalCode;
+        if (targetSwapCode.trim() === expectedTargetCode) {
+          status = 'auto_approved';
+        }
+      }
+    }
+    
     const finalRequest = { ...requestData, status };
     
     // Create request
@@ -195,11 +206,11 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
       });
       
       toast({
-        title: 'ההחלפה אושרה!',
-        description: 'השיעורים הוחלפו בהצלחה',
+        title: '✅ החלפה אושרה אוטומטית',
+        description: 'השיעורים הוחלפו בהצלחה והמורה קיבלה עדכון',
       });
     } else {
-      // Send to manager
+      // pending_manager - do NOT perform swap, only save request
       await addMessage({
         senderId: studentId,
         senderName: `${currentStudent.firstName} ${currentStudent.lastName}`,
@@ -210,8 +221,8 @@ const StudentSwapPanel = ({ studentId, onLessonClick }: StudentSwapPanelProps) =
       });
       
       toast({
-        title: 'הבקשה נשלחה',
-        description: 'הבקשה נשלחה לאישור המנהל',
+        title: '⏳ הבקשה נשלחה למנהל',
+        description: 'בקשת ההחלפה ממתינה לאישור המנהל',
       });
     }
     
