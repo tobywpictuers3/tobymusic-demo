@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { LogOut, Calendar, User, Phone, FileText } from 'lucide-react';
-import { getCurrentUser, setCurrentUser, getStudents } from '@/lib/storage';
+import { getCurrentUser, setCurrentUser, getStudents, getLessons } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { Student } from '@/lib/types';
 import { useAccessMode } from '@/contexts/AccessModeContext';
@@ -26,6 +26,7 @@ import MedalStore from '@/components/student/MedalStore';
 import BackButton from '@/components/ui/back-button';
 import { SaveButton } from '@/components/ui/save-button';
 import { UnreadMessagesBadge } from '@/components/ui/unread-messages-badge';
+import StudentSwapPanel from '@/components/student/lessonSwap/StudentSwapPanel';
 
 const StudentDashboard = () => {
   const { studentId } = useParams<{ studentId: string }>();
@@ -218,7 +219,10 @@ const StudentDashboard = () => {
                 </CardContent>
               </Card>
             ) : (
-              <GeneralWeeklySchedule />
+              <>
+                <GeneralWeeklySchedule />
+                {student && <StudentSwapPanel student={student} lessons={getLessons()} />}
+              </>
             )}
           </TabsContent>
 

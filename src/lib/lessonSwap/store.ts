@@ -89,40 +89,32 @@ export function updateSwapRequest(id: string, patch: Partial<SwapRequest>): Swap
 // Mark lessons as swapped (exchange studentId between two lessons)
 export function markLessonsAsSwapped(
   req: SwapRequest,
-  getLessons: () => Lesson[],
-  setLessons: (lessons: Lesson[]) => void
+  getLessonsFn: () => Lesson[],
+  updateLessonFn: (id: string, updates: Partial<Lesson>) => Lesson | undefined
 ): void {
-  const lessons = getLessons();
+  const lessons = getLessonsFn();
   
-  const requesterIndex = lessons.findIndex(l => l.id === req.requesterLessonId);
-  const targetIndex = lessons.findIndex(l => l.id === req.targetLessonId);
+  const requesterLesson = lessons.find(l => l.id === req.requesterLessonId);
+  const targetLesson = lessons.find(l => l.id === req.targetLessonId);
   
-  if (requesterIndex === -1 || targetIndex === -1) {
+  if (!requesterLesson || !targetLesson) {
     logger.error('❌ Cannot swap - lessons not found');
     throw new Error('Lessons not found for swap');
   }
   
   // Exchange studentId
-  const requesterStudentId = lessons[requesterIndex].studentId;
-  const targetStudentId = lessons[targetIndex].studentId;
+  const requesterStudentId = requesterLesson.studentId;
+  const targetStudentId = targetLesson.studentId;
   
-  lessons[requesterIndex] = {
-    ...lessons[requesterIndex],
+  updateLessonFn(req.requesterLessonId, {
     studentId: targetStudentId,
     isSwapped: true
-  };
+  });
   
-  lessons[targetIndex] = {
-    ...lessons[targetIndex],
+  updateLessonFn(req.targetLessonId, {
     studentId: requesterStudentId,
     isSwapped: true
-  };
-  
-  setLessons(lessons);
-  
-  if (!isDevMode()) {
-    hybridSync.onDataChange();
-  }
+  });
   
   logger.info(`✅ Lessons swapped: ${req.requesterLessonId} ↔ ${req.targetLessonId}`);
 }
