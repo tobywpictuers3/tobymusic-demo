@@ -10,7 +10,7 @@ export interface Student {
   additionalPhones?: string[]; // Additional phone numbers
   additionalEmails?: string[]; // Additional email addresses
   personalCode: string; // 4-digit personal code
-  swapCode: string; // 4-digit swap code for automatic swap approvals (default: random 4-digit code)
+  swapCode?: string; // 4-digit swap code for automatic swap approvals (default: random)
   startDate: string; // ISO date string (default: September 1st)
   endDate?: string; // Optional end date - when student stops lessons
   startingLessonNumber: number; // Starting lesson number (default: 1)
@@ -34,7 +34,6 @@ export interface Lesson {
   isFromTemplate?: boolean; // indicates lesson was generated from active template
   grade?: number; // lesson grade 1-5 (homework grade)
   gradeNotes?: string; // optional text notes for the grade
-  isSwapped?: boolean; // indicates lesson was swapped
 }
 
 export interface Payment {
@@ -197,5 +196,5 @@ export interface Message {
   isDeleted?: { [studentId: string]: boolean }; // track deleted status per recipient
   isDraft?: boolean; // draft status
   inReplyTo?: string; // ID of message being replied to
-  type: 'general' | 'swap_request' | 'swap_approval' | 'swap_rejection' | 'system';
+  type: 'general' | 'swap_request' | 'swap_approval' | 'swap_rejection';
 }

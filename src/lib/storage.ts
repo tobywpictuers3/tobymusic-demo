@@ -1,6 +1,4 @@
 import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord } from './types';
-import { SwapRequest as NewSwapRequest } from './lessonSwap/types';
-import { initializeSwapRequests, exportSwapRequests } from './lessonSwap/store';
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 
@@ -60,12 +58,6 @@ export const initializeStorage = (data: any) => {
     }
   });
   
-  // Initialize new swap requests module
-  if (data.musicSystem_newSwapRequests) {
-    initializeSwapRequests(data.musicSystem_newSwapRequests);
-    keysFound++;
-  }
-  
   if (initialized) {
     logger.info(`✅ Memory storage initialized with ${keysFound} data keys`);
   } else {
@@ -87,9 +79,6 @@ export const exportAllData = (allowEmpty: boolean = false): Record<string, any> 
     const fullKey = key === 'oneTimePayments' ? key : `musicSystem_${key}`;
     data[fullKey] = inMemoryStorage[key];
   });
-  
-  // Export new swap requests
-  data.musicSystem_newSwapRequests = exportSwapRequests();
   
   data.timestamp = new Date().toISOString();
   

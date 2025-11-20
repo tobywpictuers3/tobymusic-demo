@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { LogOut, Calendar, User, Phone, FileText } from 'lucide-react';
-import { getCurrentUser, setCurrentUser, getStudents, getLessons } from '@/lib/storage';
+import { getCurrentUser, setCurrentUser, getStudents } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { Student } from '@/lib/types';
 import { useAccessMode } from '@/contexts/AccessModeContext';
-import StudentWeeklySchedule from '@/components/student/StudentWeeklySchedule';
-import StudentSwapPanel from '@/components/student/StudentSwapPanel';
+import GeneralWeeklySchedule from '@/components/student/GeneralWeeklySchedule';
+import SwapRequestForm from '@/components/student/SwapRequestForm';
+import SwapRequestsStatus from '@/components/student/SwapRequestsStatus';
 import EditableStudentDetails from '@/components/student/EditableStudentDetails';
 import ContactsList from '@/components/student/ContactsList';
 import StudentFiles from '@/components/student/StudentFiles';
@@ -32,9 +33,6 @@ const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState('schedule');
   const [student, setStudent] = useState<Student | null>(null);
   const { isPublicMode, setAccessMode } = useAccessMode();
-  const [mySelectedLesson, setMySelectedLesson] = useState<any>(null);
-  const [targetSelectedLesson, setTargetSelectedLesson] = useState<any>(null);
-  const [selectingFor, setSelectingFor] = useState<'my' | 'target' | null>(null);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -60,7 +58,6 @@ const StudentDashboard = () => {
         phone: '',
         email: '',
         personalCode: '',
-        swapCode: '',
         startDate: '',
         startingLessonNumber: 1,
         annualAmount: 0,
@@ -220,27 +217,7 @@ const StudentDashboard = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
-                <StudentWeeklySchedule 
-                  lessons={getLessons().filter(l => l.studentId === student.id)}
-                  onLessonClick={(lesson) => {
-                    if (selectingFor === 'my') {
-                      setMySelectedLesson(lesson);
-                      setSelectingFor(null);
-                    } else if (selectingFor === 'target') {
-                      setTargetSelectedLesson(lesson);
-                      setSelectingFor(null);
-                    }
-                  }}
-                />
-                <StudentSwapPanel 
-                  studentId={studentId!}
-                  myLesson={mySelectedLesson}
-                  targetLesson={targetSelectedLesson}
-                  onMyLessonClick={() => setSelectingFor('my')}
-                  onTargetLessonClick={() => setSelectingFor('target')}
-                />
-              </div>
+              <GeneralWeeklySchedule />
             )}
           </TabsContent>
 

@@ -143,7 +143,6 @@ const StudentsManagement = () => {
         phone: studentForm.phone,
         email: studentForm.email,
         personalCode: studentForm.personalCode,
-        swapCode: Math.floor(1000 + Math.random() * 9000).toString(), // Generate random 4-digit swap code
         startDate: studentForm.startDate,
         startingLessonNumber: studentForm.startingLessonNumber,
         annualAmount: studentForm.annualAmount,
