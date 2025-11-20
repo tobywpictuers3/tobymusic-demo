@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { LogOut, Calendar, User, Phone, FileText } from 'lucide-react';
-import { getCurrentUser, setCurrentUser, getStudents } from '@/lib/storage';
+import { getCurrentUser, setCurrentUser, getStudents, getLessons } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { Student } from '@/lib/types';
 import { useAccessMode } from '@/contexts/AccessModeContext';
@@ -222,7 +222,7 @@ const StudentDashboard = () => {
             ) : (
               <div className="space-y-6">
                 <StudentWeeklySchedule 
-                  lessons={[]}
+                  lessons={getLessons().filter(l => l.studentId === student.id)}
                   onLessonClick={(lesson) => {
                     if (selectingFor === 'my') {
                       setMySelectedLesson(lesson);
