@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Play, Square, Clock, Trophy, Sparkles, TrendingUp } from 'lucide-react';
+import { Play, Square, Clock, Trophy, Sparkles, TrendingUp, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { getPracticeSessions, addPracticeSession, getStudentPracticeSessions, updateMonthlyAchievement, getStudents, getLessons, addMedalRecord, getStudentMedalRecords } from '@/lib/storage';
 import { PracticeSession } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
@@ -15,6 +15,7 @@ import PracticeLeaderboard from './PracticeLeaderboard';
 import MonthlyAchievements from './MonthlyAchievements';
 import YearlyAchievements from './YearlyAchievements';
 import StreakProgress from './StreakProgress';
+import { hybridSync } from '@/lib/hybridSync';
 
 interface PracticeTrackingProps {
   studentId: string;
@@ -38,6 +39,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [shownCongrats, setShownCongrats] = useState<Set<string>>(new Set());
   const [activeCelebration, setActiveCelebration] = useState<{ message: string; medal: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadSessions();
@@ -284,6 +286,63 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     setActiveCelebration({ message, medal });
   };
 
+  const saveWithRetry = async (sessionData: Omit<PracticeSession, 'id' | 'createdAt'>, maxRetries = 3): Promise<boolean> => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        setIsSaving(true);
+        
+        // Add session locally first
+        const session = addPracticeSession(sessionData);
+        
+        // Sync to Dropbox
+        const result = await hybridSync.onDataChange();
+        
+        if (result.success) {
+          toast({
+            title: '✅ נשמר בהצלחה!',
+            description: `${sessionData.durationMinutes} דקות נשמרו בדרופבוקס`,
+            duration: 3000,
+          });
+          return true;
+        } else {
+          // Failed - retry
+          if (attempt < maxRetries) {
+            toast({
+              title: '⚠️ ניסיון שמירה...',
+              description: `ניסיון ${attempt + 1} מתוך ${maxRetries}`,
+              duration: 2000,
+            });
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+          } else {
+            toast({
+              title: '❌ שמירה נכשלה',
+              description: result.message || 'בדקי חיבור לאינטרנט ונסי שוב',
+              variant: 'destructive',
+              duration: 5000,
+            });
+            return false;
+          }
+        }
+      } catch (error) {
+        console.error('Save error:', error);
+        if (attempt === maxRetries) {
+          toast({
+            title: '❌ שגיאה בשמירה',
+            description: 'אנא נסי שוב מאוחר יותר',
+            variant: 'destructive',
+            duration: 5000,
+          });
+          return false;
+        }
+      } finally {
+        if (attempt === maxRetries) {
+          setIsSaving(false);
+        }
+      }
+    }
+    return false;
+  };
+
   const handleStartTracking = () => {
     setIsTracking(true);
     setStartTime(new Date());
@@ -294,7 +353,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     });
   };
 
-  const handleStopTracking = () => {
+  const handleStopTracking = async () => {
     if (!startTime) return;
 
     const endTime = new Date();
@@ -311,29 +370,28 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
       return;
     }
 
-    const session = addPracticeSession({
+    const sessionData = {
       studentId,
       date: new Date().toISOString().split('T')[0],
       startTime: startTime.toTimeString().slice(0, 5),
       endTime: endTime.toTimeString().slice(0, 5),
       durationMinutes,
-    });
+    };
+
+    const saved = await saveWithRetry(sessionData);
 
     setIsTracking(false);
     setStartTime(null);
     setElapsedSeconds(0);
-    loadSessions();
 
-    // Check for duration milestones - for THIS session only, not total
-    showDurationCongrats(durationMinutes);
-
-    toast({
-      title: 'אימון הושלם!',
-      description: `נרשמו ${durationMinutes} דקות אימון`,
-    });
+    if (saved) {
+      loadSessions();
+      // Check for duration milestones - for THIS session only, not total
+      showDurationCongrats(durationMinutes);
+    }
   };
 
-  const handleManualEntry = () => {
+  const handleManualEntry = async () => {
     if (!manualStartTime || !manualEndTime || !manualDate) {
       toast({
         title: 'שגיאה',
@@ -356,62 +414,61 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
       return;
     }
 
-    addPracticeSession({
+    const sessionData = {
       studentId,
       date: manualDate,
       startTime: manualStartTime,
       endTime: manualEndTime,
       durationMinutes,
-    });
+    };
 
-    // Reload sessions and recalculate stats after adding manual entry
-    const allSessions = getStudentPracticeSessions(studentId);
-    const allMedals = getStudentMedalRecords(studentId);
-    
-    // Group by date
-    const grouped = allSessions.reduce((acc, session) => {
-      if (!acc[session.date]) acc[session.date] = [];
-      acc[session.date].push(session);
-      return acc;
-    }, {} as Record<string, PracticeSession[]>);
-    
-    const stats = Object.entries(grouped)
-      .map(([date, daySessions]) => {
-        const totalMinutes = daySessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-        const medals: string[] = [];
-        
-        allMedals.filter(m => m.earnedDate === date).forEach(m => {
-          if (m.medalType === 'duration') {
-            if (m.level === 'diamond') medals.push('💠 יהלום');
-            else if (m.level === 'platinum') medals.push('💎 פלטינום');
-            else if (m.level === 'gold') medals.push('🥇 זהב');
-            else if (m.level === 'silver') medals.push('🥈 כסף');
-            else if (m.level === 'bronze') medals.push('🥉 נחושת');
-          } else if (m.medalType === 'streak') {
-            if (m.level === 'streak7') medals.push('👑 מרצפת');
-            else if (m.level === 'streak5') medals.push('⚡ מרוצף');
-            else if (m.level === 'streak3') medals.push('🔥 רצוף');
-          }
-        });
-        
-        return { date, sessions: daySessions, totalMinutes, medals };
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    setDailyStats(stats);
-    checkStreaks(stats);
-    
-    setManualStartTime('');
-    setManualEndTime('');
-    setManualDate('');
-    
-    // Award medal for the ENTERED DATE, not today
-    showDurationCongrats(durationMinutes, manualDate);
+    const saved = await saveWithRetry(sessionData);
 
-    toast({
-      title: 'אימון נרשם!',
-      description: `נרשמו ${durationMinutes} דקות אימון`,
-    });
+    if (saved) {
+      // Reload sessions and recalculate stats after adding manual entry
+      const allSessions = getStudentPracticeSessions(studentId);
+      const allMedals = getStudentMedalRecords(studentId);
+      
+      // Group by date
+      const grouped = allSessions.reduce((acc, session) => {
+        if (!acc[session.date]) acc[session.date] = [];
+        acc[session.date].push(session);
+        return acc;
+      }, {} as Record<string, PracticeSession[]>);
+      
+      const stats = Object.entries(grouped)
+        .map(([date, daySessions]) => {
+          const totalMinutes = daySessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+          const medals: string[] = [];
+          
+          allMedals.filter(m => m.earnedDate === date).forEach(m => {
+            if (m.medalType === 'duration') {
+              if (m.level === 'diamond') medals.push('💠 יהלום');
+              else if (m.level === 'platinum') medals.push('💎 פלטינום');
+              else if (m.level === 'gold') medals.push('🥇 זהב');
+              else if (m.level === 'silver') medals.push('🥈 כסף');
+              else if (m.level === 'bronze') medals.push('🥉 נחושת');
+            } else if (m.medalType === 'streak') {
+              if (m.level === 'streak7') medals.push('👑 מרצפת');
+              else if (m.level === 'streak5') medals.push('⚡ מרוצף');
+              else if (m.level === 'streak3') medals.push('🔥 רצוף');
+            }
+          });
+          
+          return { date, sessions: daySessions, totalMinutes, medals };
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      setDailyStats(stats);
+      checkStreaks(stats);
+      
+      setManualStartTime('');
+      setManualEndTime('');
+      setManualDate(new Date().toISOString().split('T')[0]);
+      
+      // Award medal for the ENTERED DATE, not today
+      showDurationCongrats(durationMinutes, manualDate);
+    }
   };
 
   const getWeeklyTotal = () => {
@@ -530,9 +587,19 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
                   size="lg"
                   variant="destructive"
                   onClick={handleStopTracking}
+                  disabled={isSaving}
                 >
-                  <Square className="h-5 w-5 mr-2" />
-                  סיום אימון
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      שומר...
+                    </>
+                  ) : (
+                    <>
+                      <Square className="h-5 w-5 mr-2" />
+                      סיום אימון
+                    </>
+                  )}
                 </Button>
               </div>
             )}
@@ -569,8 +636,19 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
                 />
               </div>
               <div className="flex items-end">
-                <Button onClick={handleManualEntry} className="w-full">
-                  רישום אימון
+                <Button 
+                  onClick={handleManualEntry} 
+                  className="w-full"
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      שומר...
+                    </>
+                  ) : (
+                    'רישום אימון'
+                  )}
                 </Button>
               </div>
             </div>
