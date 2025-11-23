@@ -223,10 +223,10 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
       setIsProcessing(true);
 
       try {
-        const allLessons = getLessons();
+        // Use lessons prop which includes template lessons
         const allStudents = getStudents();
-        const myLesson = allLessons.find(l => l.id === myLessonId);
-        const targetLesson = allLessons.find(l => l.id === targetLessonId);
+        const myLesson = lessons.find(l => l.id === myLessonId);
+        const targetLesson = lessons.find(l => l.id === targetLessonId);
 
         if (!myLesson || !targetLesson) {
           throw new Error('שיעורים לא נמצאו');
@@ -251,7 +251,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
         };
 
         // Validate the swap
-        const validation = validateSwap(swapRequest as SwapRequest, allLessons, allStudents);
+        const validation = validateSwap(swapRequest as SwapRequest, lessons, allStudents);
         if (!validation.ok) {
           toast({
             title: 'שגיאה',
@@ -265,7 +265,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
         // Apply the swap logic
         const result = applySwap(
           swapRequest as SwapRequest,
-          allLessons,
+          lessons,
           allStudents,
           (req) => markLessonsAsSwapped(req, getLessons, updateLesson)
         );
