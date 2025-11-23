@@ -145,7 +145,7 @@ const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick, isSelectionActi
                       return (
                         <div
                           key={lesson.id}
-                          onDoubleClick={() => isClickable && onLessonDoubleClick(lesson)}
+                          onClick={() => isClickable && onLessonDoubleClick(lesson)}
                           className={`flex justify-between items-center p-3 border rounded-lg transition-all ${
                             isFuture 
                               ? 'bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 shadow-sm' 

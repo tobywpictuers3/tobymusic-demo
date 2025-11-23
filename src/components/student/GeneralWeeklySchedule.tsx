@@ -19,6 +19,7 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [selectedLessonForSwap, setSelectedLessonForSwap] = useState<Lesson | null>(null);
 
   useEffect(() => {
     const lessonsData = getLessons();
@@ -163,9 +164,10 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
     return lesson.isSwapped || lesson.notes?.includes('שיעור שהוחלף') || lesson.notes?.includes('החלפה');
   };
 
-  const handleLessonDoubleClick = (lesson: Lesson) => {
+  const handleLessonClick = (lesson: Lesson) => {
     const currentDate = new Date().toISOString().split('T')[0];
     if (lesson.date >= currentDate) {
+      setSelectedLessonForSwap(lesson);
       if (onLessonDoubleClick) {
         // Use new swap panel logic
         onLessonDoubleClick(lesson);
@@ -187,7 +189,7 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
           מערכת שיעורים שבועית
         </CardTitle>
         <p className="text-sm text-muted-foreground mt-2">
-          לחיצה כפולה על שיעור לבקשת החלפה
+          לחצי על שיעור לבחירה לבקשת החלפה
         </p>
       </CardHeader>
       <CardContent>
@@ -229,25 +231,28 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                       const isCompleted = lesson.status === 'completed';
                       const isSwapped = isSwappedLesson(lesson);
                       const isClickable = isFuture && onLessonDoubleClick;
+                      const isSelected = selectedLessonForSwap?.id === lesson.id;
 
                       return (
                         <div
                           key={lesson.id}
                           className={`p-2 border-2 rounded-lg text-xs transition-all duration-200 hover:shadow-md ${
-                            isSwapped 
-                              ? 'bg-[#8B4513]/10 border-[#8B4513] text-[#8B4513]' 
-                              : isFuture 
-                                ? 'bg-white/50 text-gray-700 border-gray-300' 
-                                : isCompleted 
-                                  ? 'bg-[#FFD700]/10 border-[#FFD700] text-gray-900' 
-                                  : 'bg-white border-gray-400 text-black'
-                          } ${isClickable ? 'cursor-pointer' : ''} ${
+                            isSelected
+                              ? 'bg-primary/20 border-primary border-4 shadow-lg ring-2 ring-primary ring-offset-2'
+                              : isSwapped 
+                                ? 'bg-[#8B4513]/10 border-[#8B4513] text-[#8B4513]' 
+                                : isFuture 
+                                  ? 'bg-white/50 text-gray-700 border-gray-300' 
+                                  : isCompleted 
+                                    ? 'bg-[#FFD700]/10 border-[#FFD700] text-gray-900' 
+                                    : 'bg-white border-gray-400 text-black'
+                          } ${isClickable ? 'cursor-pointer hover:scale-105' : ''} ${
                             isSelectionActive && isClickable 
                               ? 'ring-2 ring-primary ring-offset-2 animate-pulse' 
                               : ''
                           }`}
-                          onDoubleClick={() => handleLessonDoubleClick(lesson)}
-                          title={isClickable ? "לחץ פעמיים לבקשת החלפה" : ""}
+                          onClick={() => isClickable && handleLessonClick(lesson)}
+                          title={isClickable ? "לחצי לבחירת שיעור להחלפה" : ""}
                         >
                           <div className="space-y-1">
                             <div className="font-bold text-base text-black">
@@ -262,16 +267,23 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                             <div className="text-sm font-bold mt-2 text-black">
                               {lesson.startTime} - {lesson.endTime}
                             </div>
-                            {isSwapped && (
-                              <Badge className="text-[10px] px-1.5 py-0.5 bg-orange-500 text-white border-orange-500">
-                                הוחלף
-                              </Badge>
-                            )}
-                            {lesson.isOneOff && (
-                              <Badge className="text-[10px] px-1.5 py-0.5 bg-[#FFD700] text-black border-[#FFD700]">
-                                חד פעמי
-                              </Badge>
-                            )}
+                            <div className="flex gap-1 flex-wrap mt-1">
+                              {isSelected && (
+                                <Badge className="text-[10px] px-1.5 py-0.5 bg-primary text-white">
+                                  ✓ נבחר
+                                </Badge>
+                              )}
+                              {isSwapped && (
+                                <Badge className="text-[10px] px-1.5 py-0.5 bg-orange-500 text-white border-orange-500">
+                                  הוחלף
+                                </Badge>
+                              )}
+                              {lesson.isOneOff && (
+                                <Badge className="text-[10px] px-1.5 py-0.5 bg-[#FFD700] text-black border-[#FFD700]">
+                                  חד פעמי
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
