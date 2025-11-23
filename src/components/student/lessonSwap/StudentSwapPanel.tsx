@@ -82,6 +82,15 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
     // Handle lesson click from weekly schedule - auto-detect based on currentStep
     const handleLessonDoubleClick = (lesson: Lesson) => {
+      console.log('🔍 handleLessonDoubleClick called', { 
+        lessonId: lesson.id, 
+        lessonStudentId: lesson.studentId,
+        currentStudentId: student.id,
+        currentStep, 
+        myLessonId, 
+        targetLessonId 
+      });
+
       // Validate future lesson
       if (!isFutureLesson(lesson)) {
         toast({ 
@@ -93,28 +102,35 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
       // Auto-detect what to select based on currentStep
       if (currentStep === 2) {
+        console.log('📍 Step 2: Selecting MY lesson');
         // Step 2: Select MY lesson
         if (lesson.studentId === student.id) {
           setMyLessonId(lesson.id);
+          console.log('✅ MY lesson selected:', lesson.id);
           toast({ description: '✓ השיעור שלי נבחר בהצלחה' });
         } else {
+          console.log('❌ Not student lesson:', lesson.studentId, 'vs', student.id);
           toast({ 
             description: 'זה לא השיעור שלך - בחרי שיעור שרשום על שמך', 
             variant: 'destructive' 
           });
         }
       } else if (currentStep === 3) {
+        console.log('📍 Step 3: Selecting TARGET lesson');
         // Step 3: Select TARGET lesson
         if (lesson.id !== myLessonId && isFutureLesson(lesson)) {
           setTargetLessonId(lesson.id);
+          console.log('✅ TARGET lesson selected:', lesson.id);
           toast({ description: '✓ השיעור המבוקש נבחר בהצלחה' });
         } else {
+          console.log('❌ Cannot select:', { isSameAsMyLesson: lesson.id === myLessonId, isFuture: isFutureLesson(lesson) });
           toast({ 
             description: 'לא ניתן לבחור שיעור זה', 
             variant: 'destructive' 
           });
         }
       } else {
+        console.log('❌ Not in selection step, currentStep:', currentStep);
         // Not in selection mode
         toast({ 
           description: 'השלימי את השלבים הקודמים', 
