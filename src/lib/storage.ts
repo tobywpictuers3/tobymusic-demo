@@ -123,6 +123,7 @@ export const addStudent = (student: Omit<Student, 'id'>): Student => {
   const newStudent: Student = {
     ...student,
     id: generateId(),
+    lastModified: new Date().toISOString(),
   };
   students.push(newStudent);
   if (devModeActive) {
@@ -143,7 +144,11 @@ export const updateStudent = (id: string, updatedFields: Partial<Student>): Stud
   }
 
   // Update the student with the provided fields
-  students[studentIndex] = { ...students[studentIndex], ...updatedFields };
+  students[studentIndex] = { 
+    ...students[studentIndex], 
+    ...updatedFields,
+    lastModified: new Date().toISOString()
+  };
   if (devModeActive) {
     devData['students'] = students;
   } else {
@@ -185,6 +190,7 @@ export const addLesson = (lesson: Omit<Lesson, 'id'>): Lesson => {
   const newLesson: Lesson = {
     ...lesson,
     id: generateId(),
+    lastModified: new Date().toISOString(),
   };
   lessons.push(newLesson);
   if (devModeActive) {
@@ -204,7 +210,11 @@ export const updateLesson = (id: string, updatedFields: Partial<Lesson>): Lesson
     return undefined; // Lesson not found
   }
 
-  lessons[lessonIndex] = { ...lessons[lessonIndex], ...updatedFields };
+  lessons[lessonIndex] = { 
+    ...lessons[lessonIndex], 
+    ...updatedFields,
+    lastModified: new Date().toISOString()
+  };
   if (devModeActive) {
     devData['lessons'] = lessons;
   } else {
@@ -249,6 +259,7 @@ export const addPayment = (payment: Omit<Payment, 'id'>): Payment => {
   const newPayment: Payment = {
     ...payment,
     id: generateId(),
+    lastModified: new Date().toISOString(),
   };
   payments.push(newPayment);
   if (devModeActive) {
@@ -268,7 +279,11 @@ export const updatePayment = (studentId: string, month: string, updatedFields: P
     return undefined;
   }
 
-  payments[paymentIndex] = { ...payments[paymentIndex], ...updatedFields };
+  payments[paymentIndex] = { 
+    ...payments[paymentIndex], 
+    ...updatedFields,
+    lastModified: new Date().toISOString()
+  };
   if (devModeActive) {
     devData['payments'] = payments;
   } else {
@@ -645,10 +660,12 @@ export const getPerformances = (): Performance[] => {
 
 export const addPerformance = (performance: Omit<Performance, 'id' | 'createdAt'>): Performance => {
   const performances = getPerformances();
+  const now = new Date().toISOString();
   const newPerformance: Performance = {
     ...performance,
     id: generateId(),
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    lastModified: now,
   };
   performances.push(newPerformance);
   if (devModeActive) {
@@ -668,7 +685,11 @@ export const updatePerformance = (id: string, updatedFields: Partial<Performance
     return undefined;
   }
 
-  performances[performanceIndex] = { ...performances[performanceIndex], ...updatedFields };
+  performances[performanceIndex] = { 
+    ...performances[performanceIndex], 
+    ...updatedFields,
+    lastModified: new Date().toISOString()
+  };
   if (devModeActive) {
     devData['performances'] = performances;
   } else {
@@ -842,6 +863,7 @@ export const updateMonthlyAchievement = (
   const currentMonth = new Date().toISOString().slice(0, 7);
   const achievements = getMonthlyAchievements();
   const index = achievements.findIndex(a => a.studentId === studentId && a.month === currentMonth);
+  const now = new Date().toISOString();
   
   if (index !== -1) {
     const current = achievements[index];
@@ -850,7 +872,8 @@ export const updateMonthlyAchievement = (
       maxDailyAverage: Math.max(current.maxDailyAverage, updates.maxDailyAverage || 0),
       maxDailyMinutes: Math.max(current.maxDailyMinutes, updates.maxDailyMinutes || 0),
       maxStreak: Math.max(current.maxStreak, updates.maxStreak || 0),
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
+      lastModified: now,
     };
   } else {
     const newAchievement: MonthlyAchievement = {
@@ -860,8 +883,9 @@ export const updateMonthlyAchievement = (
       maxDailyAverage: updates.maxDailyAverage || 0,
       maxDailyMinutes: updates.maxDailyMinutes || 0,
       maxStreak: updates.maxStreak || 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
+      lastModified: now,
     };
     achievements.push(newAchievement);
   }
@@ -910,10 +934,12 @@ export const getStudentMedalRecords = (studentId: string): MedalRecord[] => {
 
 export const addMedalRecord = (record: Omit<MedalRecord, 'id' | 'createdAt'>): MedalRecord => {
   const records = getMedalRecords();
+  const now = new Date().toISOString();
   const newRecord: MedalRecord = {
     ...record,
     id: generateId(),
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    lastModified: now,
   };
   records.push(newRecord);
   inMemoryStorage['medalRecords'] = records;
@@ -931,7 +957,8 @@ export const updateMedalAsUsed = (medalId: string, usedForItem: string): boolean
     ...records[medalIndex],
     used: true,
     usedDate: new Date().toISOString().split('T')[0],
-    usedForItem
+    usedForItem,
+    lastModified: new Date().toISOString()
   };
   
   inMemoryStorage['medalRecords'] = records;
@@ -949,7 +976,8 @@ export const refundMedal = (medalId: string): boolean => {
     ...records[medalIndex],
     used: false,
     usedDate: undefined,
-    usedForItem: undefined
+    usedForItem: undefined,
+    lastModified: new Date().toISOString()
   };
   
   inMemoryStorage['medalRecords'] = records;

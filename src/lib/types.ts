@@ -19,6 +19,7 @@ export interface Student {
   calculatedAmount?: number; // Proportional amount when starting mid-year (overrides annualAmount for payment calculation)
   monthlyAmount: number; // Calculated: (calculatedAmount || annualAmount) / paymentMonths
   notes?: string;
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface Lesson {
@@ -35,6 +36,7 @@ export interface Lesson {
   grade?: number; // lesson grade 1-5 (homework grade)
   gradeNotes?: string; // optional text notes for the grade
   isSwapped?: boolean; // indicates this lesson was swapped with another student
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface Payment {
@@ -46,6 +48,7 @@ export interface Payment {
   paymentMethod: 'bank' | 'check' | 'cash' | 'inactive';
   notes?: string;
   paidDate?: string;
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface OneTimePayment {
@@ -74,6 +77,7 @@ export interface Performance {
   notes?: string;
   status: 'open' | 'closed'; // open = not finalized, closed = finalized
   createdAt: string;
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface SwapRequest {
@@ -162,6 +166,7 @@ export interface MedalRecord {
   used?: boolean; // whether medal was used for store purchase
   usedDate?: string; // when medal was used
   usedForItem?: string; // what item was purchased
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface MonthlyAchievement {
@@ -173,6 +178,7 @@ export interface MonthlyAchievement {
   maxStreak: number;
   createdAt: string;
   updatedAt: string;
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface LeaderboardEntry {

@@ -183,15 +183,39 @@ class HybridSyncManager {
   private mergeDataWithConflictResolution(localData: any, remoteData: any): any {
     const merged = { ...remoteData };
     
-    // Merge practice sessions with conflict resolution
-    const localSessions = localData.musicSystem_practiceSessions || [];
-    const remoteSessions = remoteData.musicSystem_practiceSessions || [];
-    merged.musicSystem_practiceSessions = this.mergeSessions(localSessions, remoteSessions);
+    // List of all data types that need conflict resolution
+    const conflictKeys = [
+      'musicSystem_practiceSessions',
+      'musicSystem_students',
+      'musicSystem_lessons',
+      'musicSystem_payments',
+      'musicSystem_performances',
+      'musicSystem_monthlyAchievements',
+      'musicSystem_medalRecords'
+    ];
+    
+    // Merge each data type with conflict resolution
+    conflictKeys.forEach(key => {
+      const localRecords = localData[key];
+      const remoteRecords = remoteData[key];
+      
+      if (localRecords && remoteRecords) {
+        try {
+          const localArray = typeof localRecords === 'string' ? JSON.parse(localRecords) : localRecords;
+          const remoteArray = typeof remoteRecords === 'string' ? JSON.parse(remoteRecords) : remoteRecords;
+          merged[key] = this.mergeRecords(localArray, remoteArray);
+        } catch (error) {
+          logger.warn(`Failed to merge ${key}, using local:`, error);
+          merged[key] = localRecords;
+        }
+      } else if (localRecords) {
+        merged[key] = localRecords;
+      }
+    });
     
     // Add other data types that don't need conflict resolution
-    // (they will be taken from local as they're the latest)
     Object.keys(localData).forEach(key => {
-      if (key !== 'musicSystem_practiceSessions' && key !== 'timestamp') {
+      if (!conflictKeys.includes(key) && key !== 'timestamp') {
         merged[key] = localData[key];
       }
     });
@@ -201,41 +225,41 @@ class HybridSyncManager {
   }
 
   /**
-   * Merge practice sessions by taking the most recent version of each session
+   * Generic merge function for any record type with lastModified timestamp
    */
-  private mergeSessions(localSessions: any[], remoteSessions: any[]): any[] {
-    const sessionMap = new Map<string, any>();
+  private mergeRecords(localRecords: any[], remoteRecords: any[]): any {
+    const recordMap = new Map<string, any>();
     
-    // Add all remote sessions first
-    remoteSessions.forEach(session => {
-      sessionMap.set(session.id, session);
+    // Add all remote records first
+    remoteRecords.forEach(record => {
+      recordMap.set(record.id, record);
     });
     
-    // Override with local sessions if they're newer
-    localSessions.forEach(localSession => {
-      const remoteSession = sessionMap.get(localSession.id);
+    // Override with local records if they're newer
+    localRecords.forEach(localRecord => {
+      const remoteRecord = recordMap.get(localRecord.id);
       
-      if (!remoteSession) {
-        // New local session - add it
-        sessionMap.set(localSession.id, localSession);
-      } else if (localSession.lastModified && remoteSession.lastModified) {
+      if (!remoteRecord) {
+        // New local record - add it
+        recordMap.set(localRecord.id, localRecord);
+      } else if (localRecord.lastModified && remoteRecord.lastModified) {
         // Both have timestamps - take the newer one
-        const localTime = new Date(localSession.lastModified).getTime();
-        const remoteTime = new Date(remoteSession.lastModified).getTime();
+        const localTime = new Date(localRecord.lastModified).getTime();
+        const remoteTime = new Date(remoteRecord.lastModified).getTime();
         
         if (localTime > remoteTime) {
-          sessionMap.set(localSession.id, localSession);
-          logger.info(`🔄 Merged session ${localSession.id}: local newer (${localSession.lastModified} vs ${remoteSession.lastModified})`);
-        } else {
-          logger.info(`🔄 Merged session ${localSession.id}: remote newer (${remoteSession.lastModified} vs ${localSession.lastModified})`);
+          recordMap.set(localRecord.id, localRecord);
         }
       } else {
         // No timestamp - prefer local (it's the latest change)
-        sessionMap.set(localSession.id, localSession);
+        recordMap.set(localRecord.id, localRecord);
       }
     });
     
-    return Array.from(sessionMap.values());
+    const mergedArray = Array.from(recordMap.values());
+    return typeof localRecords === 'string' || typeof remoteRecords === 'string' 
+      ? JSON.stringify(mergedArray)
+      : mergedArray;
   }
 
   /**

@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast';
 import { workerApi } from '@/lib/workerApi';
 import { logger } from '@/lib/logger';
 import { isDevMode } from '@/lib/storage';
+import { restorePracticeSessionsFromVersion } from '@/lib/practiceRestore';
 import { 
   History, 
   Download, 
@@ -13,7 +14,8 @@ import {
   RotateCcw,
   Calendar,
   HardDrive,
-  Loader2
+  Loader2,
+  Dumbbell
 } from 'lucide-react';
 import {
   Table,
@@ -68,6 +70,8 @@ const BackupHistory = () => {
   const [selectedVersion, setSelectedVersion] = useState<VersionInfo | null>(null);
   const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isPracticeRestoreDialogOpen, setIsPracticeRestoreDialogOpen] = useState(false);
+  const [isRestoringPractice, setIsRestoringPractice] = useState(false);
 
   useEffect(() => {
     loadVersions();
@@ -109,6 +113,48 @@ const BackupHistory = () => {
   const handleVersionClick = (version: VersionInfo) => {
     setSelectedVersion(version);
     setIsRestoreDialogOpen(true);
+  };
+
+  const handlePracticeRestoreClick = (version: VersionInfo, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedVersion(version);
+    setIsPracticeRestoreDialogOpen(true);
+  };
+
+  const handlePracticeRestore = async () => {
+    if (!selectedVersion) return;
+
+    setIsRestoringPractice(true);
+    try {
+      const result = await restorePracticeSessionsFromVersion(selectedVersion.path);
+      
+      if (result.success) {
+        toast({
+          title: '✅ שחזור אימונים הושלם',
+          description: `${result.restored} אימונים שוחזרו בהצלחה. הדף יתרענן...`,
+        });
+
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        toast({
+          title: '❌ שגיאה בשחזור אימונים',
+          description: result.error || 'לא ניתן לשחזר את האימונים',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      logger.error('Error restoring practice sessions:', error);
+      toast({
+        title: '❌ שגיאה',
+        description: 'אירעה תקלה. נסי שוב.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRestoringPractice(false);
+      setIsPracticeRestoreDialogOpen(false);
+    }
   };
 
   const handleRestore = async () => {
@@ -232,7 +278,7 @@ const BackupHistory = () => {
                       <TableHead className="text-right">תאריך ושעה</TableHead>
                       <TableHead className="text-right">גודל</TableHead>
                       <TableHead className="text-right">נתיב</TableHead>
-                      <TableHead className="text-right">פעולות</TableHead>
+                      <TableHead className="text-right" colSpan={2}>פעולות</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -267,7 +313,17 @@ const BackupHistory = () => {
                             }}
                           >
                             <RotateCcw className="h-4 w-4 ml-2" />
-                            שחזר
+                            שחזר הכל
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => handlePracticeRestoreClick(version, e)}
+                          >
+                            <Dumbbell className="h-4 w-4 ml-2" />
+                            שחזר רק אימונים
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -280,6 +336,7 @@ const BackupHistory = () => {
         </CardContent>
       </Card>
 
+      {/* Full Restore Dialog */}
       <AlertDialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -323,6 +380,62 @@ const BackupHistory = () => {
                 <>
                   <RotateCcw className="h-4 w-4 ml-2" />
                   שחזר גרסה
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Practice Sessions Only Restore Dialog */}
+      <AlertDialog open={isPracticeRestoreDialogOpen} onOpenChange={setIsPracticeRestoreDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>שחזור אימונים בלבד</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  פעולה זו תשחזר רק את נתוני האימונים מהגרסה הזו.
+                </p>
+                {selectedVersion && (
+                  <div className="p-4 bg-muted rounded-lg space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">תאריך:</span>
+                      <span>{formatDate(selectedVersion.server_modified)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">גודל:</span>
+                      <span>{formatSize(selectedVersion.size)}</span>
+                    </div>
+                  </div>
+                )}
+                <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                  <p className="text-sm font-medium">
+                    ✅ בטוח: כל שאר הנתונים (תלמידות, שיעורים, תשלומים) יישארו ללא שינוי
+                  </p>
+                </div>
+                <p className="text-destructive font-medium text-sm">
+                  ⚠️ נתוני האימונים הנוכחיים יוחלפו באימונים מהגרסה הזו
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRestoringPractice}>ביטול</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handlePracticeRestore}
+              disabled={isRestoringPractice}
+              className="bg-primary"
+            >
+              {isRestoringPractice ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                  משחזר אימונים...
+                </>
+              ) : (
+                <>
+                  <Dumbbell className="h-4 w-4 ml-2" />
+                  שחזר אימונים
                 </>
               )}
             </AlertDialogAction>
