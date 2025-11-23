@@ -268,6 +268,11 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                               {lesson.startTime} - {lesson.endTime}
                             </div>
                             <div className="flex gap-1 flex-wrap mt-1">
+                              {isSelectionActive && isClickable && (
+                                <Badge className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white animate-pulse">
+                                  לחצי כאן
+                                </Badge>
+                              )}
                               {isSelected && (
                                 <Badge className="text-[10px] px-1.5 py-0.5 bg-primary text-white">
                                   ✓ נבחר

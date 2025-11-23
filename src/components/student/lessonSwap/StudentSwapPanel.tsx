@@ -44,8 +44,6 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
     const [targetLessonId, setTargetLessonId] = useState<string>('');
     const [targetSwapCode, setTargetSwapCode] = useState<string>('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isSelectingMy, setIsSelectingMy] = useState(false);
-    const [isSelectingTarget, setIsSelectingTarget] = useState(false);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
     const myFutureLessons = lessons.filter(
@@ -82,16 +80,8 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
       }
     }, [targetLessonId, currentStep]);
 
-    // Handle lesson click from weekly schedule - using persistent selection states
+    // Handle lesson click from weekly schedule - auto-detect based on currentStep
     const handleLessonDoubleClick = (lesson: Lesson) => {
-      console.log('🔄 handleLessonDoubleClick called', { 
-        lessonId: lesson.id, 
-        isSelectingMy, 
-        isSelectingTarget,
-        myLessonId, 
-        targetLessonId 
-      });
-
       // Validate future lesson
       if (!isFutureLesson(lesson)) {
         toast({ 
@@ -101,26 +91,22 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
         return;
       }
 
-      // Handle based on persistent selection states
-      if (isSelectingMy) {
-        console.log('✅ Selecting MY lesson');
-        // Validate it's the student's lesson
+      // Auto-detect what to select based on currentStep
+      if (currentStep === 2) {
+        // Step 2: Select MY lesson
         if (lesson.studentId === student.id) {
           setMyLessonId(lesson.id);
-          setIsSelectingMy(false);
           toast({ description: '✓ השיעור שלי נבחר בהצלחה' });
         } else {
           toast({ 
-            description: 'זה לא השיעור שלך', 
+            description: 'זה לא השיעור שלך - בחרי שיעור שרשום על שמך', 
             variant: 'destructive' 
           });
         }
-      } else if (isSelectingTarget) {
-        console.log('✅ Selecting TARGET lesson');
-        // Validate it's not the same lesson
+      } else if (currentStep === 3) {
+        // Step 3: Select TARGET lesson
         if (lesson.id !== myLessonId && isFutureLesson(lesson)) {
           setTargetLessonId(lesson.id);
-          setIsSelectingTarget(false);
           toast({ description: '✓ השיעור המבוקש נבחר בהצלחה' });
         } else {
           toast({ 
@@ -129,10 +115,9 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           });
         }
       } else {
-        console.log('❌ No selection mode active');
-        // No selection mode active
+        // Not in selection mode
         toast({ 
-          description: 'לחצי קודם על "בחרי שיעור" או "בחרי שיעור מבוקש"', 
+          description: 'השלימי את השלבים הקודמים', 
           variant: 'destructive' 
         });
       }
@@ -346,16 +331,6 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
     return (
       <>
-        {/* Selection Mode Banner */}
-        {(isSelectingMy || isSelectingTarget) && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
-            <Badge className="text-lg px-6 py-3 bg-primary text-primary-foreground shadow-lg animate-pulse">
-              <MousePointerClick className="h-5 w-5 ml-2" />
-              {isSelectingMy ? 'בחרי את השיעור שלך מהמערכת למעלה' : 'בחרי את השיעור המבוקש מהמערכת למעלה'}
-            </Badge>
-          </div>
-        )}
-
         <Card className="card-gradient card-shadow mt-6">
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
@@ -409,24 +384,13 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button
-                    variant={isSelectingMy ? 'default' : 'outline'}
-                    className={`w-full justify-start text-right h-auto py-3 ${
-                      isSelectingMy ? 'bg-primary text-primary-foreground animate-pulse' : ''
-                    }`}
-                    onClick={() => {
-                      setIsSelectingMy(true);
-                      setIsSelectingTarget(false);
-                      toast({ 
-                        description: '👆 עכשיו לחצי על שיעור שלך במערכת למעלה',
-                        duration: 3000
-                      });
-                    }}
-                    disabled={currentStep < 2 || currentStep > 2}
-                  >
-                    <MousePointerClick className="h-4 w-4 ml-2" />
-                    {mySelectedLesson ? 'שיעור נבחר - לחצי לשינוי' : 'לחצי כאן ובחרי שיעור מהמערכת'}
-                  </Button>
+                  {currentStep === 2 && !myLessonId && (
+                    <div className="p-4 bg-primary/10 border-2 border-primary rounded-lg">
+                      <p className="text-center font-semibold">
+                        👆 לחצי על השיעור שלך במערכת השעות למעלה
+                      </p>
+                    </div>
+                  )}
                   {formatLessonDisplay(mySelectedLesson)}
                 </CardContent>
               </Card>
@@ -442,24 +406,13 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button
-                    variant={isSelectingTarget ? 'default' : 'outline'}
-                    className={`w-full justify-start text-right h-auto py-3 ${
-                      isSelectingTarget ? 'bg-primary text-primary-foreground animate-pulse' : ''
-                    }`}
-                    onClick={() => {
-                      setIsSelectingTarget(true);
-                      setIsSelectingMy(false);
-                      toast({ 
-                        description: '👆 עכשיו לחצי על השיעור המבוקש במערכת למעלה',
-                        duration: 3000
-                      });
-                    }}
-                    disabled={currentStep < 3 || currentStep > 3}
-                  >
-                    <MousePointerClick className="h-4 w-4 ml-2" />
-                    {targetSelectedLesson ? 'שיעור נבחר - לחצי לשינוי' : 'לחצי כאן ובחרי שיעור מהמערכת'}
-                  </Button>
+                  {currentStep === 3 && !targetLessonId && (
+                    <div className="p-4 bg-primary/10 border-2 border-primary rounded-lg">
+                      <p className="text-center font-semibold">
+                        👆 לחצי על השיעור המבוקש במערכת השעות למעלה
+                      </p>
+                    </div>
+                  )}
                   {formatLessonDisplay(targetSelectedLesson)}
                 </CardContent>
               </Card>
