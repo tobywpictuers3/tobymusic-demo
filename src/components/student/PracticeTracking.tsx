@@ -5,12 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Play, Square, Clock, Trophy, Sparkles, TrendingUp, Loader2, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { Play, Square, Clock, Trophy, Sparkles, TrendingUp, Loader2, CheckCircle, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { getPracticeSessions, addPracticeSession, getStudentPracticeSessions, updateMonthlyAchievement, getStudents, getLessons, addMedalRecord, getStudentMedalRecords, deletePracticeSession } from '@/lib/storage';
 import { PracticeSession } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
+import { format } from 'date-fns';
+import { he } from 'date-fns/locale';
 import { CelebrationToast } from './CelebrationToast';
 import PracticeLeaderboard from './PracticeLeaderboard';
 import MonthlyAchievements from './MonthlyAchievements';
@@ -42,6 +44,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   const [activeCelebration, setActiveCelebration] = useState<{ message: string; medal: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   useEffect(() => {
     loadSessions();
@@ -572,6 +575,73 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     }
   };
 
+  // Recalculate medals for all days - handles retroactive entries
+  const recalculateMedalsForAllDays = () => {
+    setIsRecalculating(true);
+    
+    try {
+      let medalsAwarded = 0;
+      const existingMedals = getStudentMedalRecords(studentId);
+      
+      // Process each day
+      dailyStats.forEach(day => {
+        // Check for duration medals (20, 40, 60 minutes)
+        const milestones = [
+          { minutes: 60, level: 'gold' as const, name: 'אלופה! 60 דקות' },
+          { minutes: 40, level: 'silver' as const, name: 'מצוינת! 40 דקות' },
+          { minutes: 20, level: 'bronze' as const, name: 'כל הכבוד! 20 דקות' }
+        ];
+        
+        milestones.forEach(milestone => {
+          if (day.totalMinutes >= milestone.minutes) {
+            // Check if medal already exists for this date and level
+            const alreadyHasMedal = existingMedals.some(m => 
+              m.earnedDate === day.date && 
+              m.medalType === 'duration' &&
+              m.durationMinutes === milestone.minutes &&
+              !m.used
+            );
+            
+            if (!alreadyHasMedal) {
+              addMedalRecord({
+                studentId,
+                medalType: 'duration',
+                level: milestone.level,
+                durationMinutes: milestone.minutes,
+                earnedDate: day.date,
+                used: false
+              });
+              medalsAwarded++;
+            }
+          }
+        });
+      });
+      
+      if (medalsAwarded > 0) {
+        toast({
+          title: `הוענקו ${medalsAwarded} מדליות חדשות! 🏅`,
+          description: 'המדליות נוספו על אימונים קודמים',
+        });
+        
+        // Reload sessions to update UI
+        loadSessions();
+      } else {
+        toast({
+          title: 'כל המדליות כבר הוענקו ✓',
+          description: 'לא נמצאו אימונים שזכאים למדליות נוספות',
+        });
+      }
+    } catch (error) {
+      console.error('Error recalculating medals:', error);
+      toast({
+        title: 'שגיאה בעדכון מדליות',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
   return (
     <>
       {activeCelebration && (
@@ -592,6 +662,23 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Retroactive Medal Calculation Button */}
+          <div className="pb-4 border-b">
+            <Button
+              onClick={recalculateMedalsForAllDays}
+              disabled={isRecalculating}
+              variant="outline"
+              size="sm"
+              className="w-full"
+            >
+              <RefreshCw className={`w-4 h-4 ml-2 ${isRecalculating ? 'animate-spin' : ''}`} />
+              {isRecalculating ? 'מחשב מדליות...' : 'עדכן מדליות למפרע'}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              לחצי כאן אם הזנת אימונים למפרע ולא קיבלת מדליות
+            </p>
+          </div>
+          
           <div className="flex items-center justify-center gap-4">
             {!isTracking ? (
               <Button

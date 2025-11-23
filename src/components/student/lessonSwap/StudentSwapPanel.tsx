@@ -1,4 +1,4 @@
-import { useState, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
+import { useState, useImperativeHandle, forwardRef, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -104,7 +104,8 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
     }, [currentStep]);
 
     // Handle lesson click from weekly schedule - auto-detect based on currentStep
-    const handleLessonDoubleClick = (lesson: Lesson) => {
+    // Use useCallback to ensure we always have the latest currentStep
+    const handleLessonDoubleClick = useCallback((lesson: Lesson) => {
       console.log('🔍 handleLessonDoubleClick called', { 
         lessonId: lesson.id, 
         lessonStudentId: lesson.studentId,
@@ -160,7 +161,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           variant: 'destructive' 
         });
       }
-    };
+    }, [currentStep, student.id, myLessonId, targetLessonId]);
 
     // Expose the handler to parent via ref
     useImperativeHandle(ref, () => ({
