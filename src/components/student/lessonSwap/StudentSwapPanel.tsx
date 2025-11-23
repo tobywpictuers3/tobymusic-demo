@@ -8,7 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Student, Lesson } from '@/lib/types';
 import { SwapRequest } from '@/lib/lessonSwap/types';
 import { isFutureLesson, validateSwap, applySwap } from '@/lib/lessonSwap/logic';
-import { addSwapRequest, markLessonsAsSwapped } from '@/lib/lessonSwap/store';
+import { addSwapRequest, markLessonsAsSwapped } from '@/lib/lessonSwap/swapStore';
 import { getLessons, getStudents, updateLesson } from '@/lib/storage';
 import { addMessage } from '@/lib/messages';
 import { ArrowLeftRight, X, MousePointerClick } from 'lucide-react';
