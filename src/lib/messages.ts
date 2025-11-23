@@ -115,14 +115,16 @@ export const getMessagesForStudent = (studentId: string, includeDeleted: boolean
       return false;
     }
     
-    // Skip drafts
-    if (message.isDraft) {
+    // Skip drafts not from this student
+    if (message.isDraft && message.senderId !== studentId) {
       return false;
     }
     
     // Include messages sent to all students or specifically to this student
+    // OR messages sent by this student
     return message.recipientIds.includes('all') || 
-           message.recipientIds.includes(studentId);
+           message.recipientIds.includes(studentId) ||
+           message.senderId === studentId;
   });
 };
 

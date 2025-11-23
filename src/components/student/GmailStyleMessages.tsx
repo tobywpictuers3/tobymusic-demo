@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   getMessagesForStudent, 
   markMessageAsRead, 
@@ -48,11 +49,14 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
   
   const [composeSubject, setComposeSubject] = useState('');
   const [composeContent, setComposeContent] = useState('');
+  const [composeRecipients, setComposeRecipients] = useState<string[]>(['admin']);
   
   const [allMessages, setAllMessages] = useState<Message[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
 
   useEffect(() => {
     loadMessages();
+    loadStudents();
   }, [studentId]);
 
   const loadMessages = () => {
@@ -60,11 +64,22 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     setAllMessages(messages);
   };
 
+  const loadStudents = async () => {
+    try {
+      const { getStudents } = await import('@/lib/storage');
+      const allStudents = getStudents();
+      // Filter out current student
+      setStudents(allStudents.filter(s => s.id !== studentId));
+    } catch (error) {
+      console.error('Error loading students:', error);
+    }
+  };
+
   const getFilteredMessages = (): Message[] => {
     switch (selectedFolder) {
       case 'inbox':
         return allMessages.filter(m => 
-          m.senderId !== studentId && 
+          (m.senderId !== studentId || m.recipientIds.includes(studentId)) && 
           !m.deletedBy?.[studentId]
         );
       case 'sent':
@@ -88,6 +103,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     setIsReplying(false);
     setComposeSubject('');
     setComposeContent('');
+    setComposeRecipients(['admin']);
     setSelectedMessage(null);
   };
 
@@ -96,6 +112,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     setIsComposing(true);
     setComposeSubject(`תגובה: ${message.subject}`);
     setComposeContent('');
+    setComposeRecipients([message.senderId]);
     setSelectedMessage(message);
   };
 
@@ -108,7 +125,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     addMessage({
       senderId: studentId,
       senderName: studentName,
-      recipientIds: ['admin'],
+      recipientIds: composeRecipients,
       subject: composeSubject,
       content: composeContent,
       inReplyTo: isReplying && selectedMessage ? selectedMessage.id : undefined,
@@ -120,6 +137,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     setIsReplying(false);
     setComposeSubject('');
     setComposeContent('');
+    setComposeRecipients(['admin']);
     setSelectedMessage(null);
     loadMessages();
   };
@@ -292,7 +310,31 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
               </div>
 
               <div className="space-y-2">
-                <Label>אל: מנהל המערכת</Label>
+                <Label>נמענים</Label>
+                <Select
+                  value={composeRecipients[0]}
+                  onValueChange={(value) => {
+                    if (value === 'all') {
+                      const allStudentIds = students.map(s => s.id);
+                      setComposeRecipients(['all', ...allStudentIds]);
+                    } else {
+                      setComposeRecipients([value]);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר נמענים" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">למנהל</SelectItem>
+                    <SelectItem value="all">לכל התלמידות</SelectItem>
+                    {students.map((student: any) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.firstName} {student.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
