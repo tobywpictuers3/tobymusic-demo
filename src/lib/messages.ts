@@ -38,19 +38,29 @@ export const saveMessages = (messages: Message[]): void => {
 export const addMessage = (message: Omit<Message, 'id' | 'createdAt'>): Message => {
   const messages = getMessages();
   const now = new Date();
+  
+  // Auto-star logic:
+  let autoStarred: Record<string, boolean> = {};
+  
+  // 1. If sent to "all", star for all students
+  if (message.recipientIds.includes('all')) {
+    const { getStudents } = require('./storage');
+    const allStudents = getStudents();
+    autoStarred = allStudents.reduce((acc: Record<string, boolean>, s: any) => 
+      ({ ...acc, [s.id]: true }), {});
+  }
+  // 2. If from admin, star for all recipients
+  else if (message.senderId === 'admin') {
+    autoStarred = message.recipientIds
+      .filter(id => id !== 'admin')
+      .reduce((acc, id) => ({ ...acc, [id]: true }), {});
+  }
+  
   const newMessage: Message = {
     ...message,
     id: Date.now().toString(),
     createdAt: now.toISOString(),
-    starred: message.senderId === 'admin' 
-      ? message.recipientIds
-          .filter(id => id !== 'admin')
-          .reduce((acc, id) => ({ ...acc, [id]: true }), {})
-      : message.recipientIds.includes('all')
-      ? message.recipientIds
-          .filter(id => id !== 'admin' && id !== 'all')
-          .reduce((acc, id) => ({ ...acc, [id]: true }), {})
-      : (message.starred || {}),
+    starred: autoStarred,
     expiresAt: message.senderId !== 'admin' && message.recipientIds.includes('all')
       ? new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString()
       : message.expiresAt,
