@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Play, Square, Clock, Trophy, Sparkles, TrendingUp, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { getPracticeSessions, addPracticeSession, getStudentPracticeSessions, updateMonthlyAchievement, getStudents, getLessons, addMedalRecord, getStudentMedalRecords } from '@/lib/storage';
+import { Play, Square, Clock, Trophy, Sparkles, TrendingUp, Loader2, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { getPracticeSessions, addPracticeSession, getStudentPracticeSessions, updateMonthlyAchievement, getStudents, getLessons, addMedalRecord, getStudentMedalRecords, deletePracticeSession } from '@/lib/storage';
 import { PracticeSession } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
@@ -40,6 +41,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   const [shownCongrats, setShownCongrats] = useState<Set<string>>(new Set());
   const [activeCelebration, setActiveCelebration] = useState<{ message: string; medal: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadSessions();
@@ -539,6 +541,31 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     return average;
   };
 
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      deletePracticeSession(sessionId);
+      await hybridSync.onDataChange();
+      
+      loadSessions();
+      
+      toast({
+        title: '✅ נמחק בהצלחה',
+        description: 'האימון נמחק מהמערכת',
+        duration: 3000,
+      });
+      
+      setSessionToDelete(null);
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({
+        title: '❌ שגיאה במחיקה',
+        description: 'אנא נסי שוב',
+        variant: 'destructive',
+        duration: 3000,
+      });
+    }
+  };
+
   return (
     <>
       {activeCelebration && (
@@ -737,6 +764,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
                 <TableHead>אימונים</TableHead>
                 <TableHead>סה"כ דקות</TableHead>
                 <TableHead>הישגים</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -753,11 +781,21 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
                   <TableCell>
                     <div className="space-y-1">
                       {day.sessions.map((session) => (
-                        <div key={session.id} className="text-sm text-muted-foreground">
-                          {session.startTime && session.endTime && (
-                            <span>{session.startTime} - {session.endTime}</span>
-                          )}
-                          <span className="mr-2">({session.durationMinutes} דק')</span>
+                        <div key={session.id} className="flex items-center justify-between text-sm text-muted-foreground group">
+                          <div>
+                            {session.startTime && session.endTime && (
+                              <span>{session.startTime} - {session.endTime}</span>
+                            )}
+                            <span className="mr-2">({session.durationMinutes} דק')</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                            onClick={() => setSessionToDelete(session.id)}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -774,6 +812,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
                       ))}
                     </div>
                   </TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -781,6 +820,26 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
         </CardContent>
       </Card>
       </div>
+
+      <AlertDialog open={!!sessionToDelete} onOpenChange={() => setSessionToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>מחיקת אימון</AlertDialogTitle>
+            <AlertDialogDescription>
+              האם את בטוחה שברצונך למחוק את האימון? פעולה זו לא ניתנת לביטול.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => sessionToDelete && handleDeleteSession(sessionToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              מחק
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
