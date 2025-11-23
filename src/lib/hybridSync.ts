@@ -23,12 +23,14 @@ class HybridSyncManager {
   };
 
   private syncInterval: NodeJS.Timeout | null = null;
+  private retryInterval: NodeJS.Timeout | null = null;
   private pendingQueue: Array<() => Promise<void>> = [];
 
   constructor() {
     this.setupNetworkListeners();
     this.startPeriodicSync();
     this.setupUnloadListener();
+    this.startOfflineRetry();
   }
 
   /**
@@ -48,39 +50,64 @@ class HybridSyncManager {
   }
 
   /**
+   * Start offline retry mechanism - try to sync every 2 minutes when offline with pending changes
+   */
+  private startOfflineRetry() {
+    this.retryInterval = setInterval(() => {
+      // Only retry if we have pending changes and think we're offline
+      if (this.syncState.pendingChanges > 0 && !this.syncState.isOnline) {
+        logger.info('🔄 Retrying offline sync (2min interval)...');
+        this.syncToWorker().then(success => {
+          if (success) {
+            logger.info('✅ Offline retry succeeded!');
+            this.syncState.isOnline = true; // Update online status
+          }
+        });
+      }
+    }, 2 * 60 * 1000); // 2 minutes
+  }
+
+  /**
    * Setup beforeunload listener to sync on close
    */
   private setupUnloadListener() {
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener('beforeunload', (e) => {
       // 🔧 DEV MODE: Skip all Worker sync
       if (isDevMode()) {
         logger.info('🔧 DEV MODE: Skipping beforeunload sync');
         return;
       }
       
-      if (this.syncState.isOnline && this.syncState.pendingChanges > 0) {
-        logger.info('💾 Saving to Worker on close...');
+      // ⚠️ CRITICAL: Warn if pending changes exist
+      if (this.syncState.pendingChanges > 0) {
+        const warningMessage = 'יש שינויים שטרם נשמרו בדרופבוקס! האם את בטוחה שאת רוצה לצאת?';
+        e.preventDefault();
+        e.returnValue = warningMessage;
         
-        try {
-          const data = this.gatherAllData();
+        logger.warn('⚠️ User trying to leave with pending changes');
+        
+        // Try one last sync with sendBeacon
+        if (this.syncState.isOnline) {
+          logger.info('💾 Attempting last sync before close...');
           
-          // 🛡️ GUARD: Only sync if we have meaningful data
-          const dataSize = JSON.stringify(data).length;
-          if (dataSize < 100) {
-            logger.warn('⚠️ Skipping beforeunload sync - data too small');
-            return;
+          try {
+            const data = this.gatherAllData();
+            
+            // 🛡️ GUARD: Only sync if we have meaningful data
+            const dataSize = JSON.stringify(data).length;
+            if (dataSize >= 100) {
+              const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+              navigator.sendBeacon(
+                'https://lovable-dropbox-api.w0504124161.workers.dev/?action=upload_versioned',
+                blob
+              );
+            }
+          } catch (error) {
+            logger.error('❌ beforeunload sync prevented:', error);
           }
-          
-          // Use sendBeacon for reliable sync on unload
-          const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-          navigator.sendBeacon(
-            'https://lovable-dropbox-api.w0504124161.workers.dev/?action=upload_versioned',
-            blob
-          );
-        } catch (error) {
-          logger.error('❌ beforeunload sync prevented:', error);
-          // Don't sync if there's an error
         }
+        
+        return warningMessage;
       }
     });
   }
@@ -479,6 +506,9 @@ class HybridSyncManager {
   destroy() {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
+    }
+    if (this.retryInterval) {
+      clearInterval(this.retryInterval);
     }
   }
 }
