@@ -62,6 +62,13 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
     // Handle lesson click from weekly schedule - EXPLICIT selectionMode
     const handleLessonDoubleClick = (lesson: Lesson) => {
+      console.log('🔄 handleLessonDoubleClick called', { 
+        lessonId: lesson.id, 
+        selectionMode, 
+        myLessonId, 
+        targetLessonId 
+      });
+
       // Validate future lesson
       if (!isFutureLesson(lesson)) {
         toast({ 
@@ -73,6 +80,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
       // Handle based on EXPLICIT selectionMode
       if (selectionMode === 'my') {
+        console.log('✅ Selecting MY lesson');
         // Validate it's the student's lesson
         if (lesson.studentId === student.id) {
           setMyLessonId(lesson.id);
@@ -85,6 +93,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           });
         }
       } else if (selectionMode === 'target') {
+        console.log('✅ Selecting TARGET lesson');
         // Validate it's not the same lesson
         if (lesson.id !== myLessonId && isFutureLesson(lesson)) {
           setTargetLessonId(lesson.id);
@@ -97,6 +106,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           });
         }
       } else {
+        console.log('❌ No selectionMode active');
         // No selection mode active
         toast({ 
           description: 'לחצי קודם על "בחרי שיעור" או "בחרי שיעור מבוקש"', 
@@ -341,8 +351,17 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
                     <Label>בחרי שיעור</Label>
                     <Button
                       variant={selectionMode === 'my' ? 'default' : 'outline'}
-                      className="w-full justify-start text-right h-auto py-3"
-                      onClick={() => setSelectionMode('my')}
+                      className={`w-full justify-start text-right h-auto py-3 ${
+                        selectionMode === 'my' ? 'bg-primary text-primary-foreground animate-pulse' : ''
+                      }`}
+                      onClick={() => {
+                        console.log('🔘 Button clicked - setting selectionMode to MY');
+                        setSelectionMode('my');
+                        toast({ 
+                          description: '👆 עכשיו לחצי על שיעור שלך במערכת למעלה',
+                          duration: 3000
+                        });
+                      }}
                     >
                       <MousePointerClick className="h-4 w-4 ml-2" />
                       {mySelectedLesson ? 'שיעור נבחר - לחצי לשינוי' : 'לחצי כאן ובחרי שיעור מהמערכת'}
@@ -381,8 +400,17 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
                     <Label>בחרי שיעור מבוקש</Label>
                     <Button
                       variant={selectionMode === 'target' ? 'default' : 'outline'}
-                      className="w-full justify-start text-right h-auto py-3"
-                      onClick={() => setSelectionMode('target')}
+                      className={`w-full justify-start text-right h-auto py-3 ${
+                        selectionMode === 'target' ? 'bg-primary text-primary-foreground animate-pulse' : ''
+                      }`}
+                      onClick={() => {
+                        console.log('🔘 Button clicked - setting selectionMode to TARGET');
+                        setSelectionMode('target');
+                        toast({ 
+                          description: '👆 עכשיו לחצי על השיעור המבוקש במערכת למעלה',
+                          duration: 3000
+                        });
+                      }}
                       disabled={!myLessonId || !isMyCodeValid}
                     >
                       <MousePointerClick className="h-4 w-4 ml-2" />
