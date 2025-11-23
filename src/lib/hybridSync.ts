@@ -191,7 +191,12 @@ class HybridSyncManager {
       'musicSystem_payments',
       'musicSystem_performances',
       'musicSystem_monthlyAchievements',
-      'musicSystem_medalRecords'
+      'musicSystem_medalRecords',
+      'musicSystem_swapRequests',
+      'musicSystem_files',
+      'musicSystem_scheduleTemplates',
+      'musicSystem_holidays',
+      'oneTimePayments'
     ];
     
     // Merge each data type with conflict resolution
