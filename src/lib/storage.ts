@@ -315,6 +315,7 @@ export const addSwapRequest = (swapRequest: Omit<SwapRequest, 'id'>) => {
   const newRequest = {
     ...swapRequest,
     id: Date.now().toString(),
+    lastModified: new Date().toISOString(),
   };
   requests.push(newRequest);
   inMemoryStorage['swapRequests'] = requests;
@@ -329,7 +330,11 @@ export const updateSwapRequest = (requestId: string, updates: Partial<SwapReques
   if (requestIndex === -1) return;
   
   const request = requests[requestIndex];
-  requests[requestIndex] = { ...request, ...updates };
+  requests[requestIndex] = { 
+    ...request, 
+    ...updates,
+    lastModified: new Date().toISOString()
+  };
   
   // If approved, perform the actual swap
   if (updates.status === 'approved') {
@@ -436,6 +441,7 @@ export const addFile = (file: Omit<FileEntry, 'id'>): FileEntry => {
   const newFile: FileEntry = {
     ...file,
     id: generateId(),
+    lastModified: new Date().toISOString(),
   };
   files.push(newFile);
   if (devModeActive) {
@@ -455,7 +461,11 @@ export const updateFile = (id: string, updatedFields: Partial<FileEntry>): FileE
     return undefined; // File not found
   }
 
-  files[fileIndex] = { ...files[fileIndex], ...updatedFields };
+  files[fileIndex] = { 
+    ...files[fileIndex], 
+    ...updatedFields,
+    lastModified: new Date().toISOString()
+  };
   if (devModeActive) {
     devData['files'] = files;
   } else {
@@ -497,6 +507,7 @@ export const addScheduleTemplate = (template: Omit<ScheduleTemplate, 'id' | 'cre
     ...template,
     id: generateId(),
     createdAt: new Date().toISOString(),
+    lastModified: new Date().toISOString(),
   };
   templates.push(newTemplate);
   if (devModeActive) {
@@ -516,11 +527,14 @@ export const activateScheduleTemplate = (id: string): ScheduleTemplate | undefin
     return undefined; // Template not found
   }
 
+  const now = new Date().toISOString();
+
   // Deactivate all other templates
   templates.forEach((template, index) => {
     if (index !== templateIndex && template.isActive) {
       template.isActive = false;
-      template.deactivatedAt = new Date().toISOString();
+      template.deactivatedAt = now;
+      template.lastModified = now;
     }
   });
 
@@ -528,7 +542,8 @@ export const activateScheduleTemplate = (id: string): ScheduleTemplate | undefin
   templates[templateIndex] = { 
     ...templates[templateIndex], 
     isActive: true,
-    activatedAt: new Date().toISOString()
+    activatedAt: now,
+    lastModified: now
   };
   
   if (devModeActive) {
@@ -548,7 +563,11 @@ export const updateScheduleTemplate = (id: string, updatedFields: Partial<Schedu
     return undefined; // Template not found
   }
 
-  templates[templateIndex] = { ...templates[templateIndex], ...updatedFields };
+  templates[templateIndex] = { 
+    ...templates[templateIndex], 
+    ...updatedFields,
+    lastModified: new Date().toISOString()
+  };
   if (devModeActive) {
     devData['scheduleTemplates'] = templates;
   } else {
@@ -737,11 +756,13 @@ export const getHolidays = (): Holiday[] => {
 
 export const addHoliday = (date: string, description?: string): Holiday => {
   const holidays = getHolidays();
+  const now = new Date().toISOString();
   const newHoliday: Holiday = {
     id: generateId(),
     date,
     description,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    lastModified: now,
   };
   holidays.push(newHoliday);
   if (devModeActive) {

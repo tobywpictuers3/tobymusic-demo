@@ -91,6 +91,7 @@ export interface SwapRequest {
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface FileEntry {
@@ -100,6 +101,7 @@ export interface FileEntry {
   description?: string; // optional description/explanation for the file
   webViewLink: string;
   uploadDate: string;
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface IntegrationSettings {
@@ -117,6 +119,7 @@ export interface ScheduleTemplate {
   createdAt: string;
   activatedAt?: string; // When this template was activated
   deactivatedAt?: string; // When this template was deactivated
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface WeeklyScheduleData {
@@ -141,6 +144,7 @@ export interface Holiday {
   date: string; // YYYY-MM-DD format
   description?: string;
   createdAt: string;
+  lastModified?: string; // Optimistic locking timestamp
 }
 
 export interface PracticeSession {
