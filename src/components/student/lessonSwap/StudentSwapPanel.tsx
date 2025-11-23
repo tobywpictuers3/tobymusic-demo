@@ -51,6 +51,9 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
     const hasAutoAdvancedToStep2 = useRef(false);
     const hasAutoAdvancedToStep3 = useRef(false);
     const hasAutoAdvancedToStep4 = useRef(false);
+    
+    // Use ref to track currentStep in real-time (solves race condition)
+    const currentStepRef = useRef<1 | 2 | 3 | 4>(1);
 
     const myFutureLessons = lessons.filter(
       (lesson) => lesson.studentId === student.id && isFutureLesson(lesson)
@@ -66,6 +69,12 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
     const mySelectedLesson = myLessonId ? lessons.find(l => l.id === myLessonId) : null;
     const targetSelectedLesson = targetLessonId ? getLessons().find(l => l.id === targetLessonId) : null;
+
+    // Sync ref with state for real-time access
+    useEffect(() => {
+      currentStepRef.current = currentStep;
+      console.log('[StudentSwapPanel] currentStepRef updated to:', currentStep);
+    }, [currentStep]);
 
     // Auto-advance to step 2 when valid code is entered
     useEffect(() => {
@@ -104,13 +113,16 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
     }, [currentStep]);
 
     // Handle lesson click from weekly schedule - auto-detect based on currentStep
-    // Use useCallback to ensure we always have the latest currentStep
+    // Use ref to get real-time currentStep value (solves race condition)
     const handleLessonDoubleClick = useCallback((lesson: Lesson) => {
+      // Read current step from ref for real-time value
+      const step = currentStepRef.current;
+      
       console.log('🔍 handleLessonDoubleClick called', { 
         lessonId: lesson.id, 
         lessonStudentId: lesson.studentId,
         currentStudentId: student.id,
-        currentStep, 
+        currentStep: step, 
         myLessonId, 
         targetLessonId 
       });
@@ -125,7 +137,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
       }
 
       // Auto-detect what to select based on currentStep
-      if (currentStep === 2) {
+      if (step === 2) {
         console.log('📍 Step 2: Selecting MY lesson');
         // Step 2: Select MY lesson
         if (lesson.studentId === student.id) {
@@ -139,7 +151,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
             variant: 'destructive' 
           });
         }
-      } else if (currentStep === 3) {
+      } else if (step === 3) {
         console.log('📍 Step 3: Selecting TARGET lesson');
         // Step 3: Select TARGET lesson
         if (lesson.id !== myLessonId && isFutureLesson(lesson)) {
@@ -154,14 +166,14 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           });
         }
       } else {
-        console.log('❌ Not in selection step, currentStep:', currentStep);
+        console.log('❌ Not in selection step, currentStep:', step);
         // Not in selection mode
         toast({ 
           description: 'השלימי את השלבים הקודמים', 
           variant: 'destructive' 
         });
       }
-    }, [currentStep, student.id, myLessonId, targetLessonId]);
+    }, [student.id, myLessonId, targetLessonId]);
 
     // Expose the handler to parent via ref
     useImperativeHandle(ref, () => ({
