@@ -38,7 +38,13 @@ const StudentDashboard = () => {
   const [student, setStudent] = useState<Student | null>(null);
   const { isPublicMode, setAccessMode } = useAccessMode();
   const [swapPanelRef, setSwapPanelRef] = useState<StudentSwapPanelRef | null>(null);
+  const [currentSwapStep, setCurrentSwapStep] = useState<1 | 2 | 3 | 4>(1);
   const [isSwapSelectionActive, setIsSwapSelectionActive] = useState(false);
+
+  // Sync isSwapSelectionActive with currentStep from SwapPanel
+  useEffect(() => {
+    setIsSwapSelectionActive(currentSwapStep === 2 || currentSwapStep === 3);
+  }, [currentSwapStep]);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -241,12 +247,14 @@ const StudentDashboard = () => {
                   studentId={student.id}
                   onLessonDoubleClick={handleLessonDoubleClick}
                   isSelectionActive={isSwapSelectionActive}
+                  currentSwapStep={currentSwapStep}
                 />
                 {student && (
                   <StudentSwapPanel 
                     student={student} 
                     lessons={getLessons()}
                     onMount={(ref) => setSwapPanelRef(ref)}
+                    onStepChange={(step) => setCurrentSwapStep(step)}
                   />
                 )}
               </>

@@ -29,6 +29,7 @@ interface StudentSwapPanelProps {
   student: Student;
   lessons: Lesson[];
   onMount?: (ref: { handleLessonDoubleClick: (lesson: Lesson) => void }) => void;
+  onStepChange?: (step: 1 | 2 | 3 | 4) => void;
 }
 
 export interface StudentSwapPanelRef {
@@ -36,7 +37,7 @@ export interface StudentSwapPanelRef {
 }
 
 const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
-  ({ student, lessons, onMount }, ref) => {
+  ({ student, lessons, onMount, onStepChange }, ref) => {
     // Step-based state management
     const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
     const [myLessonId, setMyLessonId] = useState<string>('');
@@ -150,6 +151,13 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
         onMount({ handleLessonDoubleClick });
       }
     }, []);
+
+    // Notify parent of step changes
+    useEffect(() => {
+      if (onStepChange) {
+        onStepChange(currentStep);
+      }
+    }, [currentStep, onStepChange]);
 
     const handleSubmitClick = () => {
       if (!myLessonId || !targetLessonId) {

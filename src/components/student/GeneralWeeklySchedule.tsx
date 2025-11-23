@@ -11,9 +11,10 @@ interface GeneralWeeklyScheduleProps {
   studentId?: string;
   onLessonDoubleClick?: (lesson: Lesson) => void;
   isSelectionActive?: boolean;
+  currentSwapStep?: 1 | 2 | 3 | 4;
 }
 
-const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId, onLessonDoubleClick, isSelectionActive }) => {
+const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId, onLessonDoubleClick, isSelectionActive, currentSwapStep = 1 }) => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -230,6 +231,17 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                       const isFuture = lesson.date > currentDate;
                       const isCompleted = lesson.status === 'completed';
                       const isSwapped = isSwappedLesson(lesson);
+                      
+                      // Determine if lesson is clickable based on currentSwapStep
+                      const isClickableForSelection = 
+                        isSelectionActive && 
+                        isFuture && 
+                        onLessonDoubleClick && 
+                        (
+                          (currentSwapStep === 2 && lesson.studentId === studentId) ||
+                          (currentSwapStep === 3 && lesson.studentId !== studentId)
+                        );
+                      
                       const isClickable = isFuture && onLessonDoubleClick;
                       const isSelected = selectedLessonForSwap?.id === lesson.id;
 
@@ -268,7 +280,7 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                               {lesson.startTime} - {lesson.endTime}
                             </div>
                             <div className="flex gap-1 flex-wrap mt-1">
-                              {isSelectionActive && isClickable && (
+                              {isClickableForSelection && (
                                 <Badge className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white animate-pulse">
                                   לחצי כאן
                                 </Badge>
