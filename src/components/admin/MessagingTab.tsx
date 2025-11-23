@@ -106,8 +106,8 @@ export default function MessagingTab() {
   };
 
   const handleSend = () => {
-    if (!composeContent.trim() || !composeSubject.trim()) {
-      toast.error('נא למלא נושא ותוכן');
+    if (!composeSubject.trim()) {
+      toast.error('נא למלא נושא');
       return;
     }
 

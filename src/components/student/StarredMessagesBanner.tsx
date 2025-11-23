@@ -38,10 +38,10 @@ export default function StarredMessagesBanner({ studentId }: StarredMessagesBann
         <Alert 
           key={message.id} 
           variant="default" 
-          className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 shadow-lg"
+          className="border-yellow-500 bg-gradient-to-br from-white to-yellow-100 shadow-lg"
         >
           <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-          <AlertTitle className="text-lg font-bold mb-2 flex items-center justify-between">
+          <AlertTitle className="text-lg font-bold mb-2 flex items-center justify-between text-red-600">
             <span>{message.subject}</span>
             <Button
               variant="ghost"
@@ -52,7 +52,7 @@ export default function StarredMessagesBanner({ studentId }: StarredMessagesBann
               <X className="h-4 w-4" />
             </Button>
           </AlertTitle>
-          <AlertDescription className="text-base">
+          <AlertDescription className="text-base text-black">
             <div className="mb-3 whitespace-pre-wrap">{message.content}</div>
             <div className="flex justify-between items-center text-sm text-muted-foreground">
               <span>מאת: {message.senderName}</span>

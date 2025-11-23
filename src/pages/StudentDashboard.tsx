@@ -43,6 +43,8 @@ const StudentDashboard = () => {
 
   // Sync isSwapSelectionActive with currentStep from SwapPanel
   useEffect(() => {
+    console.log('[StudentDashboard] currentSwapStep changed to:', currentSwapStep);
+    console.log('[StudentDashboard] Setting isSwapSelectionActive to:', currentSwapStep === 2 || currentSwapStep === 3);
     setIsSwapSelectionActive(currentSwapStep === 2 || currentSwapStep === 3);
   }, [currentSwapStep]);
 

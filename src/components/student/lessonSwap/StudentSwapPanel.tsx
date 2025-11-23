@@ -154,6 +154,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
     // Notify parent of step changes
     useEffect(() => {
+      console.log('[StudentSwapPanel] Step changed to:', currentStep);
       if (onStepChange) {
         onStepChange(currentStep);
       }

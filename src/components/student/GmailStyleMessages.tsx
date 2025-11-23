@@ -117,8 +117,8 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
   };
 
   const handleSend = () => {
-    if (!composeContent.trim() || !composeSubject.trim()) {
-      toast.error('נא למלא נושא ותוכן');
+    if (!composeSubject.trim()) {
+      toast.error('נא למלא נושא');
       return;
     }
 
@@ -322,8 +322,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                   value={composeRecipients[0]}
                   onValueChange={(value) => {
                     if (value === 'all') {
-                      const allStudentIds = students.map(s => s.id);
-                      setComposeRecipients(['all', ...allStudentIds]);
+                      setComposeRecipients(['all']);
                     } else {
                       setComposeRecipients([value]);
                     }
