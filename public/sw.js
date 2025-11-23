@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sonata-music-v2-20251123';
+const CACHE_NAME = 'sonata-music-v3-gmail-style';
 const urlsToCache = [
   '/',
   '/index.html',

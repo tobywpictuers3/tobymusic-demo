@@ -204,7 +204,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
             subject: '⭐ ✓ החלפת שיעור בוצעה',
             content: `✅ החלפת שיעור בוצעה בהצלחה!\n\n👥 בין: ${student.firstName} ${student.lastName} ↔ ${targetStudent.firstName} ${targetStudent.lastName}\n\n📅 שיעור של ${student.firstName}: ${myLessonDetails}\n📅 שיעור של ${targetStudent.firstName}: ${targetLessonDetails}\n\n✨ ההחלפה אושרה אוטומטית באמצעות קוד החלפה תקין.\nהשיעורים עודכנו במערכת.`,
             type: 'swap_approval',
-            starred: true,
+            starred: { [student.id]: true, [targetStudent.id]: true, 'admin': true },
           });
 
           toast({
@@ -220,7 +220,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
             subject: '⭐ בקשת החלפת שיעור - דורש אישור',
             content: `📋 בקשה חדשה להחלפת שיעור\n\n👤 מבקשת: ${student.firstName} ${student.lastName}\n📅 שיעור להחלפה: ${myLessonDetails}\n\n👤 תלמידת יעד: ${targetStudent.firstName} ${targetStudent.lastName}\n📅 שיעור מבוקש: ${targetLessonDetails}\n\n${targetSwapCode ? '⚠️ קוד החלפה של היעד הוזן אך אינו תקין - נדרש אישור ידני' : '⏳ לא הוזן קוד החלפה - נדרש אישור ידני'}\n\nלאישור או דחייה, עברי ללשונית 'תקשורת' > 'בקשות החלפה'`,
             type: 'swap_request',
-            starred: true,
+            starred: { 'admin': true },
           });
 
           toast({

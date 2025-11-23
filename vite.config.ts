@@ -5,7 +5,6 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  cacheDir: '.vite-cache-cleared-' + Date.now(),
   server: {
     host: "::",
     port: 8080,

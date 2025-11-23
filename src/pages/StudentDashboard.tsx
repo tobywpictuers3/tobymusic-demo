@@ -19,7 +19,8 @@ import PaymentAlert from '@/components/student/PaymentAlert';
 import PaymentSummary from '@/components/student/PaymentSummary';
 import LessonHistory from '@/components/student/LessonHistory';
 import PracticeTracking from '@/components/student/PracticeTracking';
-import MessagesView from '@/components/student/MessagesView';
+import GmailStyleMessages from '@/components/student/GmailStyleMessages';
+import BroadcastMessageBanner from '@/components/student/BroadcastMessageBanner';
 import MessageAlert from '@/components/student/MessageAlert';
 import MedalCollection from '@/components/student/MedalCollection';
 import MedalStore from '@/components/student/MedalStore';
@@ -173,6 +174,9 @@ const StudentDashboard = () => {
 
       <div className="container mx-auto p-4 space-y-6 pt-2">
 
+        {/* Broadcast Messages Banner - Above everything */}
+        {!isPublicMode && <BroadcastMessageBanner studentId={studentId!} />}
+
         {/* Payment Alerts - Hide in public mode */}
         {!isPublicMode && <PaymentAlert studentId={studentId!} />}
 
@@ -262,8 +266,7 @@ const StudentDashboard = () => {
           </TabsContent>
 
           <TabsContent value="messages" className="space-y-6">
-            <MessageAlert studentId={studentId!} />
-            <MessagesView 
+            <GmailStyleMessages 
               studentId={studentId!} 
               studentName={`${student?.firstName || ''} ${student?.lastName || ''}`}
             />
