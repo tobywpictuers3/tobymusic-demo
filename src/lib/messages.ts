@@ -94,7 +94,19 @@ export const toggleMessageStar = (messageId: string, userId: string): void => {
     if (!message.starred) {
       message.starred = {};
     }
-    message.starred[userId] = !message.starred[userId];
+    
+    // Allow sender to unstar messages sent to "all" even if they were auto-starred
+    const isSender = message.senderId === userId;
+    const isSentToAll = message.recipientIds.includes('all');
+    
+    if (isSender && isSentToAll) {
+      // Sender can freely toggle their own star on messages sent to all
+      message.starred[userId] = !message.starred[userId];
+    } else {
+      // Regular toggle for other cases
+      message.starred[userId] = !message.starred[userId];
+    }
+    
     saveMessages(messages);
   }
 };

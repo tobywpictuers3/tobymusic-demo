@@ -1,6 +1,7 @@
 import { workerApi } from './workerApi';
 import { logger } from './logger';
 import { exportAllData, initializeStorage, isDevMode } from './storage';
+import { recalculateAllMonthlyAchievements } from './recalculateAchievements';
 
 /**
  * Hybrid Sync Manager - Worker as source of truth, localStorage as cache
@@ -382,6 +383,15 @@ class HybridSyncManager {
         this.syncState.lastSyncTime = new Date().toISOString();
         this.syncState.pendingChanges = 0;
         logger.info('✅ Worker sync completed with conflict resolution');
+        
+        // Recalculate achievements after sync to ensure they reflect current data
+        try {
+          recalculateAllMonthlyAchievements();
+          logger.info('✅ Achievements recalculated after sync');
+        } catch (error) {
+          logger.warn('⚠️ Failed to recalculate achievements after sync:', error);
+        }
+        
         return true;
       } else {
         logger.warn('⚠️ Sync failed:', result.error);
