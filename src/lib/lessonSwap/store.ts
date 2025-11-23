@@ -3,8 +3,7 @@ import { SwapRequest } from './types';
 import { Student, Lesson } from '@/lib/types';
 import { 
   isDevMode, 
-  getDevStore,
-  exportAllData as baseExportAllData 
+  getDevStore
 } from '@/lib/storage';
 import { hybridSync } from '@/lib/hybridSync';
 import { logger } from '@/lib/logger';
