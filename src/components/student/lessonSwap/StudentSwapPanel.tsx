@@ -60,30 +60,55 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
     const mySelectedLesson = myLessonId ? lessons.find(l => l.id === myLessonId) : null;
     const targetSelectedLesson = targetLessonId ? getLessons().find(l => l.id === targetLessonId) : null;
 
-    // Handle lesson double-click from weekly schedule
+    // Handle lesson click from weekly schedule - SMART AUTO-DETECTION
     const handleLessonDoubleClick = (lesson: Lesson) => {
-      if (selectionMode === 'my') {
-        if (lesson.studentId === student.id && isFutureLesson(lesson)) {
+      // If lesson is not a future lesson, reject
+      if (!isFutureLesson(lesson)) {
+        toast({ 
+          description: 'ניתן לבחור רק שיעורים עתידיים', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      // SMART MODE: Auto-detect which field to fill
+      
+      // If 'my lesson' is not selected yet, fill it (only if it's the student's lesson)
+      if (!myLessonId) {
+        if (lesson.studentId === student.id) {
           setMyLessonId(lesson.id);
           setSelectionMode(null);
-          toast({ description: 'שיעור נבחר בהצלחה ✓' });
+          toast({ description: '✓ השיעור שלי נבחר בהצלחה' });
         } else {
           toast({ 
-            description: 'לא ניתן לבחור שיעור זה', 
+            description: 'זה לא השיעור שלך. בחרי את השיעור שלך קודם.', 
             variant: 'destructive' 
           });
         }
-      } else if (selectionMode === 'target') {
-        if (isFutureLesson(lesson) && lesson.id !== myLessonId) {
-          setTargetLessonId(lesson.id);
-          setSelectionMode(null);
-          toast({ description: 'שיעור יעד נבחר בהצלחה ✓' });
-        } else {
+        return;
+      }
+
+      // If 'my lesson' is already selected but 'target lesson' is not, fill target
+      if (myLessonId && !targetLessonId) {
+        if (lesson.id === myLessonId) {
           toast({ 
-            description: 'לא ניתן לבחור שיעור זה', 
+            description: 'בחרת את אותו שיעור. בחרי שיעור אחר להחלפה.', 
             variant: 'destructive' 
           });
+          return;
         }
+        setTargetLessonId(lesson.id);
+        setSelectionMode(null);
+        toast({ description: '✓ השיעור המבוקש נבחר בהצלחה' });
+        return;
+      }
+
+      // If both are selected, let user know they need to clear first
+      if (myLessonId && targetLessonId) {
+        toast({ 
+          description: 'שני השיעורים כבר נבחרו. אם ברצונך לשנות, נקי קודם.', 
+          variant: 'destructive' 
+        });
       }
     };
 
