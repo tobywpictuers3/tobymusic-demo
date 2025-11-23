@@ -1,5 +1,5 @@
 import { Message } from './types';
-import { isDevMode, getDevStore } from './storage';
+import { isDevMode, getDevStore, getStudents } from './storage';
 import { hybridSync } from './hybridSync';
 
 // Get storage location
@@ -44,7 +44,6 @@ export const addMessage = (message: Omit<Message, 'id' | 'createdAt'>): Message 
   
   // 1. If sent to "all", star for all students
   if (message.recipientIds.includes('all')) {
-    const { getStudents } = require('./storage');
     const allStudents = getStudents();
     autoStarred = allStudents.reduce((acc: Record<string, boolean>, s: any) => 
       ({ ...acc, [s.id]: true }), {});

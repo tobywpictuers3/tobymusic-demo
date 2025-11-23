@@ -1,4 +1,4 @@
-import { useState, useImperativeHandle, forwardRef, useEffect } from 'react';
+import { useState, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +46,11 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
     const [targetSwapCode, setTargetSwapCode] = useState<string>('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    
+    // Refs to prevent infinite loops in auto-advance
+    const hasAutoAdvancedToStep2 = useRef(false);
+    const hasAutoAdvancedToStep3 = useRef(false);
+    const hasAutoAdvancedToStep4 = useRef(false);
 
     const myFutureLessons = lessons.filter(
       (lesson) => lesson.studentId === student.id && isFutureLesson(lesson)
@@ -62,24 +67,41 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
     const mySelectedLesson = myLessonId ? lessons.find(l => l.id === myLessonId) : null;
     const targetSelectedLesson = targetLessonId ? getLessons().find(l => l.id === targetLessonId) : null;
 
-    // Auto-advance steps
+    // Auto-advance to step 2 when valid code is entered
     useEffect(() => {
-      if (currentStep === 1 && isMyCodeValid) {
+      if (currentStep === 1 && isMyCodeValid && !hasAutoAdvancedToStep2.current) {
+        console.log('[StudentSwapPanel] Auto-advancing to step 2');
+        hasAutoAdvancedToStep2.current = true;
         setCurrentStep(2);
       }
-    }, [mySwapCode, isMyCodeValid, currentStep]);
+    }, [mySwapCode, isMyCodeValid]);
 
+    // Auto-advance to step 3 when my lesson is selected
     useEffect(() => {
-      if (currentStep === 2 && myLessonId) {
+      if (currentStep === 2 && myLessonId && !hasAutoAdvancedToStep3.current) {
+        console.log('[StudentSwapPanel] Auto-advancing to step 3');
+        hasAutoAdvancedToStep3.current = true;
         setCurrentStep(3);
       }
-    }, [myLessonId, currentStep]);
+    }, [myLessonId]);
 
+    // Auto-advance to step 4 when target lesson is selected
     useEffect(() => {
-      if (currentStep === 3 && targetLessonId) {
+      if (currentStep === 3 && targetLessonId && !hasAutoAdvancedToStep4.current) {
+        console.log('[StudentSwapPanel] Auto-advancing to step 4');
+        hasAutoAdvancedToStep4.current = true;
         setCurrentStep(4);
       }
-    }, [targetLessonId, currentStep]);
+    }, [targetLessonId]);
+
+    // Reset refs when going back to step 1
+    useEffect(() => {
+      if (currentStep === 1) {
+        hasAutoAdvancedToStep2.current = false;
+        hasAutoAdvancedToStep3.current = false;
+        hasAutoAdvancedToStep4.current = false;
+      }
+    }, [currentStep]);
 
     // Handle lesson click from weekly schedule - auto-detect based on currentStep
     const handleLessonDoubleClick = (lesson: Lesson) => {
