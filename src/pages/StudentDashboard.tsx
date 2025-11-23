@@ -21,6 +21,7 @@ import LessonHistory from '@/components/student/LessonHistory';
 import PracticeTracking from '@/components/student/PracticeTracking';
 import GmailStyleMessages from '@/components/student/GmailStyleMessages';
 import BroadcastMessageBanner from '@/components/student/BroadcastMessageBanner';
+import StarredMessagesBanner from '@/components/student/StarredMessagesBanner';
 import MessageAlert from '@/components/student/MessageAlert';
 import MedalCollection from '@/components/student/MedalCollection';
 import MedalStore from '@/components/student/MedalStore';
@@ -174,7 +175,10 @@ const StudentDashboard = () => {
 
       <div className="container mx-auto p-4 space-y-6 pt-2">
 
-        {/* Broadcast Messages Banner - Above everything */}
+        {/* Starred Messages Banner - Above everything */}
+        {!isPublicMode && <StarredMessagesBanner studentId={studentId!} />}
+
+        {/* Broadcast Messages Banner */}
         {!isPublicMode && <BroadcastMessageBanner studentId={studentId!} />}
 
         {/* Payment Alerts - Hide in public mode */}

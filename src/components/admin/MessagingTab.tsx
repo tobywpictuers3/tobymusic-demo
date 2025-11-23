@@ -164,6 +164,13 @@ export default function MessagingTab() {
       markMessageAsRead(message.id, 'admin', true);
       loadData();
     }
+    
+    // Auto-unstar when opening a starred message
+    if (message.starred?.['admin']) {
+      toggleMessageStar(message.id, 'admin');
+      loadData();
+    }
+    
     setSelectedMessage(message);
   };
 

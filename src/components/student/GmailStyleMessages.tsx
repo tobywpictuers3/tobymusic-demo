@@ -166,6 +166,13 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
       markMessageAsRead(message.id, studentId, true);
       loadMessages();
     }
+    
+    // Auto-unstar when opening a starred message
+    if (message.starred?.[studentId]) {
+      toggleMessageStar(message.id, studentId);
+      loadMessages();
+    }
+    
     setSelectedMessage(message);
   };
 
