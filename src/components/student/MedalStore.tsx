@@ -1,10 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ShoppingBag, Trophy } from 'lucide-react';
-import { getStudentMedalRecords, updateMedalAsUsed } from '@/lib/storage';
+import { ShoppingBag, Trophy, Undo2, ShoppingCart } from 'lucide-react';
+import { getStudentMedalRecords, updateMedalAsUsed, refundMedal } from '@/lib/storage';
 import { useEffect, useState } from 'react';
 import { MedalRecord } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MedalStoreProps {
   studentId: string;
@@ -21,6 +31,8 @@ interface StoreItem {
 const MedalStore = ({ studentId }: MedalStoreProps) => {
   const [medals, setMedals] = useState<MedalRecord[]>([]);
   const [availableMedals, setAvailableMedals] = useState(0);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [selectedRefund, setSelectedRefund] = useState<{ medalIds: string[], itemName: string } | null>(null);
 
   useEffect(() => {
     loadMedals();
@@ -69,6 +81,63 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
     loadMedals();
   };
 
+  const handleRefundRequest = (itemName: string) => {
+    // Find all medals used for this item
+    const usedMedals = medals.filter(m => m.used && m.usedForItem === itemName);
+    
+    if (usedMedals.length === 0) return;
+
+    setSelectedRefund({
+      medalIds: usedMedals.map(m => m.id),
+      itemName
+    });
+    setRefundDialogOpen(true);
+  };
+
+  const handleRefundConfirm = () => {
+    if (!selectedRefund) return;
+
+    selectedRefund.medalIds.forEach(medalId => {
+      refundMedal(medalId);
+    });
+
+    toast({
+      title: '✅ הרכישה בוטלה בהצלחה',
+      description: `${selectedRefund.medalIds.length} מדליות הוחזרו לחשבונך`
+    });
+
+    setRefundDialogOpen(false);
+    setSelectedRefund(null);
+    loadMedals();
+  };
+
+  // Group purchases by item name
+  const getPurchasedItems = () => {
+    const purchasedMap = new Map<string, { count: number, date: string }>();
+    
+    medals.filter(m => m.used && m.usedForItem).forEach(medal => {
+      const itemName = medal.usedForItem!;
+      const existing = purchasedMap.get(itemName);
+      
+      if (existing) {
+        purchasedMap.set(itemName, {
+          count: existing.count + 1,
+          date: medal.usedDate! > existing.date ? medal.usedDate! : existing.date
+        });
+      } else {
+        purchasedMap.set(itemName, { count: 1, date: medal.usedDate! });
+      }
+    });
+
+    return Array.from(purchasedMap.entries()).map(([itemName, data]) => ({
+      itemName,
+      medalCount: data.count,
+      purchaseDate: data.date
+    }));
+  };
+
+  const purchasedItems = getPurchasedItems();
+
   return (
     <div className="space-y-6">
       {/* Available Medals Counter */}
@@ -83,6 +152,44 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Purchased Items - Refund Section */}
+      {purchasedItems.length > 0 && (
+        <Card className="border-purple-200 dark:border-purple-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              הרכישות שלי
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {purchasedItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20"
+                >
+                  <div className="flex-1">
+                    <h4 className="font-bold">{item.itemName}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {item.medalCount} מדליות • נרכש ב-{item.purchaseDate}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRefundRequest(item.itemName)}
+                    className="gap-2"
+                  >
+                    <Undo2 className="h-4 w-4" />
+                    החזר
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Store Items */}
       <Card>
@@ -126,6 +233,30 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Refund Confirmation Dialog */}
+      <AlertDialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>אישור ביטול רכישה</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedRefund && (
+                <>
+                  האם את בטוחה שברצונך לבטל את הרכישה של "{selectedRefund.itemName}"?
+                  <br />
+                  <strong className="text-foreground">{selectedRefund.medalIds.length} מדליות יוחזרו לחשבונך.</strong>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRefundConfirm}>
+              אישור החזר
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
