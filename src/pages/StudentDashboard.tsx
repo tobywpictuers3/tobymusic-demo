@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { LogOut, Calendar, User, Phone, FileText } from 'lucide-react';
-import { getCurrentUser, setCurrentUser, getStudents, getLessons } from '@/lib/storage';
+import { getCurrentUser, setCurrentUser, getStudents } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { Student } from '@/lib/types';
+import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { useAccessMode } from '@/contexts/AccessModeContext';
 import GeneralWeeklySchedule from '@/components/student/GeneralWeeklySchedule';
 import SwapRequestForm from '@/components/student/SwapRequestForm';
@@ -254,7 +255,7 @@ const StudentDashboard = () => {
                 {student && (
                   <StudentSwapPanel 
                     student={student} 
-                    lessons={getLessons()}
+                    lessons={getAllLessonsIncludingTemplates()}
                     onMount={(ref) => setSwapPanelRef(ref)}
                     onStepChange={(step) => setCurrentSwapStep(step)}
                   />
