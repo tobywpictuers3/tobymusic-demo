@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 
 interface StudentWeeklyScheduleProps {
   studentId: string;
+  onLessonDoubleClick?: (lesson: any) => void;
+  isSelectionActive?: boolean;
 }
 
-const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
+const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick, isSelectionActive }: StudentWeeklyScheduleProps) => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const allLessons = getLessons();
   const lessons = allLessons.filter(lesson => 
@@ -92,18 +94,18 @@ const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Week Navigation */}
+        {/* Week Navigation - RTL corrected */}
         <div className="flex justify-between items-center mb-6">
-          <Button onClick={handlePrevWeek} variant="outline" size="sm">
-            <ArrowRight className="h-4 w-4" />
-            שבוע קודם
+          <Button onClick={handleNextWeek} variant="outline" size="sm">
+            <ArrowLeft className="h-4 w-4 ml-2" />
+            שבוע הבא
           </Button>
           <h3 className="text-lg font-semibold">
             {weekDates[0].toLocaleDateString('he-IL')} - {weekDates[6].toLocaleDateString('he-IL')}
           </h3>
-          <Button onClick={handleNextWeek} variant="outline" size="sm">
-            שבוע הבא
-            <ArrowLeft className="h-4 w-4 mr-2" />
+          <Button onClick={handlePrevWeek} variant="outline" size="sm">
+            שבוע קודם
+            <ArrowRight className="h-4 w-4 mr-2" />
           </Button>
         </div>
 
@@ -138,10 +140,12 @@ const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
                       const isFuture = lesson.date >= currentDate;
                       const isCompleted = lesson.status === 'completed';
                       const isCancelled = lesson.status === 'cancelled';
+                      const isClickable = onLessonDoubleClick && isFuture;
                       
                       return (
                         <div
                           key={lesson.id}
+                          onDoubleClick={() => isClickable && onLessonDoubleClick(lesson)}
                           className={`flex justify-between items-center p-3 border rounded-lg transition-all ${
                             isFuture 
                               ? 'bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 shadow-sm' 
@@ -150,6 +154,14 @@ const StudentWeeklySchedule = ({ studentId }: StudentWeeklyScheduleProps) => {
                                 : isCancelled
                                   ? 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800'
                                   : 'bg-muted/50 border-muted'
+                          } ${
+                            isClickable 
+                              ? 'cursor-pointer hover:scale-[1.02] hover:shadow-md active:scale-[0.98]' 
+                              : ''
+                          } ${
+                            isSelectionActive && isClickable
+                              ? 'ring-2 ring-primary ring-offset-2 animate-pulse'
+                              : ''
                           }`}
                         >
                           <div className="space-y-1">

@@ -26,7 +26,9 @@ import MedalStore from '@/components/student/MedalStore';
 import BackButton from '@/components/ui/back-button';
 import { SaveButton } from '@/components/ui/save-button';
 import { UnreadMessagesBadge } from '@/components/ui/unread-messages-badge';
-import StudentSwapPanel from '@/components/student/lessonSwap/StudentSwapPanel';
+import StudentSwapPanel, { StudentSwapPanelRef } from '@/components/student/lessonSwap/StudentSwapPanel';
+import StudentWeeklySchedule from '@/components/student/StudentWeeklySchedule';
+import { Lesson } from '@/lib/types';
 
 const StudentDashboard = () => {
   const { studentId } = useParams<{ studentId: string }>();
@@ -34,6 +36,8 @@ const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState('schedule');
   const [student, setStudent] = useState<Student | null>(null);
   const { isPublicMode, setAccessMode } = useAccessMode();
+  const [swapPanelRef, setSwapPanelRef] = useState<StudentSwapPanelRef | null>(null);
+  const [isSwapSelectionActive, setIsSwapSelectionActive] = useState(false);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -113,6 +117,12 @@ const StudentDashboard = () => {
       title: 'התנתקות מוצלחת',
       description: 'נתראה בפעם הבאה!',
     });
+  };
+
+  const handleLessonDoubleClick = (lesson: Lesson) => {
+    if (swapPanelRef) {
+      swapPanelRef.handleLessonDoubleClick(lesson);
+    }
   };
 
   if (!student) {
@@ -220,8 +230,18 @@ const StudentDashboard = () => {
               </Card>
             ) : (
               <>
-                <GeneralWeeklySchedule />
-                {student && <StudentSwapPanel student={student} lessons={getLessons()} />}
+                <StudentWeeklySchedule 
+                  studentId={student.id}
+                  onLessonDoubleClick={handleLessonDoubleClick}
+                  isSelectionActive={isSwapSelectionActive}
+                />
+                {student && (
+                  <StudentSwapPanel 
+                    student={student} 
+                    lessons={getLessons()}
+                    onMount={(ref) => setSwapPanelRef(ref)}
+                  />
+                )}
               </>
             )}
           </TabsContent>
