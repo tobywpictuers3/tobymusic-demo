@@ -4,6 +4,7 @@ import './index.css'
 import { hybridSync } from './lib/hybridSync';
 import { logger } from './lib/logger';
 import { clearPracticeAndMedalData, setDevMode } from './lib/storage';
+import { clearClientCaches } from './lib/cacheManager';
 // Show loading screen
 const root = document.getElementById("root")!;
 root.innerHTML = `
@@ -43,6 +44,11 @@ if ('serviceWorker' in navigator) {
     );
   });
 }
+
+// Clear cache on every load
+window.addEventListener('load', () => {
+  clearClientCaches();
+});
 
 // ❌ REMOVED: Don't clean localStorage on app close
 // All data is in inMemoryStorage, and hybridSync handles beforeunload sync

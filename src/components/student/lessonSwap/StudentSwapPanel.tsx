@@ -9,7 +9,7 @@ import { Student, Lesson } from '@/lib/types';
 import { SwapRequest } from '@/lib/lessonSwap/types';
 import { isFutureLesson, validateSwap, applySwap } from '@/lib/lessonSwap/logic';
 import { addSwapRequest, markLessonsAsSwapped } from '@/lib/lessonSwap/swapStore';
-import { updateLesson } from '@/lib/storage';
+import { updateLesson, getLessons } from '@/lib/storage';
 import { addMessage } from '@/lib/messages';
 import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { ArrowLeftRight, X, MousePointerClick } from 'lucide-react';
@@ -269,7 +269,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           swapRequest as SwapRequest,
           lessons,
           students,
-          (req) => markLessonsAsSwapped(req, () => lessons, updateLesson)
+          (req) => markLessonsAsSwapped(req, getLessons, updateLesson)
         );
 
         if (!result.ok) {
@@ -328,7 +328,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
         }
 
         // Get updated lessons after swap
-        const updatedLessons = getAllLessonsIncludingTemplates();
+        const updatedLessons = getLessons();
         
         // Refresh lessons in parent component with new data
         if (onSwapCompleted) {
