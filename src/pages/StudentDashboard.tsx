@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut, Calendar, User, Phone, FileText } from 'lucide-react';
 import { getCurrentUser, setCurrentUser, getStudents } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
-import { Student } from '@/lib/types';
+import { Student, Lesson } from '@/lib/types';
 import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { useAccessMode } from '@/contexts/AccessModeContext';
 import GeneralWeeklySchedule from '@/components/student/GeneralWeeklySchedule';
@@ -30,7 +30,6 @@ import BackButton from '@/components/ui/back-button';
 import { SaveButton } from '@/components/ui/save-button';
 import { UnreadMessagesBadge } from '@/components/ui/unread-messages-badge';
 import StudentSwapPanel, { StudentSwapPanelRef } from '@/components/student/lessonSwap/StudentSwapPanel';
-import { Lesson } from '@/lib/types';
 
 const StudentDashboard = () => {
   const { studentId } = useParams<{ studentId: string }>();
@@ -41,6 +40,17 @@ const StudentDashboard = () => {
   const [swapPanelRef, setSwapPanelRef] = useState<StudentSwapPanelRef | null>(null);
   const [currentSwapStep, setCurrentSwapStep] = useState<1 | 2 | 3 | 4>(1);
   const [isSwapSelectionActive, setIsSwapSelectionActive] = useState(false);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+
+  // Load lessons on mount
+  useEffect(() => {
+    setLessons(getAllLessonsIncludingTemplates());
+  }, []);
+
+  // Refresh lessons function
+  const refreshLessons = () => {
+    setLessons(getAllLessonsIncludingTemplates());
+  };
 
   // Sync isSwapSelectionActive with currentStep from SwapPanel
   useEffect(() => {
@@ -250,6 +260,7 @@ const StudentDashboard = () => {
               <>
                 <GeneralWeeklySchedule 
                   studentId={student.id}
+                  lessons={lessons}
                   onLessonDoubleClick={handleLessonDoubleClick}
                   isSelectionActive={isSwapSelectionActive}
                   currentSwapStep={currentSwapStep}
@@ -257,10 +268,11 @@ const StudentDashboard = () => {
                 {student && (
                   <StudentSwapPanel 
                     student={student} 
-                    lessons={getAllLessonsIncludingTemplates()}
+                    lessons={lessons}
                     students={allStudents}
                     onMount={(ref) => setSwapPanelRef(ref)}
                     onStepChange={(step) => setCurrentSwapStep(step)}
+                    onSwapCompleted={refreshLessons}
                   />
                 )}
               </>

@@ -11,24 +11,21 @@ import { isFutureLesson } from '@/lib/lessonSwap/logic';
 
 interface GeneralWeeklyScheduleProps {
   studentId?: string;
+  lessons: Lesson[];
   onLessonDoubleClick?: (lesson: Lesson) => void;
   isSelectionActive?: boolean;
   currentSwapStep?: 1 | 2 | 3 | 4;
 }
 
-const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId, onLessonDoubleClick, isSelectionActive, currentSwapStep = 1 }) => {
+const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId, lessons, onLessonDoubleClick, isSelectionActive, currentSwapStep = 1 }) => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [selectedLessonForSwap, setSelectedLessonForSwap] = useState<Lesson | null>(null);
 
   useEffect(() => {
-    const lessonsData = getAllLessonsIncludingTemplates();
     const studentsData = getStudents();
-    
-    setLessons(lessonsData);
     setStudents(studentsData);
   }, []);
 
@@ -272,29 +269,34 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                             </div>
                             <div className="text-sm font-bold mt-2 text-black">
                               {lesson.startTime} - {lesson.endTime}
-                            </div>
-                            <div className="flex gap-1 flex-wrap mt-1">
-                              {isClickableForSelection && (
-                                <Badge className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white animate-pulse">
-                                  לחצי כאן
-                                </Badge>
-                              )}
-                              {isSelected && (
-                                <Badge className="text-[10px] px-1.5 py-0.5 bg-primary text-white">
-                                  ✓ נבחר
-                                </Badge>
-                              )}
-                              {isSwapped && (
-                                <Badge className="text-[10px] px-1.5 py-0.5 bg-orange-500 text-white border-orange-500">
-                                  הוחלף
-                                </Badge>
-                              )}
-                              {lesson.isOneOff && (
-                                <Badge className="text-[10px] px-1.5 py-0.5 bg-[#FFD700] text-black border-[#FFD700]">
-                                  חד פעמי
-                                </Badge>
-                              )}
-                            </div>
+                             </div>
+                             <div className="flex gap-1 flex-wrap mt-1">
+                               {lesson.isSwapped && (
+                                 <Badge className="text-[10px] px-1.5 py-0.5 bg-orange-500 text-white border-orange-500">
+                                   הוחלף
+                                 </Badge>
+                               )}
+                               {isClickableForSelection && (
+                                 <Badge className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white animate-pulse">
+                                   לחצי כאן
+                                 </Badge>
+                               )}
+                               {isSelected && (
+                                 <Badge className="text-[10px] px-1.5 py-0.5 bg-primary text-white">
+                                   ✓ נבחר
+                                 </Badge>
+                               )}
+                               {isSwapped && (
+                                 <Badge className="text-[10px] px-1.5 py-0.5 bg-orange-500 text-white border-orange-500">
+                                   הוחלף
+                                 </Badge>
+                               )}
+                               {lesson.isOneOff && (
+                                 <Badge className="text-[10px] px-1.5 py-0.5 bg-[#FFD700] text-black border-[#FFD700]">
+                                   חד פעמי
+                                 </Badge>
+                               )}
+                             </div>
                           </div>
                         </div>
                       );

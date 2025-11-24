@@ -31,6 +31,7 @@ interface StudentSwapPanelProps {
   students: Student[];
   onMount?: (ref: { handleLessonDoubleClick: (lesson: Lesson) => void }) => void;
   onStepChange?: (step: 1 | 2 | 3 | 4) => void;
+  onSwapCompleted?: () => void;
 }
 
 export interface StudentSwapPanelRef {
@@ -38,7 +39,7 @@ export interface StudentSwapPanelRef {
 }
 
 const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
-  ({ student, lessons, students = [], onMount, onStepChange }, ref) => {
+  ({ student, lessons, students = [], onMount, onStepChange, onSwapCompleted }, ref) => {
     // Step-based state management
     const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
     const [myLessonId, setMyLessonId] = useState<string>('');
@@ -323,6 +324,11 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
             title: 'הבקשה נשלחה',
             description: 'הבקשה נשלחה למנהלת לאישור',
           });
+        }
+
+        // Refresh lessons in parent component
+        if (onSwapCompleted) {
+          onSwapCompleted();
         }
 
         // Reset form
