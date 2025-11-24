@@ -1,8 +1,11 @@
 import { logger } from './logger';
 
+// Version number - increment this to force cache clear on all clients
+const APP_VERSION = '1.0.1';
+
 /**
  * Clears all client-side caches, service workers, localStorage, and IndexedDB
- * Ensures fresh data on next load by forcing a hard reload
+ * Does NOT reload the page - caller is responsible for navigation/reload
  */
 export const clearClientCaches = async (): Promise<void> => {
   try {
@@ -82,4 +85,31 @@ export const clearCachesAndReload = async (): Promise<void> => {
   await clearClientCaches();
   // Force hard reload
   window.location.reload();
+};
+
+/**
+ * Checks if app version changed and clears cache if needed
+ * Call this once on app initialization (in App.tsx)
+ */
+export const checkVersionAndClearCache = async (): Promise<void> => {
+  try {
+    const storedVersion = localStorage.getItem('app_version');
+    
+    if (storedVersion !== APP_VERSION) {
+      logger.info(`🔄 App version changed from ${storedVersion || 'unknown'} to ${APP_VERSION}`);
+      logger.info('🧹 Clearing all caches due to version change...');
+      
+      // Clear everything EXCEPT the version flag (we'll set it after)
+      await clearClientCaches();
+      
+      // Set new version
+      localStorage.setItem('app_version', APP_VERSION);
+      
+      logger.info('✅ Cache cleared successfully for new version');
+    } else {
+      logger.info(`✓ App version ${APP_VERSION} - cache is up to date`);
+    }
+  } catch (error) {
+    logger.error('❌ Error checking version:', error);
+  }
 };
