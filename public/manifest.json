@@ -1,6 +1,7 @@
 {
   "name": "מערכת שיעורי נגינה - סונטה",
   "short_name": "סונטה",
+  "version": "1.0.2",
   "description": "מערכת ניהול שיעורי נגינה של טובי וינברג",
   "start_url": "/",
   "display": "standalone",
