@@ -352,73 +352,51 @@ export const updateSwapRequestStatus = (requestId: string, status: 'approved' | 
 const performLessonSwap = (swapRequest: SwapRequest) => {
   const lessons = getLessons();
   
-  // Find or create the original lesson
-  let originalLessonIndex = lessons.findIndex(l => 
+  // Find EXISTING lessons only (not templates)
+  const originalLessonIndex = lessons.findIndex(l => 
     l.studentId === swapRequest.requesterId && 
     l.date === swapRequest.date && 
     l.startTime === swapRequest.time
   );
   
-  // If original lesson doesn't exist (it was a template lesson), create it
-  if (originalLessonIndex === -1 && swapRequest.targetDate && swapRequest.targetTime) {
-    const newLesson = {
-      id: generateId(),
-      studentId: swapRequest.requesterId,
-      date: swapRequest.date,
-      startTime: swapRequest.time,
-      endTime: calculateEndTime(swapRequest.time, 30),
-      status: 'scheduled' as const,
-      notes: '',
-    };
-    lessons.push(newLesson);
-    originalLessonIndex = lessons.length - 1;
+  const targetLessonIndex = swapRequest.targetDate && swapRequest.targetTime
+    ? lessons.findIndex(l => 
+        l.studentId === swapRequest.targetId && 
+        l.date === swapRequest.targetDate && 
+        l.startTime === swapRequest.targetTime
+      )
+    : -1;
+  
+  // Only swap if BOTH lessons exist
+  if (originalLessonIndex === -1 || targetLessonIndex === -1) {
+    console.error('Cannot swap: one or both lessons not found', {
+      originalLessonIndex,
+      targetLessonIndex,
+      swapRequest
+    });
+    return;
   }
   
-  // Find or create the target lesson
-  let targetLessonIndex = -1;
-  if (swapRequest.targetDate && swapRequest.targetTime) {
-    targetLessonIndex = lessons.findIndex(l => 
-      l.studentId === swapRequest.targetId && 
-      l.date === swapRequest.targetDate && 
-      l.startTime === swapRequest.targetTime
-    );
-    
-    // If target lesson doesn't exist (it was a template lesson), create it
-    if (targetLessonIndex === -1) {
-      const newLesson = {
-        id: generateId(),
-        studentId: swapRequest.targetId,
-        date: swapRequest.targetDate,
-        startTime: swapRequest.targetTime,
-        endTime: calculateEndTime(swapRequest.targetTime, 30),
-        status: 'scheduled' as const,
-        notes: '',
-      };
-      lessons.push(newLesson);
-      targetLessonIndex = lessons.length - 1;
-    }
-  }
+  // Perform bidirectional swap
+  const temp = lessons[originalLessonIndex].studentId;
+  lessons[originalLessonIndex].studentId = lessons[targetLessonIndex].studentId;
+  lessons[targetLessonIndex].studentId = temp;
   
-  if (originalLessonIndex !== -1 && targetLessonIndex !== -1) {
-    // Swap the student IDs
-    const originalStudentId = lessons[originalLessonIndex].studentId;
-    const targetStudentId = lessons[targetLessonIndex].studentId;
-    
-    lessons[originalLessonIndex].studentId = targetStudentId;
-    lessons[targetLessonIndex].studentId = originalStudentId;
-    
-    // Add swap notation to both lessons with clear marker
-    const swapDate = new Date().toLocaleDateString('he-IL');
-    const swapNote = `שיעור שהוחלף (${swapDate})`;
-    
-    // Replace any existing notes or add the swap note
-    lessons[originalLessonIndex].notes = swapNote;
-    lessons[targetLessonIndex].notes = swapNote;
-    
-    inMemoryStorage['lessons'] = lessons;
-    // שמירה לדרופבוקס אחרי swap
-    hybridSync.onDataChange();
-  }
+  // Add swap notation to both lessons (ONE TIME)
+  const swapDate = new Date().toLocaleDateString('he-IL');
+  const swapNote = `שיעור שהוחלף (${swapDate})`;
+  
+  lessons[originalLessonIndex].notes = swapNote;
+  lessons[targetLessonIndex].notes = swapNote;
+  
+  // Save to storage
+  inMemoryStorage['lessons'] = lessons;
+  hybridSync.onDataChange();
+  
+  console.log('✅ Lesson swap completed successfully', {
+    lesson1: lessons[originalLessonIndex],
+    lesson2: lessons[targetLessonIndex]
+  });
 };
 
 // Helper function to calculate end time

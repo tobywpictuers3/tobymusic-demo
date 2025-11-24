@@ -273,7 +273,7 @@ const StudentDashboard = () => {
                     students={allStudents}
                     onMount={(ref) => setSwapPanelRef(ref)}
                     onStepChange={(step) => setCurrentSwapStep(step)}
-                    onSwapCompleted={refreshLessons}
+                    onSwapCompleted={() => refreshLessons()}
                   />
                 )}
               </>

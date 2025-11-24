@@ -210,5 +210,10 @@ export interface Message {
   isDraft?: boolean; // draft status
   inReplyTo?: string; // ID of message being replied to
   type: 'general' | 'swap_request' | 'swap_approval' | 'swap_rejection';
+  metadata?: {
+    swapRequestId?: string;
+    action?: 'approve_or_reject';
+    [key: string]: any;
+  };
 }
 
