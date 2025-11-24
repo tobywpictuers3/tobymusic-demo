@@ -5,7 +5,7 @@ import { hybridSync } from '@/lib/hybridSync';
 import { toast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { useAccessMode } from '@/contexts/AccessModeContext';
-import { clearAppCache } from '@/lib/clearAppCache';
+import { clearClientCaches } from '@/lib/cacheManager';
 
 export const SaveButton = () => {
   const [isSaving, setIsSaving] = useState(false);
@@ -26,7 +26,7 @@ export const SaveButton = () => {
 
     try {
       // Clear cache before saving
-      await clearAppCache();
+      await clearClientCaches();
       
       const result = await hybridSync.onDataChange();
 

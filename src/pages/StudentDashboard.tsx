@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { Student, Lesson } from '@/lib/types';
 import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { useAccessMode } from '@/contexts/AccessModeContext';
-import { clearAppCache } from '@/lib/clearAppCache';
+import { clearClientCaches } from '@/lib/cacheManager';
 import GeneralWeeklySchedule from '@/components/student/GeneralWeeklySchedule';
 import SwapRequestForm from '@/components/student/SwapRequestForm';
 import SwapRequestsStatus from '@/components/student/SwapRequestsStatus';
@@ -131,7 +131,7 @@ const StudentDashboard = () => {
   }, [studentId, navigate, setAccessMode]);
 
   const handleLogout = async () => {
-    await clearAppCache();
+    await clearClientCaches();
     setCurrentUser(null);
     navigate('/');
     toast({

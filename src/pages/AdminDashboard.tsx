@@ -9,7 +9,7 @@ import { hybridSync } from '@/lib/hybridSync';
 import { PrintPDFButton } from '@/components/ui/print-pdf-button';
 import { SaveButton } from '@/components/ui/save-button';
 import { UnreadMessagesBadge } from '@/components/ui/unread-messages-badge';
-import { clearAppCache } from '@/lib/clearAppCache';
+import { clearClientCaches } from '@/lib/cacheManager';
 
 // Import components
 import StudentsManagement from '@/components/admin/StudentsManagement';
@@ -58,7 +58,7 @@ const AdminDashboard = () => {
   }
 
   const handleLogout = async () => {
-    await clearAppCache();
+    await clearClientCaches();
     // Clear dev mode flag on logout
     sessionStorage.removeItem('musicSystem_devMode');
     setDevMode(false);

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar, Clock, Save } from 'lucide-react';
 import { getStudents, getActiveScheduleTemplate, syncStudentWithTemplate } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
-import { clearAppCache } from '@/lib/clearAppCache';
+import { clearClientCaches } from '@/lib/cacheManager';
 
 interface StudentScheduleViewProps {
   onSave?: () => void;
@@ -69,7 +69,7 @@ const StudentScheduleView = ({ onSave }: StudentScheduleViewProps) => {
   };
 
   const handleSave = async () => {
-    await clearAppCache();
+    await clearClientCaches();
     setHasChanges(false);
     onSave?.();
     toast({
