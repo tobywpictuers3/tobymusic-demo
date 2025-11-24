@@ -1,7 +1,7 @@
 import { logger } from './logger';
 
 // Version number - increment this to force cache clear on all clients
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 
 /**
  * Clears all client-side caches, service workers, localStorage, and IndexedDB
