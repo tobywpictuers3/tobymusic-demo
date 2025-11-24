@@ -9,18 +9,12 @@ const APP_VERSION = '1.0.1';
  */
 export const clearClientCaches = async (): Promise<void> => {
   try {
-    logger.info('🧹 Starting complete cache cleanup...');
+    logger.info('🧹 Starting cache cleanup...');
 
-    // 1. Unregister all Service Workers
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        await registration.unregister();
-        logger.info('✅ Service Worker unregistered');
-      }
-    }
+    // ⚠️ DON'T unregister Service Workers here - main.tsx handles it
+    // This prevents conflicts and allows PWA to work properly
 
-    // 2. Delete all caches
+    // 1. Delete all browser caches (SW will recreate minimal cache if needed)
     if ('caches' in window) {
       const cacheNames = await caches.keys();
       await Promise.all(
@@ -32,27 +26,43 @@ export const clearClientCaches = async (): Promise<void> => {
       logger.info('✅ All caches deleted');
     }
 
-    // 3. Clear localStorage
+    // 2. Clear localStorage EXCEPT session data
     try {
+      // 🔒 CRITICAL: Preserve hybridSync session
+      const sessionData = localStorage.getItem('hybridSync_session');
+      const appVersion = localStorage.getItem('app_version');
+      
       localStorage.clear();
-      logger.info('✅ localStorage cleared');
+      
+      // Restore critical data
+      if (sessionData) {
+        localStorage.setItem('hybridSync_session', sessionData);
+      }
+      if (appVersion) {
+        localStorage.setItem('app_version', appVersion);
+      }
+      
+      logger.info('✅ localStorage cleared (session preserved)');
     } catch (error) {
       logger.warn('⚠️ Could not clear localStorage:', error);
     }
 
-    // 4. Clear sessionStorage
+    // 3. Clear sessionStorage (except dev mode flag)
     try {
+      const devMode = sessionStorage.getItem('musicSystem_devMode');
       sessionStorage.clear();
-      logger.info('✅ sessionStorage cleared');
+      if (devMode) {
+        sessionStorage.setItem('musicSystem_devMode', devMode);
+      }
+      logger.info('✅ sessionStorage cleared (devMode preserved)');
     } catch (error) {
       logger.warn('⚠️ Could not clear sessionStorage:', error);
     }
 
-    // 5. Delete IndexedDB databases
+    // 4. Delete IndexedDB databases (EXCEPT hybridSync ones)
     if ('indexedDB' in window) {
       const dbNames = [
         'firebase-heartbeat',
-        'sonata-music-v3-gmail-style',
         'LocalForage',
         'firebaseLocalStorageDb'
       ];
@@ -63,16 +73,19 @@ export const clearClientCaches = async (): Promise<void> => {
           await new Promise((resolve, reject) => {
             deleteRequest.onsuccess = resolve;
             deleteRequest.onerror = reject;
-            deleteRequest.onblocked = resolve; // Continue even if blocked
+            deleteRequest.onblocked = resolve;
           });
           logger.info(`🗑️ IndexedDB deleted: ${dbName}`);
         } catch (error) {
           logger.warn(`⚠️ Could not delete IndexedDB: ${dbName}`, error);
         }
       }
+      
+      // ⚠️ DO NOT DELETE 'sonata-music-v3-gmail-style' - it may contain hybridSync data
+      logger.info('ℹ️ Skipped sonata-music-v3-gmail-style IndexedDB (may contain sync data)');
     }
 
-    logger.info('✅ Complete cache cleanup finished');
+    logger.info('✅ Cache cleanup finished');
   } catch (error) {
     logger.error('❌ Error during cache cleanup:', error);
   }

@@ -31,24 +31,46 @@ const cleanupLocalStorage = () => {
   logger.info('🧹 localStorage cleaned - only session data kept');
 };
 
-// Register Service Worker for PWA
+// Register Service Worker for PWA (minimal, network-first)
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(
-      (registration) => {
-        logger.info('ServiceWorker registered');
-      },
-      (error) => {
-        logger.info('ServiceWorker registration failed');
+  window.addEventListener('load', async () => {
+    try {
+      // Unregister old SWs first
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.unregister();
+        logger.info('🗑️ Old ServiceWorker unregistered');
       }
-    );
+
+      // Register new clean SW
+      const registration = await navigator.serviceWorker.register('/sw.js', {
+        updateViaCache: 'none', // Never cache SW file itself
+        scope: '/'
+      });
+
+      // Force update check on every load
+      registration.update();
+
+      logger.info('✅ ServiceWorker registered (v1.0.2)');
+      
+      // Listen for updates
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated') {
+              logger.info('🔄 New ServiceWorker activated');
+            }
+          });
+        }
+      });
+    } catch (error) {
+      logger.error('❌ ServiceWorker registration failed:', error);
+    }
   });
 }
 
-// Clear cache on every load
-window.addEventListener('load', () => {
-  clearClientCaches();
-});
+// ❌ REMOVED: clearClientCaches() on load - causes conflicts with SW
 
 // ❌ REMOVED: Don't clean localStorage on app close
 // All data is in inMemoryStorage, and hybridSync handles beforeunload sync
