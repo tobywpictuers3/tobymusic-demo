@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, ArrowRight, ArrowLeft } from 'lucide-react';
-import { getLessons, getStudents, getActiveScheduleTemplate } from '@/lib/storage';
+import { getStudents, getActiveScheduleTemplate } from '@/lib/storage';
+import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { Lesson, Student } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import StudentsSwapRequestDialog from '@/components/students/StudentsSwapRequestDialog';
@@ -24,7 +25,7 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
   const [selectedLessonForSwap, setSelectedLessonForSwap] = useState<Lesson | null>(null);
 
   useEffect(() => {
-    const lessonsData = getLessons();
+    const lessonsData = getAllLessonsIncludingTemplates();
     const studentsData = getStudents();
     
     setLessons(lessonsData);
