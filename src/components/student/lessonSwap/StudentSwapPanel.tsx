@@ -5,13 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Student, Lesson } from '@/lib/types';
-import { SwapRequest } from '@/lib/lessonSwap/types';
-import { isFutureLesson, validateSwap, applySwap } from '@/lib/lessonSwap/logic';
-import { addSwapRequest, markLessonsAsSwapped } from '@/lib/lessonSwap/swapStore';
-import { updateLesson, getLessons } from '@/lib/storage';
+import { Student, Lesson, SwapRequest } from '@/lib/types';
+import { addSwapRequest, updateSwapRequestStatus, getLessons } from '@/lib/storage';
 import { addMessage } from '@/lib/messages';
-import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { ArrowLeftRight, X, MousePointerClick } from 'lucide-react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -38,6 +34,14 @@ interface StudentSwapPanelProps {
 export interface StudentSwapPanelRef {
   handleLessonDoubleClick: (lesson: Lesson) => void;
 }
+
+// Helper: Check if lesson is in the future (allow up to 10 minutes before)
+const isFutureLesson = (lesson: Lesson): boolean => {
+  const now = new Date();
+  const lessonDateTime = new Date(`${lesson.date}T${lesson.startTime}`);
+  const tenMinutesBefore = new Date(lessonDateTime.getTime() - 10 * 60 * 1000);
+  return now < tenMinutesBefore;
+};
 
 const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
   ({ student, lessons, students = [], onMount, onStepChange, onSwapCompleted }, ref) => {
@@ -226,7 +230,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
       setIsProcessing(true);
 
       try {
-        // Use lessons and students from props
+        // Get lessons and students from props
         const myLesson = lessons.find(l => l.id === myLessonId);
         const targetLesson = lessons.find(l => l.id === targetLessonId);
 
@@ -240,97 +244,51 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           throw new Error('תלמידת יעד לא נמצאה');
         }
 
-        // Create swap request object
-        const swapRequest: Omit<SwapRequest, 'id'> = {
-          requesterStudentId: student.id,
-          requesterLessonId: myLessonId,
-          targetStudentId: targetStudent.id,
-          targetLessonId: targetLessonId,
-          requesterSwapCode: mySwapCode,
-          targetSwapCode: targetSwapCode || undefined,
-          status: 'pending_manager',
+        // Create swap request in storage.ts format
+        const swapRequestData: Omit<SwapRequest, 'id' | 'lastModified'> = {
+          requesterId: student.id,
+          targetId: targetStudent.id,
+          date: myLesson.date,
+          time: myLesson.startTime,
+          targetDate: targetLesson.date,
+          targetTime: targetLesson.startTime,
+          reason: targetSwapCode 
+            ? `החלפה אוטומטית עם קוד: ${targetSwapCode}` 
+            : 'בקשת החלפה (ללא קוד)',
+          status: 'pending',
           createdAt: new Date().toISOString(),
         };
 
-        // Validate the swap
-        const validation = validateSwap(swapRequest as SwapRequest, lessons, students);
-        if (!validation.ok) {
-          toast({
-            title: 'שגיאה',
-            description: validation.error,
-            variant: 'destructive',
-          });
-          setIsProcessing(false);
-          return;
-        }
+        // Save to storage
+        const savedRequest = addSwapRequest(swapRequestData);
 
-        // Apply the swap logic
-        const result = applySwap(
-          swapRequest as SwapRequest,
-          lessons,
-          students,
-          (req) => markLessonsAsSwapped(req, getLessons, updateLesson)
-        );
-
-        if (!result.ok) {
-          toast({
-            title: 'שגיאה',
-            description: result.error || 'שגיאה בביצוע ההחלפה',
-            variant: 'destructive',
-          });
-          setIsProcessing(false);
-          return;
-        }
-
-        // Save the swap request with the final status
-        const finalRequest = addSwapRequest({
-          ...swapRequest,
-          status: result.status || 'pending_manager',
-          resolvedAt: result.status === 'auto_approved' ? new Date().toISOString() : undefined,
-        });
+        // Auto-approve immediately (this triggers performLessonSwap in storage.ts)
+        updateSwapRequestStatus(savedRequest.id, 'approved');
 
         // Format lesson details for messages
         const myLessonDetails = `${format(new Date(myLesson.date), 'dd/MM/yyyy', { locale: he })} בשעה ${myLesson.startTime}`;
         const targetLessonDetails = `${format(new Date(targetLesson.date), 'dd/MM/yyyy', { locale: he })} בשעה ${targetLesson.startTime}`;
 
-        if (result.status === 'auto_approved') {
-          // Send success messages to admin and both students with starred flag
-          addMessage({
-            senderId: 'system',
-            senderName: 'מערכת',
-            recipientIds: ['admin', student.id, targetStudent.id],
-            subject: '⭐ ✓ החלפת שיעור בוצעה',
-            content: `✅ החלפת שיעור בוצעה בהצלחה!\n\n👥 בין: ${student.firstName} ${student.lastName} ↔ ${targetStudent.firstName} ${targetStudent.lastName}\n\n📅 שיעור של ${student.firstName}: ${myLessonDetails}\n📅 שיעור של ${targetStudent.firstName}: ${targetLessonDetails}\n\n✨ ההחלפה אושרה אוטומטית באמצעות קוד החלפה תקין.\nהשיעורים עודכנו במערכת.`,
-            type: 'swap_approval',
-            starred: { [student.id]: true, [targetStudent.id]: true, 'admin': true },
-          });
+        // Send starred message to all parties
+        addMessage({
+          senderId: 'system',
+          senderName: 'מערכת',
+          recipientIds: ['admin', student.id, targetStudent.id],
+          subject: '⭐ ✓ החלפת שיעור בוצעה',
+          content: `✅ החלפת שיעור בוצעה בהצלחה!\n\n👥 בין: ${student.firstName} ${student.lastName} ↔ ${targetStudent.firstName} ${targetStudent.lastName}\n\n📅 שיעור של ${student.firstName}: ${myLessonDetails}\n📅 שיעור של ${targetStudent.firstName}: ${targetLessonDetails}\n\n✨ ההחלפה אושרה ועודכנה במערכת.`,
+          type: 'swap_approval',
+          starred: { [student.id]: true, [targetStudent.id]: true, 'admin': true },
+        });
 
-          toast({
-            title: 'הצלחה!',
-            description: 'ההחלפה בוצעה בהצלחה באמצעות קוד החלפה',
-          });
-        } else {
-          // Send pending request message to admin only with starred flag
-          addMessage({
-            senderId: student.id,
-            senderName: `${student.firstName} ${student.lastName}`,
-            recipientIds: ['admin'],
-            subject: '⭐ בקשת החלפת שיעור - דורש אישור',
-            content: `📋 בקשה חדשה להחלפת שיעור\n\n👤 מבקשת: ${student.firstName} ${student.lastName}\n📅 שיעור להחלפה: ${myLessonDetails}\n\n👤 תלמידת יעד: ${targetStudent.firstName} ${targetStudent.lastName}\n📅 שיעור מבוקש: ${targetLessonDetails}\n\n${targetSwapCode ? '⚠️ קוד החלפה של היעד הוזן אך אינו תקין - נדרש אישור ידני' : '⏳ לא הוזן קוד החלפה - נדרש אישור ידני'}\n\nלאישור או דחייה, עברי ללשונית 'תקשורת' > 'בקשות החלפה'`,
-            type: 'swap_request',
-            starred: { 'admin': true },
-          });
+        toast({
+          title: 'הצלחה!',
+          description: 'ההחלפה בוצעה בהצלחה',
+        });
 
-          toast({
-            title: 'הבקשה נשלחה',
-            description: 'הבקשה נשלחה למנהלת לאישור',
-          });
-        }
-
-        // Get updated lessons after swap
+        // Get updated lessons from storage after swap
         const updatedLessons = getLessons();
         
-        // Refresh lessons in parent component with new data
+        // Refresh parent component with fresh data
         if (onSwapCompleted) {
           onSwapCompleted(updatedLessons);
         }
