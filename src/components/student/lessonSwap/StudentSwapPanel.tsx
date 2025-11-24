@@ -28,7 +28,7 @@ interface StudentSwapPanelProps {
   students: Student[];
   onMount?: (ref: { handleLessonDoubleClick: (lesson: Lesson) => void }) => void;
   onStepChange?: (step: 1 | 2 | 3 | 4) => void;
-  onSwapCompleted?: (newLessons: Lesson[]) => void;
+  onSwapCompleted?: () => void;
 }
 
 export interface StudentSwapPanelRef {
@@ -285,12 +285,9 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           description: 'ההחלפה בוצעה בהצלחה',
         });
 
-        // Get updated lessons from storage after swap
-        const updatedLessons = getLessons();
-        
-        // Refresh parent component with fresh data
+        // Refresh parent component to reload all lessons including templates
         if (onSwapCompleted) {
-          onSwapCompleted(updatedLessons);
+          onSwapCompleted();
         }
 
         // Reset form

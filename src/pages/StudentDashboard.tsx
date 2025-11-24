@@ -42,14 +42,14 @@ const StudentDashboard = () => {
   const [isSwapSelectionActive, setIsSwapSelectionActive] = useState(false);
   const [lessons, setLessons] = useState<Lesson[]>([]);
 
-  // Load lessons on mount
+  // Load all lessons including future template lessons on mount
   useEffect(() => {
-    setLessons(getLessons());
+    setLessons(getAllLessonsIncludingTemplates());
   }, []);
 
-  // Refresh lessons function - receives new lessons from swap panel
-  const refreshLessons = (newLessons: Lesson[]) => {
-    setLessons(newLessons);
+  // Refresh lessons function - reload all lessons including templates after swap
+  const refreshLessons = () => {
+    setLessons(getAllLessonsIncludingTemplates());
   };
 
   // Sync isSwapSelectionActive with currentStep from SwapPanel
