@@ -1,7 +1,7 @@
-
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { clearAppCache } from '@/lib/clearAppCache';
 
 interface BackButtonProps {
   to?: string;
@@ -12,7 +12,8 @@ interface BackButtonProps {
 const BackButton = ({ to, label = 'חזור', className = '' }: BackButtonProps) => {
   const navigate = useNavigate();
 
-  const handleClick = () => {
+  const handleClick = async () => {
+    await clearAppCache();
     if (to) {
       navigate(to);
     } else {
