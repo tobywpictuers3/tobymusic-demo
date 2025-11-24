@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +9,7 @@ import { hybridSync } from '@/lib/hybridSync';
 import { PrintPDFButton } from '@/components/ui/print-pdf-button';
 import { SaveButton } from '@/components/ui/save-button';
 import { UnreadMessagesBadge } from '@/components/ui/unread-messages-badge';
+import { clearAppCache } from '@/lib/clearAppCache';
 
 // Import components
 import StudentsManagement from '@/components/admin/StudentsManagement';
@@ -57,7 +57,8 @@ const AdminDashboard = () => {
     return null;
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await clearAppCache();
     // Clear dev mode flag on logout
     sessionStorage.removeItem('musicSystem_devMode');
     setDevMode(false);

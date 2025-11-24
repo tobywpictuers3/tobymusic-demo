@@ -9,6 +9,7 @@ import { User, Phone, Mail, Calendar, CreditCard, Edit, Plus, Trash2 } from 'luc
 import { Student } from '@/lib/types';
 import { getPayments, updateStudent } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
+import { clearAppCache } from '@/lib/clearAppCache';
 
 interface EditableStudentDetailsProps {
   student: Student;
@@ -85,7 +86,8 @@ const EditableStudentDetails = ({ student, onUpdate }: EditableStudentDetailsPro
     return labels[method];
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
+    await clearAppCache();
     updateStudent(student.id, {
       email: editedEmail,
       phone: editedPhone,

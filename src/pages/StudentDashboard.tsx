@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { Student, Lesson } from '@/lib/types';
 import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { useAccessMode } from '@/contexts/AccessModeContext';
+import { clearAppCache } from '@/lib/clearAppCache';
 import GeneralWeeklySchedule from '@/components/student/GeneralWeeklySchedule';
 import SwapRequestForm from '@/components/student/SwapRequestForm';
 import SwapRequestsStatus from '@/components/student/SwapRequestsStatus';
@@ -130,7 +130,8 @@ const StudentDashboard = () => {
     }
   }, [studentId, navigate, setAccessMode]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await clearAppCache();
     setCurrentUser(null);
     navigate('/');
     toast({
