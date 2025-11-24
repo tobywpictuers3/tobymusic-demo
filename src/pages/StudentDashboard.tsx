@@ -141,6 +141,8 @@ const StudentDashboard = () => {
     </div>;
   }
 
+  const allStudents = getStudents();
+
   return (
     <div className="min-h-screen musical-gradient">
       {/* Sticky Header */}
@@ -256,7 +258,7 @@ const StudentDashboard = () => {
                   <StudentSwapPanel 
                     student={student} 
                     lessons={getAllLessonsIncludingTemplates()}
-                    students={getStudents()}
+                    students={allStudents}
                     onMount={(ref) => setSwapPanelRef(ref)}
                     onStepChange={(step) => setCurrentSwapStep(step)}
                   />

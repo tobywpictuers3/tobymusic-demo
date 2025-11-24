@@ -38,7 +38,7 @@ export interface StudentSwapPanelRef {
 }
 
 const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
-  ({ student, lessons, students, onMount, onStepChange }, ref) => {
+  ({ student, lessons, students = [], onMount, onStepChange }, ref) => {
     // Step-based state management
     const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
     const [myLessonId, setMyLessonId] = useState<string>('');
