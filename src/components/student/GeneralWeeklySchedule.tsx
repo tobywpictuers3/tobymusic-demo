@@ -63,12 +63,6 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
-    // Only show future lessons (not past)
-    const currentDate = new Date().toISOString().split('T')[0];
-    if (dateStr < currentDate) {
-      return [];
-    }
-    
     // Get template lessons
     const activeTemplate = getActiveScheduleTemplate();
     const templateLessons: Lesson[] = [];
