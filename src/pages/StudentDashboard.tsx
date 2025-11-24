@@ -47,9 +47,9 @@ const StudentDashboard = () => {
     setLessons(getAllLessonsIncludingTemplates());
   }, []);
 
-  // Refresh lessons function
-  const refreshLessons = () => {
-    setLessons(getAllLessonsIncludingTemplates());
+  // Refresh lessons function - receives new lessons from swap panel
+  const refreshLessons = (newLessons: Lesson[]) => {
+    setLessons(newLessons);
   };
 
   // Sync isSwapSelectionActive with currentStep from SwapPanel

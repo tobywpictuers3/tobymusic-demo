@@ -11,6 +11,7 @@ import { isFutureLesson, validateSwap, applySwap } from '@/lib/lessonSwap/logic'
 import { addSwapRequest, markLessonsAsSwapped } from '@/lib/lessonSwap/swapStore';
 import { updateLesson } from '@/lib/storage';
 import { addMessage } from '@/lib/messages';
+import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { ArrowLeftRight, X, MousePointerClick } from 'lucide-react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -31,7 +32,7 @@ interface StudentSwapPanelProps {
   students: Student[];
   onMount?: (ref: { handleLessonDoubleClick: (lesson: Lesson) => void }) => void;
   onStepChange?: (step: 1 | 2 | 3 | 4) => void;
-  onSwapCompleted?: () => void;
+  onSwapCompleted?: (newLessons: Lesson[]) => void;
 }
 
 export interface StudentSwapPanelRef {
@@ -326,9 +327,12 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           });
         }
 
-        // Refresh lessons in parent component
+        // Get updated lessons after swap
+        const updatedLessons = getAllLessonsIncludingTemplates();
+        
+        // Refresh lessons in parent component with new data
         if (onSwapCompleted) {
-          onSwapCompleted();
+          onSwapCompleted(updatedLessons);
         }
 
         // Reset form
