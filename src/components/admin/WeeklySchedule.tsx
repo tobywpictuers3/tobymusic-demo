@@ -11,7 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import ScheduleTemplateManager from './ScheduleTemplateManager';
 import { Lesson } from '@/lib/types';
 import { syncManager } from '@/lib/syncManager';
-import { clearAppCache } from '@/lib/clearAppCache';
+import { clearClientCaches } from '@/lib/cacheManager';
 
 const WeeklySchedule = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -242,7 +242,7 @@ const WeeklySchedule = () => {
   };
 
   const handleSaveWeek = async () => {
-    await clearAppCache();
+    await clearClientCaches();
     // Save any pending changes
     setHasUnsavedChanges(false);
     toast({

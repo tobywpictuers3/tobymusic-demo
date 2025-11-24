@@ -1,12 +1,12 @@
 import { logger } from './logger';
 
 /**
- * Clears all app caches, service workers, and IndexedDB databases
- * Forces a complete reload after cleanup
+ * Clears all client-side caches, service workers, localStorage, and IndexedDB
+ * Ensures fresh data on next load by forcing a hard reload
  */
-export const clearAppCache = async (): Promise<void> => {
+export const clearClientCaches = async (): Promise<void> => {
   try {
-    logger.info('🧹 Starting cache cleanup...');
+    logger.info('🧹 Starting complete cache cleanup...');
 
     // 1. Unregister all Service Workers
     if ('serviceWorker' in navigator) {
@@ -29,7 +29,23 @@ export const clearAppCache = async (): Promise<void> => {
       logger.info('✅ All caches deleted');
     }
 
-    // 3. Delete IndexedDB databases
+    // 3. Clear localStorage
+    try {
+      localStorage.clear();
+      logger.info('✅ localStorage cleared');
+    } catch (error) {
+      logger.warn('⚠️ Could not clear localStorage:', error);
+    }
+
+    // 4. Clear sessionStorage
+    try {
+      sessionStorage.clear();
+      logger.info('✅ sessionStorage cleared');
+    } catch (error) {
+      logger.warn('⚠️ Could not clear sessionStorage:', error);
+    }
+
+    // 5. Delete IndexedDB databases
     if ('indexedDB' in window) {
       const dbNames = [
         'firebase-heartbeat',
@@ -53,17 +69,17 @@ export const clearAppCache = async (): Promise<void> => {
       }
     }
 
-    logger.info('✅ Cache cleanup completed');
+    logger.info('✅ Complete cache cleanup finished');
   } catch (error) {
     logger.error('❌ Error during cache cleanup:', error);
   }
 };
 
 /**
- * Clears cache and performs hard reload
+ * Clears all caches and performs hard reload
  */
-export const clearCacheAndReload = async (): Promise<void> => {
-  await clearAppCache();
+export const clearCachesAndReload = async (): Promise<void> => {
+  await clearClientCaches();
   // Force hard reload
   window.location.reload();
 };
