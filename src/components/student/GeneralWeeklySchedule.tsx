@@ -6,6 +6,7 @@ import { getLessons, getStudents, getActiveScheduleTemplate } from '@/lib/storag
 import { Lesson, Student } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import StudentsSwapRequestDialog from '@/components/students/StudentsSwapRequestDialog';
+import { isFutureLesson } from '@/lib/lessonSwap/logic';
 
 interface GeneralWeeklyScheduleProps {
   studentId?: string;
@@ -166,8 +167,7 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
   };
 
   const handleLessonClick = (lesson: Lesson) => {
-    const currentDate = new Date().toISOString().split('T')[0];
-    if (lesson.date >= currentDate) {
+    if (isFutureLesson(lesson)) {
       setSelectedLessonForSwap(lesson);
       if (onLessonDoubleClick) {
         // Use new swap panel logic
@@ -180,7 +180,6 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
     }
   };
 
-  const currentDate = new Date().toISOString().split('T')[0];
 
   return (
     <Card className="card-gradient card-shadow">
@@ -228,7 +227,7 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                       const studentDetails = getStudentDetails(lesson.studentId);
                       if (!studentDetails) return null;
 
-                      const isFuture = lesson.date > currentDate;
+                      const isFuture = isFutureLesson(lesson);
                       const isCompleted = lesson.status === 'completed';
                       const isSwapped = isSwappedLesson(lesson);
                       
