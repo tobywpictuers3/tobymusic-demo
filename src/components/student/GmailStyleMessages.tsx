@@ -6,15 +6,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   getMessagesForStudent, 
   markMessageAsRead, 
+  markMessageAsUnread,
   addMessage,
   toggleMessageStar,
   markMessageAsDeleted,
   getDrafts,
   getStarredMessages,
-  getDeletedMessages
+  getDeletedMessages,
+  getMessageType,
+  canUserRemoveStar,
+  saveDraft
 } from "@/lib/messages";
 import { Message } from "@/lib/types";
 import { toast } from "sonner";
@@ -28,11 +33,13 @@ import {
   Plus,
   Reply,
   MailOpen,
-  X
+  X,
+  Save
 } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { MessageTypeBadge } from "./MessageTypeBadge";
 
 interface GmailStyleMessagesProps {
   studentId: string;
@@ -73,6 +80,18 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     } catch (error) {
       console.error('Error loading students:', error);
     }
+  };
+
+  const getRecipientDisplay = (message: Message): string => {
+    if (message.recipientIds.includes('all')) return 'כל התלמידות';
+    if (message.recipientIds.length > 1) {
+      const firstStudent = students.find(s => s.id === message.recipientIds[0]);
+      const firstName = firstStudent ? `${firstStudent.firstName} ${firstStudent.lastName}` : 'תלמידה';
+      return `${firstName} ועוד ${message.recipientIds.length - 1}`;
+    }
+    if (message.recipientIds[0] === 'admin') return 'המורה';
+    const recipient = students.find(s => s.id === message.recipientIds[0]);
+    return recipient ? `${recipient.firstName} ${recipient.lastName}` : 'תלמידה';
   };
 
   const getFilteredMessages = (): Message[] => {
@@ -142,6 +161,29 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     loadMessages();
   };
 
+  const handleSaveDraft = () => {
+    if (!composeSubject.trim() && !composeContent.trim()) {
+      toast.error('נא למלא נושא או תוכן');
+      return;
+    }
+
+    saveDraft({
+      senderId: studentId,
+      senderName: studentName,
+      recipientIds: composeRecipients,
+      subject: composeSubject,
+      content: composeContent,
+      type: 'general',
+    });
+
+    toast.success('הטיוטה נשמרה');
+    setIsComposing(false);
+    setComposeSubject('');
+    setComposeContent('');
+    setComposeRecipients(['admin']);
+    loadMessages();
+  };
+
   const handleToggleStar = (messageId: string) => {
     toggleMessageStar(messageId, studentId);
     loadMessages();
@@ -167,28 +209,40 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
       loadMessages();
     }
     
-    // Auto-unstar when opening a starred message
-    if (message.starred?.[studentId]) {
-      toggleMessageStar(message.id, studentId);
-      loadMessages();
-    }
-    
     setSelectedMessage(message);
   };
 
-  const filteredMessages = getFilteredMessages();
+  const handleMarkAsUnread = (messageId: string) => {
+    markMessageAsUnread(messageId, studentId);
+    loadMessages();
+    toast.success('ההודעה סומנה כלא נקראה');
+  };
+
+  const filteredMessages = getFilteredMessages().sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  
   const unreadCount = allMessages.filter(m => 
     m.senderId !== studentId && 
     !m.isRead?.[studentId] &&
     !m.deletedBy?.[studentId]
   ).length;
 
+  const sentCount = allMessages.filter(m => 
+    m.senderId === studentId &&
+    !m.deletedBy?.[studentId]
+  ).length;
+
+  const draftsCount = getDrafts(studentId).filter(m => !m.deletedBy?.[studentId]).length;
+  const starredCount = getStarredMessages(studentId).filter(m => !m.deletedBy?.[studentId]).length;
+  const trashCount = getDeletedMessages(studentId).length;
+
   const folders = [
     { type: 'inbox' as FolderType, label: 'דואר נכנס', icon: Inbox, count: unreadCount },
-    { type: 'sent' as FolderType, label: 'דואר יוצא', icon: Send, count: 0 },
-    { type: 'drafts' as FolderType, label: 'טיוטות', icon: FileText, count: 0 },
-    { type: 'starred' as FolderType, label: 'מסומנות בכוכב', icon: Star, count: 0 },
-    { type: 'trash' as FolderType, label: 'אשפה', icon: Trash2, count: 0 },
+    { type: 'sent' as FolderType, label: 'דואר יוצא', icon: Send, count: sentCount },
+    { type: 'drafts' as FolderType, label: 'טיוטות', icon: FileText, count: draftsCount },
+    { type: 'starred' as FolderType, label: 'מסומנות בכוכב', icon: Star, count: starredCount },
+    { type: 'trash' as FolderType, label: 'אשפה', icon: Trash2, count: trashCount },
   ];
 
   return (
@@ -273,9 +327,13 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <p className="text-sm truncate">
-                            {selectedFolder === 'sent' ? `אל: ${message.senderName}` : `מאת: ${message.senderName}`}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            {!isRead ? <Mail className="w-4 h-4" /> : <MailOpen className="w-4 h-4" />}
+                            <p className="text-sm truncate">
+                              {selectedFolder === 'sent' ? `אל: ${getRecipientDisplay(message)}` : `מאת: ${message.senderName}`}
+                            </p>
+                            <MessageTypeBadge message={message} />
+                          </div>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
                             {format(new Date(message.createdAt), 'dd/MM', { locale: he })}
                           </span>
@@ -371,6 +429,13 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={handleSaveDraft}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  שמור כטיוטה
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setIsComposing(false);
                     setIsReplying(false);
@@ -384,9 +449,13 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-4 pb-4 border-b">
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold mb-2">{selectedMessage.subject}</h3>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>{selectedMessage.senderName}</span>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-xl font-semibold">{selectedMessage.subject}</h3>
+                    <MessageTypeBadge message={selectedMessage} />
+                  </div>
+                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                    <span>מאת: {selectedMessage.senderName}</span>
+                    <span>אל: {getRecipientDisplay(selectedMessage)}</span>
                     <span>
                       {format(new Date(selectedMessage.createdAt), 'dd/MM/yyyy HH:mm', { locale: he })}
                     </span>
@@ -394,17 +463,29 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                 </div>
                 
                 <div className="flex gap-2">
+                  {canUserRemoveStar(selectedMessage, studentId) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleToggleStar(selectedMessage.id)}
+                      title={selectedMessage.starred?.[studentId] ? "הסר כוכב" : "הוסף כוכב"}
+                    >
+                      <Star 
+                        className={cn(
+                          "w-4 h-4",
+                          selectedMessage.starred?.[studentId] ? "fill-yellow-400 text-yellow-400" : ""
+                        )} 
+                      />
+                    </Button>
+                  )}
+                  
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleToggleStar(selectedMessage.id)}
+                    onClick={() => handleMarkAsUnread(selectedMessage.id)}
+                    title="סמן כלא נקרא"
                   >
-                    <Star 
-                      className={cn(
-                        "w-4 h-4",
-                        selectedMessage.starred?.[studentId] ? "fill-yellow-400 text-yellow-400" : ""
-                      )} 
-                    />
+                    <Mail className="w-4 h-4" />
                   </Button>
                   
                   {selectedFolder !== 'trash' ? (
@@ -412,6 +493,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                       variant="ghost"
                       size="icon"
                       onClick={() => handleMoveToTrash(selectedMessage.id)}
+                      title="העבר לאשפה"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -420,6 +502,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                       variant="ghost"
                       size="icon"
                       onClick={() => handleRestore(selectedMessage.id)}
+                      title="שחזר"
                     >
                       <MailOpen className="w-4 h-4" />
                     </Button>

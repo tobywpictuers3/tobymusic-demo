@@ -35,18 +35,47 @@ export const saveMessages = (messages: Message[]): void => {
   }
 };
 
+export const getMessageType = (message: Message): 'broadcast' | 'group' | 'direct-teacher' | 'direct-student' => {
+  if (message.recipientIds.includes('all')) return 'broadcast';
+  if (message.recipientIds.length > 1) return 'group';
+  if (message.recipientIds[0] === 'admin') return 'direct-teacher';
+  return 'direct-student';
+};
+
+export const canUserRemoveStar = (message: Message, userId: string): boolean => {
+  // Admin can remove star from any message
+  if (userId === 'admin') return true;
+  
+  // Sender can remove star from their own messages
+  if (message.senderId === userId) return true;
+  
+  // Broadcast from admin - student cannot remove
+  if (message.senderId === 'admin' && message.recipientIds.includes('all')) return false;
+  
+  // All other cases - allowed
+  return true;
+};
+
 export const addMessage = (message: Omit<Message, 'id' | 'createdAt'>): Message => {
   const messages = getMessages();
   const now = new Date();
   
   // Auto-star logic:
   let autoStarred: Record<string, boolean> = {};
+  let starExpiresAt: Record<string, string> = {};
   
   // 1. If sent to "all", star for all students
   if (message.recipientIds.includes('all')) {
     const allStudents = getStudents();
     autoStarred = allStudents.reduce((acc: Record<string, boolean>, s: any) => 
       ({ ...acc, [s.id]: true }), {});
+    
+    // If from admin, set star expiration to 48 hours
+    if (message.senderId === 'admin') {
+      const expiryTime = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+      starExpiresAt = allStudents.reduce((acc: Record<string, string>, s: any) => 
+        ({ ...acc, [s.id]: expiryTime }), {});
+    }
   }
   // 2. If from admin, star for all recipients
   else if (message.senderId === 'admin') {
@@ -55,11 +84,15 @@ export const addMessage = (message: Omit<Message, 'id' | 'createdAt'>): Message 
       .reduce((acc, id) => ({ ...acc, [id]: true }), {});
   }
   
+  const messageType = getMessageType({ ...message, id: '', createdAt: '' } as Message);
+  
   const newMessage: Message = {
     ...message,
     id: Date.now().toString(),
     createdAt: now.toISOString(),
     starred: autoStarred,
+    starExpiresAt: Object.keys(starExpiresAt).length > 0 ? starExpiresAt : undefined,
+    messageType,
     expiresAt: message.senderId !== 'admin' && message.recipientIds.includes('all')
       ? new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString()
       : message.expiresAt,
@@ -87,28 +120,47 @@ export const markMessageAsRead = (messageId: string, userId: string, isRead: boo
   }
 };
 
-export const toggleMessageStar = (messageId: string, userId: string): void => {
+export const markMessageAsUnread = (messageId: string, userId: string): void => {
+  markMessageAsRead(messageId, userId, false);
+};
+
+export const saveDraft = (draft: Omit<Message, 'id' | 'createdAt'>): Message => {
+  return addMessage({ ...draft, isDraft: true });
+};
+
+export const toggleMessageStar = (messageId: string, userId: string): boolean => {
   const messages = getMessages();
   const message = messages.find(m => m.id === messageId);
-  if (message) {
-    if (!message.starred) {
-      message.starred = {};
-    }
-    
-    // Allow sender to unstar messages sent to "all" even if they were auto-starred
-    const isSender = message.senderId === userId;
-    const isSentToAll = message.recipientIds.includes('all');
-    
-    if (isSender && isSentToAll) {
-      // Sender can freely toggle their own star on messages sent to all
-      message.starred[userId] = !message.starred[userId];
-    } else {
-      // Regular toggle for other cases
-      message.starred[userId] = !message.starred[userId];
-    }
-    
-    saveMessages(messages);
+  if (!message) return false;
+  
+  if (!message.starred) {
+    message.starred = {};
   }
+  
+  // Check if currently starred
+  const isCurrentlyStarred = message.starred[userId];
+  
+  // If trying to remove star, check permissions
+  if (isCurrentlyStarred && !canUserRemoveStar(message, userId)) {
+    return false; // Cannot remove star
+  }
+  
+  // Toggle star
+  message.starred[userId] = !message.starred[userId];
+  
+  // If starring, set expiration if it's an admin broadcast
+  if (message.starred[userId] && message.senderId === 'admin' && message.recipientIds.includes('all')) {
+    if (!message.starExpiresAt) {
+      message.starExpiresAt = {};
+    }
+    if (!message.starExpiresAt[userId]) {
+      const now = new Date();
+      message.starExpiresAt[userId] = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+    }
+  }
+  
+  saveMessages(messages);
+  return true;
 };
 
 export const markMessageAsDeleted = (messageId: string, userId: string, isDeleted: boolean = true): void => {
@@ -200,7 +252,22 @@ export const getStarredMessages = (userId: string): Message[] => {
     ? getMessagesForAdmin() 
     : getMessagesForStudent(userId);
   
-  return messages.filter(message => message.starred?.[userId]);
+  const now = new Date();
+  
+  return messages.filter(message => {
+    if (!message.starred?.[userId]) return false;
+    
+    // Check if star has expired
+    const expiresAt = message.starExpiresAt?.[userId];
+    if (expiresAt && new Date(expiresAt) < now) {
+      // Remove expired star
+      message.starred[userId] = false;
+      saveMessages(getMessages());
+      return false;
+    }
+    
+    return true;
+  });
 };
 
 export const getDrafts = (userId: string): Message[] => {

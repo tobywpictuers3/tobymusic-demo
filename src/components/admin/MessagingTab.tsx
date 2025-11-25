@@ -7,16 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   getMessagesForAdmin, 
   markMessageAsRead, 
+  markMessageAsUnread,
   addMessage,
   toggleMessageStar,
   markMessageAsDeleted,
   getDrafts,
   getStarredMessages,
   getDeletedMessages,
-  deleteMessage
+  deleteMessage,
+  getMessageType,
+  canUserRemoveStar,
+  saveDraft
 } from "@/lib/messages";
 import { getStudents, updateSwapRequestStatus } from "@/lib/storage";
 import { Message, Student } from "@/lib/types";
@@ -32,11 +37,13 @@ import {
   Reply,
   MailOpen,
   X,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Save
 } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { MessageTypeBadge } from "../student/MessageTypeBadge";
 
 type FolderType = 'inbox' | 'sent' | 'drafts' | 'starred' | 'trash' | 'swap_requests';
 
@@ -161,6 +168,30 @@ export default function MessagingTab() {
     loadData();
   };
 
+  const handleSaveDraft = () => {
+    if (!composeSubject.trim() && !composeContent.trim()) {
+      toast.error('נא למלא נושא או תוכן');
+      return;
+    }
+
+    saveDraft({
+      senderId: 'admin',
+      senderName: 'המנהל',
+      recipientIds: composeRecipients,
+      subject: composeSubject,
+      content: composeContent,
+      type: 'general',
+    });
+
+    toast.success('הטיוטה נשמרה');
+    setIsComposing(false);
+    setComposeSubject('');
+    setComposeContent('');
+    setComposeRecipients(['all']);
+    setExpirationDate('');
+    loadData();
+  };
+
   const handleToggleStar = (messageId: string) => {
     toggleMessageStar(messageId, 'admin');
     loadData();
@@ -193,29 +224,45 @@ export default function MessagingTab() {
       loadData();
     }
     
-    // Auto-unstar when opening a starred message
-    if (message.starred?.['admin']) {
-      toggleMessageStar(message.id, 'admin');
-      loadData();
-    }
-    
     setSelectedMessage(message);
   };
 
-  const filteredMessages = getFilteredMessages();
+  const handleMarkAsUnread = (messageId: string) => {
+    markMessageAsUnread(messageId, 'admin');
+    loadData();
+    toast.success('ההודעה סומנה כלא נקראה');
+  };
+
+  const filteredMessages = getFilteredMessages().sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  
   const unreadCount = allMessages.filter(m => 
     m.senderId !== 'admin' && 
     !m.isRead?.['admin'] &&
     !m.deletedBy?.['admin']
   ).length;
 
+  const sentCount = allMessages.filter(m => 
+    m.senderId === 'admin' &&
+    !m.deletedBy?.['admin']
+  ).length;
+
+  const draftsCount = getDrafts('admin').filter(m => !m.deletedBy?.['admin']).length;
+  const starredCount = getStarredMessages('admin').filter(m => !m.deletedBy?.['admin']).length;
+  const swapRequestsCount = allMessages.filter(m => 
+    (m.type === 'swap_request' || m.metadata?.action === 'approve_or_reject') &&
+    !m.deletedBy?.['admin']
+  ).length;
+  const trashCount = getDeletedMessages('admin').length;
+
   const folders = [
     { type: 'inbox' as FolderType, label: 'דואר נכנס', icon: Inbox, count: unreadCount },
-    { type: 'sent' as FolderType, label: 'דואר יוצא', icon: Send, count: 0 },
-    { type: 'drafts' as FolderType, label: 'טיוטות', icon: FileText, count: 0 },
-    { type: 'starred' as FolderType, label: 'מסומנות בכוכב', icon: Star, count: 0 },
-    { type: 'swap_requests' as FolderType, label: 'בקשות החלפה', icon: ArrowLeftRight, count: 0 },
-    { type: 'trash' as FolderType, label: 'אשפה', icon: Trash2, count: 0 },
+    { type: 'sent' as FolderType, label: 'דואר יוצא', icon: Send, count: sentCount },
+    { type: 'drafts' as FolderType, label: 'טיוטות', icon: FileText, count: draftsCount },
+    { type: 'starred' as FolderType, label: 'מסומנות בכוכב', icon: Star, count: starredCount },
+    { type: 'swap_requests' as FolderType, label: 'בקשות החלפה', icon: ArrowLeftRight, count: swapRequestsCount },
+    { type: 'trash' as FolderType, label: 'אשפה', icon: Trash2, count: trashCount },
   ];
 
   const getRecipientName = (recipientIds: string[]) => {
@@ -310,11 +357,15 @@ export default function MessagingTab() {
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <p className="text-sm truncate">
-                            {selectedFolder === 'sent' 
-                              ? `אל: ${getRecipientName(message.recipientIds)}` 
-                              : `מאת: ${message.senderName}`}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            {!isRead && selectedFolder === 'inbox' ? <Mail className="w-4 h-4" /> : <MailOpen className="w-4 h-4" />}
+                            <p className="text-sm truncate">
+                              {selectedFolder === 'sent' 
+                                ? `אל: ${getRecipientName(message.recipientIds)}` 
+                                : `מאת: ${message.senderName}`}
+                            </p>
+                            <MessageTypeBadge message={message} />
+                          </div>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
                             {format(new Date(message.createdAt), 'dd/MM', { locale: he })}
                           </span>
@@ -419,6 +470,13 @@ export default function MessagingTab() {
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={handleSaveDraft}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  שמור כטיוטה
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setIsComposing(false);
                     setIsReplying(false);
@@ -432,13 +490,13 @@ export default function MessagingTab() {
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-4 pb-4 border-b">
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold mb-2">{selectedMessage.subject}</h3>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>
-                      {selectedFolder === 'sent' 
-                        ? `אל: ${getRecipientName(selectedMessage.recipientIds)}` 
-                        : `מאת: ${selectedMessage.senderName}`}
-                    </span>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-xl font-semibold">{selectedMessage.subject}</h3>
+                    <MessageTypeBadge message={selectedMessage} />
+                  </div>
+                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                    <span>מאת: {selectedMessage.senderName}</span>
+                    <span>אל: {getRecipientName(selectedMessage.recipientIds)}</span>
                     <span>
                       {format(new Date(selectedMessage.createdAt), 'dd/MM/yyyy HH:mm', { locale: he })}
                     </span>
@@ -446,17 +504,29 @@ export default function MessagingTab() {
                 </div>
                 
                 <div className="flex gap-2">
+                  {canUserRemoveStar(selectedMessage, 'admin') && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleToggleStar(selectedMessage.id)}
+                      title={selectedMessage.starred?.['admin'] ? "הסר כוכב" : "הוסף כוכב"}
+                    >
+                      <Star 
+                        className={cn(
+                          "w-4 h-4",
+                          selectedMessage.starred?.['admin'] ? "fill-yellow-400 text-yellow-400" : ""
+                        )} 
+                      />
+                    </Button>
+                  )}
+                  
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleToggleStar(selectedMessage.id)}
+                    onClick={() => handleMarkAsUnread(selectedMessage.id)}
+                    title="סמן כלא נקרא"
                   >
-                    <Star 
-                      className={cn(
-                        "w-4 h-4",
-                        selectedMessage.starred?.['admin'] ? "fill-yellow-400 text-yellow-400" : ""
-                      )} 
-                    />
+                    <Mail className="w-4 h-4" />
                   </Button>
                   
                   {selectedFolder !== 'trash' ? (
@@ -464,6 +534,7 @@ export default function MessagingTab() {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleMoveToTrash(selectedMessage.id)}
+                      title="העבר לאשפה"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -473,6 +544,7 @@ export default function MessagingTab() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleRestore(selectedMessage.id)}
+                        title="שחזר"
                       >
                         <MailOpen className="w-4 h-4" />
                       </Button>
@@ -480,6 +552,7 @@ export default function MessagingTab() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handlePermanentDelete(selectedMessage.id)}
+                        title="מחק לצמיתות"
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>

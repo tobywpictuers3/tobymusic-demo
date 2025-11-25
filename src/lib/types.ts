@@ -205,11 +205,13 @@ export interface Message {
   scheduledFor?: string; // scheduled send time
   isRead?: { [studentId: string]: boolean }; // track read status per recipient
   starred?: { [studentId: string]: boolean }; // starred status per user
+  starExpiresAt?: { [studentId: string]: string }; // star expiration per user
   isDeleted?: { [studentId: string]: boolean }; // track deleted status per recipient
   deletedBy?: { [studentId: string]: boolean }; // track deleted by specific user
   isDraft?: boolean; // draft status
   inReplyTo?: string; // ID of message being replied to
   type: 'general' | 'swap_request' | 'swap_approval' | 'swap_rejection';
+  messageType?: 'broadcast' | 'group' | 'direct-teacher' | 'direct-student';
   metadata?: {
     swapRequestId?: string;
     action?: 'approve_or_reject';
