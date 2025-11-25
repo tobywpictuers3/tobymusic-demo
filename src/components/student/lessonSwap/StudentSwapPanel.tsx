@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { Student, Lesson, SwapRequest } from '@/lib/types';
-import { addSwapRequest, updateSwapRequestStatus, getLessons } from '@/lib/storage';
+import { addSwapRequest, updateSwapRequestStatus, getLessons, addLesson } from '@/lib/storage';
 import { addMessage } from '@/lib/messages';
 import { ArrowLeftRight, X, MousePointerClick } from 'lucide-react';
 import { format } from 'date-fns';
@@ -231,12 +231,34 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
       try {
         // Get lessons and students from props
-        const myLesson = lessons.find(l => l.id === myLessonId);
-        const targetLesson = lessons.find(l => l.id === targetLessonId);
+        let myLesson = lessons.find(l => l.id === myLessonId);
+        let targetLesson = lessons.find(l => l.id === targetLessonId);
 
         if (!myLesson || !targetLesson) {
           throw new Error('שיעורים לא נמצאו');
         }
+
+        // Materialize template lessons before creating swap request
+        const materializeIfTemplate = (lesson: Lesson): Lesson => {
+          // If lesson is not from template, return as-is
+          if (!lesson.isFromTemplate) return lesson;
+          
+          // Create a real lesson from template
+          const realLesson = addLesson({
+            studentId: lesson.studentId,
+            date: lesson.date,
+            startTime: lesson.startTime,
+            endTime: lesson.endTime,
+            status: 'scheduled' as const,
+            isOneOff: false
+          });
+          
+          return realLesson;
+        };
+
+        // Materialize both lessons if needed
+        myLesson = materializeIfTemplate(myLesson);
+        targetLesson = materializeIfTemplate(targetLesson);
 
         const targetStudent = students.find(s => s.id === targetLesson.studentId);
 
