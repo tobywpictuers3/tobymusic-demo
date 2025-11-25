@@ -382,12 +382,13 @@ const performLessonSwap = (swapRequest: SwapRequest) => {
   lessons[originalLessonIndex].studentId = lessons[targetLessonIndex].studentId;
   lessons[targetLessonIndex].studentId = temp;
   
-  // Add swap notation to both lessons (ONE TIME)
+  // Mark lessons as swapped
   const swapDate = new Date().toLocaleDateString('he-IL');
-  const swapNote = `שיעור שהוחלף (${swapDate})`;
-  
-  lessons[originalLessonIndex].notes = swapNote;
-  lessons[targetLessonIndex].notes = swapNote;
+
+  lessons[originalLessonIndex].isSwapped = true;
+  lessons[originalLessonIndex].notes = `שיעור שהוחלף (${swapDate})`;
+  lessons[targetLessonIndex].isSwapped = true;
+  lessons[targetLessonIndex].notes = `שיעור שהוחלף (${swapDate})`;
   
   // Save to storage
   inMemoryStorage['lessons'] = lessons;

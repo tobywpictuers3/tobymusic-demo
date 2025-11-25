@@ -151,9 +151,10 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                   </div>
                 </div>
                 <div className="space-y-1 min-h-[150px]">
-                  {dayLessons
-                    .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                    .map((lesson) => {
+                {dayLessons
+                  .filter(lesson => lesson.status !== 'cancelled')
+                  .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                  .map((lesson) => {
                       const studentDetails = getStudentDetails(lesson.studentId);
                       if (!studentDetails) return null;
 
@@ -208,12 +209,12 @@ const GeneralWeeklySchedule: React.FC<GeneralWeeklyScheduleProps> = ({ studentId
                              <div className="text-sm font-bold mt-2 text-black">
                                {lesson.startTime} - {lesson.endTime}
                               </div>
-                              <div className="flex gap-1 flex-wrap mt-1">
-                                {lesson.isSwapped && (
-                                  <Badge className="text-[10px] px-1.5 py-0.5 bg-orange-500 text-white border-orange-500">
-                                    הוחלף
-                                  </Badge>
-                                )}
+                               <div className="flex gap-1 flex-wrap mt-1">
+                                 {lesson.isSwapped && (
+                                   <Badge className="text-[10px] px-1.5 py-0.5 bg-red-600 text-white border-red-600">
+                                     הוחלף
+                                   </Badge>
+                                 )}
                                 {isClickableForSelection && (
                                   <Badge className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white animate-pulse">
                                     לחצי כאן

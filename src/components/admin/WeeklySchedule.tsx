@@ -320,9 +320,10 @@ const WeeklySchedule = () => {
                   </div>
                 </div>
                 <div className="space-y-1 min-h-[150px]">
-                  {dayLessons
-                    .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                    .map((lesson, lessonIndex) => {
+                {dayLessons
+                  .filter(lesson => lesson.status !== 'cancelled')
+                  .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                  .map((lesson, lessonIndex) => {
                       const currentDate = new Date().toISOString().split('T')[0];
                       const isFuture = lesson.date > currentDate;
                       const isCompleted = lesson.status === 'completed';
@@ -366,11 +367,11 @@ const WeeklySchedule = () => {
                                     מהמערכת
                                   </span>
                                 )}
-                                {isSwapped && (
-                                  <span className="block bg-orange-100 text-orange-800 px-1 rounded text-[9px] mt-0.5">
-                                    שיעור שהוחלף
-                                  </span>
-                                )}
+                              {isSwapped && (
+                                <span className="block bg-red-600 text-white px-1 rounded text-[9px] mt-0.5">
+                                  הוחלף
+                                </span>
+                              )}
                               </div>
                             </div>
                             

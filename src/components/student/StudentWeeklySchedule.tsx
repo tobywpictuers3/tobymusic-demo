@@ -135,7 +135,9 @@ const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick, isSelectionActi
                 </div>
                 
                 <div className="space-y-2">
-                  {dayLessons.map((lesson) => {
+                  {dayLessons
+                    .filter(lesson => lesson.status !== 'cancelled')
+                    .map((lesson) => {
                       const currentDate = new Date().toISOString().split('T')[0];
                       const isFuture = lesson.date >= currentDate;
                       const isCompleted = lesson.status === 'completed';
@@ -175,6 +177,9 @@ const StudentWeeklySchedule = ({ studentId, onLessonDoubleClick, isSelectionActi
                             )}
                           </div>
                           <div className="flex gap-2">
+                            {lesson.isSwapped && (
+                              <Badge className="bg-red-600 text-white">הוחלף</Badge>
+                            )}
                             {lesson.isOneOff && (
                               <Badge variant="outline" className="text-xs">
                                 חד פעמי

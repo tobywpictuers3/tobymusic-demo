@@ -31,13 +31,14 @@ import {
   Plus,
   Reply,
   MailOpen,
-  X
+  X,
+  ArrowLeftRight
 } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-type FolderType = 'inbox' | 'sent' | 'drafts' | 'starred' | 'trash';
+type FolderType = 'inbox' | 'sent' | 'drafts' | 'starred' | 'trash' | 'swap_requests';
 
 export default function MessagingTab() {
   const [selectedFolder, setSelectedFolder] = useState<FolderType>('inbox');
@@ -103,6 +104,11 @@ export default function MessagingTab() {
         return getStarredMessages('admin').filter(m => !m.deletedBy?.['admin']);
       case 'trash':
         return getDeletedMessages('admin');
+      case 'swap_requests':
+        return allMessages.filter(m => 
+          (m.type === 'swap_request' || m.metadata?.action === 'approve_or_reject') &&
+          !m.deletedBy?.['admin']
+        );
       default:
         return [];
     }
@@ -208,6 +214,7 @@ export default function MessagingTab() {
     { type: 'sent' as FolderType, label: 'דואר יוצא', icon: Send, count: 0 },
     { type: 'drafts' as FolderType, label: 'טיוטות', icon: FileText, count: 0 },
     { type: 'starred' as FolderType, label: 'מסומנות בכוכב', icon: Star, count: 0 },
+    { type: 'swap_requests' as FolderType, label: 'בקשות החלפה', icon: ArrowLeftRight, count: 0 },
     { type: 'trash' as FolderType, label: 'אשפה', icon: Trash2, count: 0 },
   ];
 
@@ -260,14 +267,15 @@ export default function MessagingTab() {
       <Card className="w-96 flex-shrink-0 overflow-hidden">
         <CardContent className="p-0">
           <ScrollArea className="h-[calc(100vh-250px)]">
-            {filteredMessages.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                {selectedFolder === 'inbox' && 'אין הודעות חדשות'}
-                {selectedFolder === 'sent' && 'לא נשלחו הודעות'}
-                {selectedFolder === 'drafts' && 'אין טיוטות'}
-                {selectedFolder === 'starred' && 'אין הודעות מסומנות'}
-                {selectedFolder === 'trash' && 'האשפה ריקה'}
-              </div>
+              {filteredMessages.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  {selectedFolder === 'inbox' && 'אין הודעות חדשות'}
+                  {selectedFolder === 'sent' && 'לא נשלחו הודעות'}
+                  {selectedFolder === 'drafts' && 'אין טיוטות'}
+                  {selectedFolder === 'starred' && 'אין הודעות מסומנות'}
+                  {selectedFolder === 'swap_requests' && 'אין בקשות החלפה'}
+                  {selectedFolder === 'trash' && 'האשפה ריקה'}
+                </div>
             ) : (
               filteredMessages.map(message => {
                 const isRead = message.isRead?.['admin'];

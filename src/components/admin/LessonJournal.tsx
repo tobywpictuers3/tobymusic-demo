@@ -169,7 +169,7 @@ const LessonJournal = () => {
       });
     }
     
-    // Get actual lessons (filter out cancelled ones from display)
+    // Get actual lessons (hide cancelled ones completely)
     const actualLessons: LessonWithStudent[] = lessons
       .filter(l => l.date === dateStr && l.status !== 'cancelled')
       .map(l => ({
@@ -698,7 +698,9 @@ const LessonJournal = () => {
                             </Badge>
                           </div>
                         ))}
-                        {dayLessons.map((lesson) => {
+                        {dayLessons
+                          .filter(lesson => lesson.status !== 'cancelled')
+                          .map((lesson) => {
                           const bankTime = getBankTimeFromNotes(lesson.notes);
                           const hasCollision = checkLessonCollision(lesson, date);
                           
@@ -748,6 +750,12 @@ const LessonJournal = () => {
                               {lesson.lessonNumber && (
                                 <Badge variant="outline" className="text-[10px] mb-1">
                                   שיעור #{lesson.lessonNumber}
+                                </Badge>
+                              )}
+
+                              {lesson.isSwapped && (
+                                <Badge className="bg-red-600 text-white text-[10px] mb-1">
+                                  הוחלף
                                 </Badge>
                               )}
 
