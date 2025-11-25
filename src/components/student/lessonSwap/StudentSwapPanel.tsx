@@ -279,6 +279,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
 
         // Only auto-approve if BOTH codes are correct
         if (swapStatus === 'approved') {
+          // Auto-approve: update status and perform swap
           updateSwapRequestStatus(savedRequest.id, 'approved');
           
           // Send success message to all parties
@@ -297,7 +298,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
             description: 'ההחלפה בוצעה בהצלחה',
           });
         } else {
-          // Send pending message to admin with action buttons
+          // Pending: Do NOT call updateSwapRequestStatus - only send message to admin
           addMessage({
             senderId: student.id,
             senderName: `${student.firstName} ${student.lastName}`,

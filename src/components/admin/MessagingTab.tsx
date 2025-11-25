@@ -18,7 +18,7 @@ import {
   getDeletedMessages,
   deleteMessage
 } from "@/lib/messages";
-import { getStudents } from "@/lib/storage";
+import { getStudents, updateSwapRequestStatus } from "@/lib/storage";
 import { Message, Student } from "@/lib/types";
 import { toast } from "sonner";
 import { 
@@ -61,6 +61,28 @@ export default function MessagingTab() {
     setStudents(getStudents());
     const messages = getMessagesForAdmin(true); // include deleted
     setAllMessages(messages);
+  };
+
+  const handleApproveSwap = (swapRequestId: string) => {
+    try {
+      updateSwapRequestStatus(swapRequestId, 'approved');
+      loadData(); // Refresh messages
+      setSelectedMessage(null); // Close message view
+      toast.success('בקשת ההחלפה אושרה והשיעורים הוחלפו');
+    } catch (error) {
+      toast.error('לא ניתן לאשר את ההחלפה');
+    }
+  };
+
+  const handleRejectSwap = (swapRequestId: string) => {
+    try {
+      updateSwapRequestStatus(swapRequestId, 'rejected');
+      loadData(); // Refresh messages
+      setSelectedMessage(null); // Close message view
+      toast.success('בקשת ההחלפה נדחתה');
+    } catch (error) {
+      toast.error('לא ניתן לדחות את ההחלפה');
+    }
   };
 
   const getFilteredMessages = (): Message[] => {
@@ -461,6 +483,28 @@ export default function MessagingTab() {
               <div className="whitespace-pre-wrap text-sm leading-relaxed">
                 {selectedMessage.content}
               </div>
+
+              {/* Swap Request Action Buttons */}
+              {selectedMessage.type === 'swap_request' && 
+               selectedMessage.metadata?.action === 'approve_or_reject' && (
+                <div className="pt-4 border-t">
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="default" 
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => handleApproveSwap(selectedMessage.metadata!.swapRequestId)}
+                    >
+                      ✓ אשר החלפה
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={() => handleRejectSwap(selectedMessage.metadata!.swapRequestId)}
+                    >
+                      ✗ דחה החלפה
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {selectedMessage.expiresAt && (
                 <div className="text-xs text-muted-foreground pt-2 border-t">
