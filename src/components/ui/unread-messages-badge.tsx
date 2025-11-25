@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { getUnreadCount } from "@/lib/messages";
 import { Mail } from "lucide-react";
+import { UnreadMessagesTooltip } from "./unread-messages-tooltip";
 
 interface UnreadMessagesBadgeProps {
   userId: string;
@@ -25,9 +26,11 @@ export function UnreadMessagesBadge({ userId }: UnreadMessagesBadgeProps) {
   }
 
   return (
-    <Badge variant="destructive" className="flex items-center gap-1">
-      <Mail className="w-3 h-3" />
-      {unreadCount}
-    </Badge>
+    <UnreadMessagesTooltip userId={userId}>
+      <Badge variant="destructive" className="flex items-center gap-1 cursor-help">
+        <Mail className="w-3 h-3" />
+        {unreadCount}
+      </Badge>
+    </UnreadMessagesTooltip>
   );
 }

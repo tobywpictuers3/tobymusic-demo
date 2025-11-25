@@ -38,12 +38,25 @@ import {
   MailOpen,
   X,
   ArrowLeftRight,
-  Save
+  Save,
+  Forward,
+  RotateCcw
 } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { MessageTypeBadge } from "../student/MessageTypeBadge";
+
+// Format message date: HH:MM for today, dd/MM for older
+const formatMessageDate = (createdAt: string): string => {
+  const msgDate = new Date(createdAt);
+  const now = new Date();
+  const isToday = msgDate.toDateString() === now.toDateString();
+  
+  return isToday
+    ? msgDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+    : msgDate.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+};
 
 type FolderType = 'inbox' | 'sent' | 'drafts' | 'starred' | 'trash' | 'swap_requests';
 
@@ -98,23 +111,23 @@ export default function MessagingTab() {
       case 'inbox':
         return allMessages.filter(m => 
           m.senderId !== 'admin' && 
-          !m.deletedBy?.['admin']
+          !m.isDeleted?.['admin']
         );
       case 'sent':
         return allMessages.filter(m => 
           m.senderId === 'admin' &&
-          !m.deletedBy?.['admin']
+          !m.isDeleted?.['admin']
         );
       case 'drafts':
-        return getDrafts('admin').filter(m => !m.deletedBy?.['admin']);
+        return getDrafts('admin').filter(m => !m.isDeleted?.['admin']);
       case 'starred':
-        return getStarredMessages('admin').filter(m => !m.deletedBy?.['admin']);
+        return getStarredMessages('admin').filter(m => !m.isDeleted?.['admin']);
       case 'trash':
         return getDeletedMessages('admin');
       case 'swap_requests':
         return allMessages.filter(m => 
           (m.type === 'swap_request' || m.metadata?.action === 'approve_or_reject') &&
-          !m.deletedBy?.['admin']
+          !m.isDeleted?.['admin']
         );
       default:
         return [];
@@ -137,6 +150,15 @@ export default function MessagingTab() {
     setComposeSubject(`תגובה: ${message.subject}`);
     setComposeContent('');
     setComposeRecipients([message.senderId]);
+    setSelectedMessage(message);
+  };
+
+  const handleForward = (message: Message) => {
+    setIsReplying(false);
+    setIsComposing(true);
+    setComposeSubject(`FW: ${message.subject}`);
+    setComposeContent(`\n\n--- הודעה מועברת ---\nמאת: ${message.senderName}\nנושא: ${message.subject}\n\n${message.content}`);
+    setComposeRecipients(['all']);
     setSelectedMessage(message);
   };
 
@@ -240,19 +262,19 @@ export default function MessagingTab() {
   const unreadCount = allMessages.filter(m => 
     m.senderId !== 'admin' && 
     !m.isRead?.['admin'] &&
-    !m.deletedBy?.['admin']
+    !m.isDeleted?.['admin']
   ).length;
 
   const sentCount = allMessages.filter(m => 
     m.senderId === 'admin' &&
-    !m.deletedBy?.['admin']
+    !m.isDeleted?.['admin']
   ).length;
 
-  const draftsCount = getDrafts('admin').filter(m => !m.deletedBy?.['admin']).length;
-  const starredCount = getStarredMessages('admin').filter(m => !m.deletedBy?.['admin']).length;
+  const draftsCount = getDrafts('admin').filter(m => !m.isDeleted?.['admin']).length;
+  const starredCount = getStarredMessages('admin').filter(m => !m.isDeleted?.['admin']).length;
   const swapRequestsCount = allMessages.filter(m => 
     (m.type === 'swap_request' || m.metadata?.action === 'approve_or_reject') &&
-    !m.deletedBy?.['admin']
+    !m.isDeleted?.['admin']
   ).length;
   const trashCount = getDeletedMessages('admin').length;
 
@@ -335,17 +357,27 @@ export default function MessagingTab() {
                     onClick={() => handleMarkAsRead(message)}
                     className={cn(
                       "p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors",
-                      !isRead && selectedFolder === 'inbox' && "bg-primary/5 font-semibold",
+                      !isRead && selectedFolder === 'inbox' && "bg-amber-50 font-bold",
                       isSelected && "bg-muted"
                     )}
                   >
                     <div className="flex items-start gap-2">
+                      {/* Envelope Icon */}
+                      <div className="flex-shrink-0 mt-1">
+                        {!isRead && selectedFolder === 'inbox' ? (
+                          <Mail className="w-4 h-4 text-primary" />
+                        ) : (
+                          <MailOpen className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleToggleStar(message.id);
                         }}
-                        className="mt-1"
+                        disabled={isStarred && !canUserRemoveStar(message, 'admin')}
+                        className={`mt-1 ${isStarred && !canUserRemoveStar(message, 'admin') ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <Star 
                           className={cn(
@@ -358,8 +390,7 @@ export default function MessagingTab() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <div className="flex items-center gap-2">
-                            {!isRead && selectedFolder === 'inbox' ? <Mail className="w-4 h-4" /> : <MailOpen className="w-4 h-4" />}
-                            <p className="text-sm truncate">
+                            <p className={cn("text-sm truncate", !isRead && "font-bold")}>
                               {selectedFolder === 'sent' 
                                 ? `אל: ${getRecipientName(message.recipientIds)}` 
                                 : `מאת: ${message.senderName}`}
@@ -367,10 +398,10 @@ export default function MessagingTab() {
                             <MessageTypeBadge message={message} />
                           </div>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {format(new Date(message.createdAt), 'dd/MM', { locale: he })}
+                            {formatMessageDate(message.createdAt)}
                           </span>
                         </div>
-                        <p className="text-sm font-medium truncate">{message.subject}</p>
+                        <p className={cn("text-sm truncate", !isRead ? "font-bold" : "font-medium")}>{message.subject}</p>
                         <p className="text-xs text-muted-foreground truncate mt-1">
                           {message.content}
                         </p>
