@@ -349,14 +349,27 @@ const LessonJournal = () => {
 
   const handleDrop = (date: Date) => {
     if (!draggedLesson) return;
-    
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const newDateStr = `${year}-${month}-${day}`;
-    
+
+    // CASE 1 — Template lesson: cancel old + create new
     if (draggedLesson.isFromTemplate) {
-      // Create new lesson
+
+      // 1) Cancel the template at original location
+      addLesson({
+        studentId: draggedLesson.studentId,
+        date: draggedLesson.date,
+        startTime: draggedLesson.startTime,
+        endTime: draggedLesson.endTime || calculateEndTime(draggedLesson.startTime, 30),
+        status: 'cancelled',
+        isOneOff: false,
+        notes: 'שיעור מהמערכת שהועבר'
+      });
+
+      // 2) Create new lesson at the new date
       const endTime = calculateEndTime(draggedLesson.startTime, 30);
       addLesson({
         studentId: draggedLesson.studentId,
@@ -364,15 +377,22 @@ const LessonJournal = () => {
         startTime: draggedLesson.startTime,
         endTime,
         status: 'scheduled',
-        isOneOff: true
+        isOneOff: true,
+        notes: `שיעור הועבר מ-${draggedLesson.date}`
       });
+
     } else {
-      updateLesson(draggedLesson.id, { date: newDateStr });
+
+      // CASE 2 — Existing lesson: just update date (no duplication)
+      updateLesson(draggedLesson.id, {
+        date: newDateStr,
+        notes: `שיעור הועבר מ-${draggedLesson.date}`
+      });
     }
-    
+
     setDraggedLesson(null);
     loadData();
-    toast({ description: 'השיעור הועבר' });
+    toast({ description: 'השיעור הועבר בהצלחה' });
   };
 
   const handleOpenBankTime = (lesson: LessonWithStudent, e: React.MouseEvent) => {
