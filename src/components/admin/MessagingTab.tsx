@@ -625,10 +625,14 @@ export default function MessagingTab() {
               )}
 
               {selectedFolder === 'inbox' && (
-                <div className="pt-4 border-t">
+                <div className="pt-4 border-t flex gap-2">
                   <Button onClick={() => handleReply(selectedMessage)}>
                     <Reply className="w-4 h-4 mr-2" />
                     השב
+                  </Button>
+                  <Button variant="outline" onClick={() => handleForward(selectedMessage)}>
+                    <Forward className="w-4 h-4 mr-2" />
+                    העבר
                   </Button>
                 </div>
               )}
