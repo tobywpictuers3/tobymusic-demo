@@ -355,10 +355,8 @@ const LessonJournal = () => {
     const day = String(date.getDate()).padStart(2, '0');
     const newDateStr = `${year}-${month}-${day}`;
 
-    // CASE 1 — Template lesson: cancel old + create new
     if (draggedLesson.isFromTemplate) {
-
-      // 1) Cancel the template at original location
+      // STEP 1 – Cancel original template
       addLesson({
         studentId: draggedLesson.studentId,
         date: draggedLesson.date,
@@ -366,10 +364,10 @@ const LessonJournal = () => {
         endTime: draggedLesson.endTime || calculateEndTime(draggedLesson.startTime, 30),
         status: 'cancelled',
         isOneOff: false,
-        notes: 'שיעור מהמערכת שהועבר'
+        notes: 'שיעור מהמערכת שבוטל עקב גרירה'
       });
 
-      // 2) Create new lesson at the new date
+      // STEP 2 – Create scheduled lesson in the new date
       const endTime = calculateEndTime(draggedLesson.startTime, 30);
       addLesson({
         studentId: draggedLesson.studentId,
@@ -378,13 +376,11 @@ const LessonJournal = () => {
         endTime,
         status: 'scheduled',
         isOneOff: true,
-        notes: `שיעור הועבר מ-${draggedLesson.date}`
+        notes: `שיעור הועבר מ־${draggedLesson.date}`
       });
 
     } else {
-
-      // CASE 2 — Existing lesson: just update date (no duplication)
-      updateLesson(draggedLesson.id, {
+      updateLesson(draggedLesson.id, { 
         date: newDateStr,
         notes: `שיעור הועבר מ-${draggedLesson.date}`
       });
