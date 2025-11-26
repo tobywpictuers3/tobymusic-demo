@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Trophy } from 'lucide-react';
-import { getStudentPracticeSessions, getStudentStatistics } from '@/lib/storage';
+import { getStudentStatistics } from '@/lib/storage';
 import { recalcAllForStudent } from '@/lib/practiceEngine';
 
 interface PracticeStatsProps {
@@ -13,32 +13,24 @@ const PracticeStats = ({ studentId }: PracticeStatsProps) => {
   const [medals, setMedals] = useState<string[]>([]);
 
   useEffect(() => {
-    const sessions = getStudentPracticeSessions(studentId);
-    
-    // Calculate weekly total (last 7 days) - real-time calculation
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const weekAgoStr = oneWeekAgo.toISOString().split('T')[0];
-    
-    const weeklyTotal = sessions
-      .filter(s => s.date >= weekAgoStr)
-      .reduce((sum, s) => sum + s.durationMinutes, 0);
-    
-    setWeeklyMinutes(weeklyTotal);
-
-    // Streak and maxDaily from cache
+    // Get all statistics from cache or recalculate
     const cached = getStudentStatistics(studentId);
+    let weeklyAvg: number;
     let maxStreak: number;
     let maxDaily: number;
 
     if (cached) {
+      weeklyAvg = cached.weeklyAverage ?? 0;
       maxStreak = cached.streak;
       maxDaily = cached.maxDaily;
     } else {
       const stats = recalcAllForStudent(studentId);
+      weeklyAvg = stats.weeklyAverage;
       maxStreak = stats.streak;
       maxDaily = stats.maxDaily;
     }
+
+    setWeeklyMinutes(weeklyAvg);
 
     // Calculate medals based on cached values
     const allMedals: string[] = [];

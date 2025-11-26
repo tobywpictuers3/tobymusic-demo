@@ -253,6 +253,11 @@ export function recalcAllForStudent(studentId: string) {
   const monthly = calculateMonthlyAchievements(studentId);
   const yearly = calculateYearlyAchievements(studentId);
 
+  // Calculate weekly average from the last interval
+  const weeklyAverage = intervals.length > 0 
+    ? intervals[intervals.length - 1].average 
+    : 0;
+
   // Save to storage and trigger sync
   saveStudentStatistics(studentId, {
     intervals,
@@ -260,6 +265,7 @@ export function recalcAllForStudent(studentId: string) {
     maxDaily,
     monthly,
     yearly,
+    weeklyAverage,
   });
 
   return {
@@ -268,6 +274,7 @@ export function recalcAllForStudent(studentId: string) {
     maxDaily,
     monthly,
     yearly,
+    weeklyAverage,
   };
 }
 

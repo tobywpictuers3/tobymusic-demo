@@ -1107,6 +1107,7 @@ export const saveStudentStatistics = (studentId: string, stats: {
   maxDaily: number;
   monthly: Record<string, any>;
   yearly: any[];
+  weeklyAverage: number;
 }) => {
   if (devModeActive) {
     if (!devData['studentStats']) devData['studentStats'] = {};

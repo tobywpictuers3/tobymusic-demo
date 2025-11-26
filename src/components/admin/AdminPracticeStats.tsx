@@ -72,8 +72,8 @@ const AdminPracticeStats = () => {
       };
     });
 
-    // Sort by total minutes descending
-    entries.sort((a, b) => b.totalMinutes - a.totalMinutes);
+    // Sort by max daily minutes descending
+    entries.sort((a, b) => b.maxDailyMinutes - a.maxDailyMinutes);
     setLeaderboard(entries);
   };
 

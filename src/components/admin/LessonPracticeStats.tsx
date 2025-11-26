@@ -12,6 +12,7 @@ interface LessonPracticeStatsProps {
 
 const LessonPracticeStats = ({ studentId, lesson }: LessonPracticeStatsProps) => {
   const [practiceMinutes, setPracticeMinutes] = useState(0);
+  const [dailyAverage, setDailyAverage] = useState(0);
   const [medals, setMedals] = useState<string[]>([]);
 
   useEffect(() => {
@@ -29,15 +30,17 @@ const LessonPracticeStats = ({ studentId, lesson }: LessonPracticeStatsProps) =>
     
     if (!interval) {
       setPracticeMinutes(0);
+      setDailyAverage(0);
       setMedals([]);
       return;
     }
 
     setPracticeMinutes(interval.totalMinutes);
+    setDailyAverage(interval.average);
     setMedals([]);
   }, [studentId, lesson.id]);
 
-  if (practiceMinutes === 0 && medals.length === 0) {
+  if (practiceMinutes === 0 && dailyAverage === 0 && medals.length === 0) {
     return null;
   }
 
@@ -47,6 +50,11 @@ const LessonPracticeStats = ({ studentId, lesson }: LessonPracticeStatsProps) =>
         <Badge variant="outline" className="flex items-center gap-1 text-xs">
           <Trophy className="h-3 w-3" />
           {practiceMinutes} דק'
+        </Badge>
+      )}
+      {dailyAverage > 0 && (
+        <Badge variant="secondary" className="text-xs">
+          {dailyAverage.toFixed(1)} דק' ממוצע יומי
         </Badge>
       )}
       {medals.map((medal, idx) => (
