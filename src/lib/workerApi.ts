@@ -1,271 +1,243 @@
-import { logger } from './logger';
-import { isDevMode } from './storage';
+import { logger } from "@/lib/logger";
+import { isDevMode, getManagerCode } from "@/lib/devMode";
 
-const WORKER_BASE_URL = 'https://lovable-dropbox-api.w0504124161.workers.dev/';
-
-interface WorkerResponse<T = any> {
+export interface WorkerResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
 }
 
-interface VersionInfo {
-  path: string;
-  server_modified: string;
-  size: number;
-  content_hash?: string;
-}
+const WORKER_BASE_URL = "https://lovable-dropbox-api.w0504124161.workers.dev";
 
-// Get manager code from storage
-const getManagerCode = (): string => {
-  try {
-    const currentUser = localStorage.getItem('musicSystem_currentUser');
-    if (currentUser) {
-      const user = JSON.parse(currentUser);
-      if (user.type === 'admin' && user.adminCode) {
-        return user.adminCode;
-      }
-    }
-  } catch (error) {
-    logger.warn('Failed to get manager code:', error);
-  }
-  return '';
-};
+/* ===========================================================
+   HEADERS HELPERS — VERY IMPORTANT !
+   =========================================================== */
 
-// Get common headers with manager code
-const getHeaders = (additionalHeaders: Record<string, string> = {}): Record<string, string> => {
-  const managerCode = getManagerCode();
-  return {
-    'Accept': 'application/json',
-    'Cache-Control': 'no-store',
-    'X-Sonata-Manager-Code': managerCode,
-    ...additionalHeaders,
-  };
-};
+const getJsonHeaders = () => ({
+  "Content-Type": "application/json",
+  "Cache-Control": "no-store",
+  "X-Sonata-Manager-Code": getManagerCode(),
+});
+
+// NOTICE:
+/// 1. UploadAttachment MUST NOT use Accept or Content-Type
+/// 2. Only X-Sonata-Manager-Code is allowed
+/// 3. Body MUST be FormData with NO headers set by us
+/// 4. Setting Content-Type manually breaks multipart upload
+
+/* ===========================================================
+   EXPORT: Worker API
+   =========================================================== */
 
 export const workerApi = {
-  /**
-   * Download latest version from Worker
-   * GET ?action=download_latest
-   */
+  /* -----------------------------------------------------------
+     1. Download Latest Database JSON
+     ----------------------------------------------------------- */
   downloadLatest: async (): Promise<WorkerResponse> => {
-    // 🔒 CRITICAL: Block all Worker access in dev mode
     if (isDevMode()) {
-      logger.info('🔧 Dev mode: downloadLatest blocked');
-      return { success: false, error: 'DEV_MODE_BLOCKED' };
+      logger.warn("DEV MODE: downloadLatest blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
     }
-    
+
     try {
-      const response = await fetch(`${WORKER_BASE_URL}?action=download_latest`, {
-        method: 'GET',
-        headers: getHeaders(),
-        mode: 'cors',
-        cache: 'no-store',
+      const r = await fetch(`${WORKER_BASE_URL}?action=download_latest`, {
+        method: "GET",
+        cache: "no-store",
       });
 
-      if (response.status === 404) {
-        logger.info('No latest version found - first time use');
-        return { success: false, error: 'NO_VERSION_FOUND' };
+      if (!r.ok) {
+        const txt = await r.text();
+        logger.error("downloadLatest failed:", txt);
+        return { success: false, error: txt };
       }
 
-      if (!response.ok) {
-        const text = await response.text();
-        logger.warn('Failed to download latest:', text);
-        return { success: false, error: text };
-      }
-
-      const data = await response.json();
-      logger.info('Latest version downloaded from Worker');
+      const data = await r.json();
       return { success: true, data };
-    } catch (error) {
-      logger.error('Failed to reach Worker:', error);
-      return { success: false, error: (error as Error).message };
+    } catch (err) {
+      logger.error("downloadLatest error:", err);
+      return { success: false, error: (err as Error).message };
     }
   },
 
-  /**
-   * Upload versioned data to Worker
-   * POST ?action=upload_versioned
-   */
-  uploadVersioned: async (data: any): Promise<WorkerResponse> => {
-    // 🔒 CRITICAL: Block all Worker access in dev mode
+  /* -----------------------------------------------------------
+     2. Upload Full Database (versioned)
+     ----------------------------------------------------------- */
+  uploadVersioned: async (db: any): Promise<WorkerResponse> => {
     if (isDevMode()) {
-      logger.info('🔧 Dev mode: uploadVersioned blocked');
-      return { success: false, error: 'DEV_MODE_BLOCKED' };
+      logger.warn("DEV MODE: uploadVersioned blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
     }
-    
+
     try {
-      const response = await fetch(`${WORKER_BASE_URL}?action=upload_versioned`, {
-        method: 'POST',
-        headers: getHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(data),
-        mode: 'cors',
-        cache: 'no-store',
+      const r = await fetch(`${WORKER_BASE_URL}?action=upload_versioned`, {
+        method: "POST",
+        headers: getJsonHeaders(),
+        body: JSON.stringify(db),
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        logger.warn('Failed to upload version:', text);
-        return { success: false, error: text };
+      if (!r.ok) {
+        const txt = await r.text();
+        logger.error("uploadVersioned failed:", txt);
+        return { success: false, error: txt };
       }
 
-      const result = await response.json();
-      logger.info('Version uploaded to Worker');
-      return { success: true, data: result };
-    } catch (error) {
-      logger.error('Failed to upload to Worker:', error);
-      return { success: false, error: (error as Error).message };
-    }
-  },
-
-  /**
-   * List all versions from Worker
-   * GET ?action=list_versions
-   */
-  listVersions: async (): Promise<WorkerResponse<VersionInfo[]>> => {
-    // 🔒 CRITICAL: Block all Worker access in dev mode
-    if (isDevMode()) {
-      logger.info('🔧 Dev mode: listVersions blocked');
-      return { success: false, error: 'DEV_MODE_BLOCKED' };
-    }
-    
-    try {
-      const response = await fetch(`${WORKER_BASE_URL}?action=list_versions`, {
-        method: 'GET',
-        headers: getHeaders(),
-        mode: 'cors',
-        cache: 'no-store',
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        logger.warn('Failed to list versions:', text);
-        return { success: false, error: text };
-      }
-
-      const data = await response.json();
-      logger.info('Versions list retrieved from Worker');
+      const data = await r.json();
       return { success: true, data };
-    } catch (error) {
-      logger.error('Failed to list versions:', error);
-      return { success: false, error: (error as Error).message };
+    } catch (err) {
+      logger.error("uploadVersioned error:", err);
+      return { success: false, error: (err as Error).message };
     }
   },
 
-  /**
-   * Download specific version by path
-   * POST ?action=download_by_path
-   */
-  downloadByPath: async (path: string): Promise<WorkerResponse> => {
-    // 🔒 CRITICAL: Block all Worker access in dev mode
-    if (isDevMode()) {
-      logger.info('🔧 Dev mode: downloadByPath blocked');
-      return { success: false, error: 'DEV_MODE_BLOCKED' };
-    }
-    
-    try {
-      const response = await fetch(`${WORKER_BASE_URL}?action=download_by_path`, {
-        method: 'POST',
-        headers: getHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ path }),
-        mode: 'cors',
-        cache: 'no-store',
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        logger.warn('Failed to download version by path:', text);
-        return { success: false, error: text };
-      }
-
-      const data = await response.json();
-      logger.info('Version downloaded by path from Worker');
-      return { success: true, data };
-    } catch (error) {
-      logger.error('Failed to download by path:', error);
-      return { success: false, error: (error as Error).message };
-    }
-  },
-
-  /**
-   * Upload attachment via multipart/form-data
-   * POST ?action=upload_attachment
-   */
+  /* -----------------------------------------------------------
+     3. Upload Attachment (multipart/form-data)
+     ----------------------------------------------------------- */
   uploadAttachment: async (file: File): Promise<WorkerResponse> => {
-    // 🔒 CRITICAL: Block all Worker access in dev mode
     if (isDevMode()) {
-      logger.info('🔧 Dev mode: uploadAttachment blocked');
-      return { success: false, error: 'DEV_MODE_BLOCKED' };
+      logger.warn("DEV MODE: uploadAttachment blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
     }
-    
+
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
-      const response = await fetch(`${WORKER_BASE_URL}?action=upload_attachment`, {
-        method: 'POST',
-        headers: getHeaders(), // No Content-Type - browser sets it with boundary
-        body: formData,
-        mode: 'cors',
-        cache: 'no-store',
+      logger.info("Uploading attachment:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
       });
+
+      const response = await fetch(
+        `${WORKER_BASE_URL}?action=upload_attachment`,
+        {
+          method: "POST",
+          // VERY IMPORTANT: DO NOT SET Content-Type or Accept
+          headers: {
+            "X-Sonata-Manager-Code": getManagerCode(),
+          },
+          body: formData,
+          mode: "cors",
+          cache: "no-store",
+        }
+      );
 
       if (!response.ok) {
         const text = await response.text();
-        logger.warn('Failed to upload attachment:', text);
+        logger.error("Failed to upload attachment:", text);
         return { success: false, error: text };
       }
 
       const result = await response.json();
-      logger.info('Attachment uploaded to Worker:', result);
+      logger.info("Attachment uploaded:", result);
+
       return { success: true, data: result };
     } catch (error) {
-      logger.error('Failed to upload attachment:', error);
+      logger.error("uploadAttachment error:", error);
       return { success: false, error: (error as Error).message };
     }
   },
 
-  /**
-   * Delete attachment via JSON
-   * POST ?action=delete_attachment
-   */
+  /* -----------------------------------------------------------
+     4. Delete Attachment
+     ----------------------------------------------------------- */
   deleteAttachment: async (path: string): Promise<WorkerResponse> => {
-    // 🔒 CRITICAL: Block all Worker access in dev mode
     if (isDevMode()) {
-      logger.info('🔧 Dev mode: deleteAttachment blocked');
-      return { success: false, error: 'DEV_MODE_BLOCKED' };
+      logger.warn("DEV MODE: deleteAttachment blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
     }
-    
+
     try {
-      const response = await fetch(`${WORKER_BASE_URL}?action=delete_attachment`, {
-        method: 'POST',
-        headers: getHeaders({ 'Content-Type': 'application/json' }),
+      const r = await fetch(`${WORKER_BASE_URL}?action=delete_attachment`, {
+        method: "POST",
+        headers: getJsonHeaders(),
         body: JSON.stringify({ path }),
-        mode: 'cors',
-        cache: 'no-store',
+        cache: "no-store",
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        logger.warn('Failed to delete attachment:', text);
-        return { success: false, error: text };
+      if (!r.ok) {
+        const txt = await r.text();
+        logger.error("deleteAttachment failed:", txt);
+        return { success: false, error: txt };
       }
 
-      const result = await response.json();
-      logger.info('Attachment deleted from Worker');
-      return { success: true, data: result };
-    } catch (error) {
-      logger.error('Failed to delete attachment:', error);
-      return { success: false, error: (error as Error).message };
+      const data = await r.json();
+      logger.info("Attachment deleted:", data);
+      return { success: true, data };
+    } catch (err) {
+      logger.error("deleteAttachment error:", err);
+      return { success: false, error: (err as Error).message };
     }
   },
 
-  // Legacy methods for backward compatibility
-  saveData: async (data: any) => {
+  /* -----------------------------------------------------------
+     5. List Versions
+     ----------------------------------------------------------- */
+  listVersions: async (): Promise<WorkerResponse> => {
+    if (isDevMode()) {
+      logger.warn("DEV MODE: listVersions blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
+    }
+
+    try {
+      const r = await fetch(`${WORKER_BASE_URL}?action=list_versions`, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!r.ok) {
+        const txt = await r.text();
+        logger.error("listVersions failed:", txt);
+        return { success: false, error: txt };
+      }
+
+      const data = await r.json();
+      return { success: true, data };
+    } catch (err) {
+      logger.error("listVersions error:", err);
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  /* -----------------------------------------------------------
+     6. Download by Path
+     ----------------------------------------------------------- */
+  downloadByPath: async (path: string): Promise<WorkerResponse> => {
+    if (isDevMode()) {
+      logger.warn("DEV MODE: downloadByPath blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
+    }
+
+    try {
+      const r = await fetch(`${WORKER_BASE_URL}?action=download_by_path`, {
+        method: "POST",
+        headers: getJsonHeaders(),
+        body: JSON.stringify({ path }),
+        cache: "no-store",
+      });
+
+      if (!r.ok) {
+        const txt = await r.text();
+        logger.error("downloadByPath failed:", txt);
+        return { success: false, error: txt };
+      }
+
+      const data = await r.json();
+      return { success: true, data };
+    } catch (err) {
+      logger.error("downloadByPath error:", err);
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  /* -----------------------------------------------------------
+     Legacy Methods
+     ----------------------------------------------------------- */
+  saveData: async (data: any): Promise<WorkerResponse> => {
     return workerApi.uploadVersioned(data);
   },
 
-  loadData: async () => {
+  loadData: async (): Promise<WorkerResponse> => {
     return workerApi.downloadLatest();
   },
 };
