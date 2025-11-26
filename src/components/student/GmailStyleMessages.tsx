@@ -192,6 +192,20 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     setIsUploading(false);
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      await handleFileUpload(files);
+    }
+  };
+
   const handleDeleteAttachment = async (index: number) => {
     const attachment = attachments[index];
     const result = await workerApi.deleteAttachment(attachment.path);
@@ -623,6 +637,8 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                     contentEditable
                     suppressContentEditableWarning
                     dir="rtl"
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
                   />
                 </div>
               </div>

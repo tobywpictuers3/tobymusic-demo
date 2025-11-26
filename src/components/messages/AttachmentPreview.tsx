@@ -26,17 +26,23 @@ export default function AttachmentPreview({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const handleImageClick = () => {
+    if (isImage) {
+      window.open(attachment.url, '_blank');
+    }
+  };
+
   return (
     <Card className={cn(
-      "relative p-2 border overflow-hidden",
-      isImage && "w-32 h-32"
+      "relative overflow-hidden border",
+      isImage ? "w-20 h-20 p-0" : "p-2"
     )}>
       {/* Delete button */}
       {!readOnly && onDelete && (
         <Button
           variant="destructive"
           size="icon"
-          className="absolute top-1 left-1 h-6 w-6 z-10"
+          className="absolute top-1 left-1 h-5 w-5 z-10"
           onClick={onDelete}
         >
           <X className="h-3 w-3" />
@@ -45,20 +51,23 @@ export default function AttachmentPreview({
 
       {/* Content based on type */}
       {isImage && (
-        <div className="w-full h-full">
+        <div 
+          className="w-full h-full cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={handleImageClick}
+        >
           <img 
             src={attachment.url} 
             alt={attachment.name}
-            className="w-full h-full object-cover rounded"
+            className="w-full h-full object-cover"
           />
         </div>
       )}
 
       {isPDF && (
-        <div className="flex flex-col items-center gap-2 p-2">
+        <div className="flex flex-col items-center gap-2 p-2 min-w-[120px]">
           <FileText className="w-8 h-8 text-red-500" />
-          <div className="text-xs text-center">
-            <div className="font-medium truncate w-24">{attachment.name}</div>
+          <div className="text-xs text-center w-full">
+            <div className="font-medium truncate">{attachment.name}</div>
             <div className="text-muted-foreground">{formatSize(attachment.size)}</div>
           </div>
           <Button size="sm" variant="outline" asChild>
@@ -70,7 +79,7 @@ export default function AttachmentPreview({
       )}
 
       {isAudio && (
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-[200px]">
           <div className="flex items-center gap-2">
             <Music className="w-4 h-4 text-primary" />
             <div className="text-xs truncate flex-1">{attachment.name}</div>
@@ -82,7 +91,7 @@ export default function AttachmentPreview({
       )}
 
       {isVideo && (
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-[200px]">
           <div className="flex items-center gap-2">
             <Video className="w-4 h-4 text-primary" />
             <div className="text-xs truncate">{attachment.name}</div>
@@ -94,7 +103,7 @@ export default function AttachmentPreview({
       )}
 
       {!isImage && !isPDF && !isAudio && !isVideo && (
-        <div className="flex items-center gap-2 p-2">
+        <div className="flex items-center gap-2 p-2 min-w-[120px]">
           <FileIcon className="w-8 h-8 text-muted-foreground flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-xs font-medium truncate">{attachment.name}</div>
@@ -107,7 +116,7 @@ export default function AttachmentPreview({
       <Button
         variant="ghost"
         size="icon"
-        className="absolute bottom-1 right-1 h-6 w-6"
+        className="absolute bottom-1 right-1 h-5 w-5"
         asChild
       >
         <a href={attachment.url} download={attachment.name}>
