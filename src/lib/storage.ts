@@ -826,8 +826,9 @@ export const deletePracticeSession = (id: string): boolean => {
     devData['practiceSessions'] = updatedSessions;
   } else {
     inMemoryStorage['practiceSessions'] = updatedSessions;
-    hybridSync.onDataChange();
   }
+  // ✅ Always trigger sync (dev + production)
+  hybridSync.onDataChange();
   return true;
 };
 

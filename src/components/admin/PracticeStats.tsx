@@ -32,15 +32,19 @@ const PracticeStats = ({ studentId }: PracticeStatsProps) => {
 
     setWeeklyMinutes(weeklyAvg);
 
-    // Calculate medals based on cached values
+    // Calculate medals based on cached values - NEW LOGIC
     const allMedals: string[] = [];
     
-    if (maxStreak >= 7) allMedals.push('🥇 שבוע רצוף');
-    else if (maxStreak >= 6) allMedals.push('🥈 6 ימים רצופים');
-    else if (maxStreak >= 3) allMedals.push('🥉 ' + maxStreak + ' ימים רצופים');
+    // Streak medals - new thresholds
+    if (maxStreak >= 21) allMedals.push('👑 רצף ראוי לציון');
+    else if (maxStreak >= 14) allMedals.push('💎 רצף נהדר');
+    else if (maxStreak >= 6) allMedals.push('⚡ מרוצף');
+    else if (maxStreak >= 3) allMedals.push('🔥 רצף');
 
-    if (maxDaily >= 60) allMedals.push('🥇 60 דק\' ביום');
-    else if (maxDaily >= 30) allMedals.push('🥈 30 דק\' ביום');
+    // Daily medals - new thresholds
+    if (maxDaily >= 270) allMedals.push('💎 270 דק\' ביום');
+    else if (maxDaily >= 150) allMedals.push('🥇 150 דק\' ביום');
+    else if (maxDaily >= 40) allMedals.push('🥈 40 דק\' ביום');
     else if (maxDaily >= 15) allMedals.push('🥉 15 דק\' ביום');
 
     setMedals(allMedals);

@@ -16,14 +16,16 @@ const StreakProgress = ({ studentId }: StreakProgressProps) => {
     const streak = calculateStreak(studentId);
     setCurrentStreak(streak);
 
-    // Calculate days to next medal
+    // Calculate days to next medal - NEW LOGIC
+    const effectiveStreak = streak > 21 ? streak % 21 : streak;
     const nextMilestones = [
-      { days: 3, medal: '🥉 רצף 3 ימים' },
-      { days: 5, medal: '🥈 רצף 5 ימים' },
-      { days: 7, medal: '🥇 רצף 7 ימים' },
+      { days: 3, medal: '🔥 רצף' },
+      { days: 6, medal: '⚡ מרוצף' },
+      { days: 14, medal: '💎 רצף נהדר' },
+      { days: 21, medal: '👑 רצף ראוי לציון' },
     ];
 
-    const nextMilestone = nextMilestones.find(m => m.days > streak);
+    const nextMilestone = nextMilestones.find(m => m.days > effectiveStreak);
     if (nextMilestone) {
       setDaysToNextMedal({
         days: nextMilestone.days - streak,

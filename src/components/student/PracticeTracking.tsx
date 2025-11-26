@@ -96,16 +96,15 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
         // Get current day medals
         dayMedals.forEach(m => {
           if (m.medalType === 'duration') {
-            if (m.level === 'diamond') medals.push('💠 יהלום');
-            else if (m.level === 'platinum') medals.push('💎 פלטינום');
+            if (m.level === 'platinum') medals.push('💎 פלטינום');
             else if (m.level === 'gold') medals.push('🥇 זהב');
             else if (m.level === 'silver') medals.push('🥈 כסף');
             else if (m.level === 'bronze') medals.push('🥉 נחושת');
           } else if (m.medalType === 'streak') {
-            if (m.level === 'streak21') medals.push('👑 אלופה');
-            else if (m.level === 'streak12') medals.push('💎 מרצפת');
-            else if (m.level === 'streak7') medals.push('⚡ מרוצף');
-            else if (m.level === 'streak4') medals.push('🔥 רצוף');
+            if (m.level === 'streak21') medals.push('👑 רצף ראוי לציון');
+            else if (m.level === 'streak14') medals.push('💎 רצף נהדר');
+            else if (m.level === 'streak6') medals.push('⚡ מרוצף');
+            else if (m.level === 'streak3') medals.push('🔥 רצף');
           }
         });
 
@@ -148,17 +147,17 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   const getNextMedalInfo = (totalMinutes: number): { nextMedal: string; remaining: number } | null => {
     if (totalMinutes < 15) return { nextMedal: 'נחושת (15 דקות)', remaining: 15 - totalMinutes };
     if (totalMinutes < 40) return { nextMedal: 'כסף (40 דקות)', remaining: 40 - totalMinutes };
-    if (totalMinutes < 60) return { nextMedal: 'זהב (60 דקות)', remaining: 60 - totalMinutes };
-    if (totalMinutes < 100) return { nextMedal: 'פלטינום (100 דקות)', remaining: 100 - totalMinutes };
-    if (totalMinutes < 150) return { nextMedal: 'יהלום (150 דקות)', remaining: 150 - totalMinutes };
+    if (totalMinutes < 150) return { nextMedal: 'זהב (150 דקות)', remaining: 150 - totalMinutes };
+    if (totalMinutes < 270) return { nextMedal: 'פלטינום (270 דקות)', remaining: 270 - totalMinutes };
     return null;
   };
 
   const getNextStreakInfo = (streak: number): { nextMedal: string; remaining: number } | null => {
-    if (streak < 4) return { nextMedal: 'רצוף (4 ימים)', remaining: 4 - streak };
-    if (streak < 7) return { nextMedal: 'מרוצף (7 ימים)', remaining: 7 - streak };
-    if (streak < 12) return { nextMedal: 'מרצפת (12 ימים)', remaining: 12 - streak };
-    if (streak < 21) return { nextMedal: 'אלופה (21 ימים)', remaining: 21 - streak };
+    const effectiveStreak = streak > 21 ? streak % 21 : streak;
+    if (effectiveStreak < 3) return { nextMedal: 'רצף (3 ימים)', remaining: 3 - effectiveStreak };
+    if (effectiveStreak < 6) return { nextMedal: 'מרוצף (6 ימים)', remaining: 6 - effectiveStreak };
+    if (effectiveStreak < 14) return { nextMedal: 'רצף נהדר (14 ימים)', remaining: 14 - effectiveStreak };
+    if (effectiveStreak < 21) return { nextMedal: 'רצף ראוי לציון (21 ימים)', remaining: 21 - effectiveStreak };
     return null;
   };
 
@@ -166,36 +165,39 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     const existingMedals = getStudentMedalRecords(studentId);
     const today = new Date().toISOString().split('T')[0];
     
+    // ✅ Reset streak after 21 days
+    const effectiveStreak = streak > 21 ? streak % 21 : streak;
+    
     let message = '';
     let medal = '';
-    let level: 'streak4' | 'streak7' | 'streak12' | 'streak21' | null = null;
+    let level: 'streak3' | 'streak6' | 'streak14' | 'streak21' | null = null;
     
-    if (streak >= 21) {
+    if (effectiveStreak >= 21 || streak === 21) {
       level = 'streak21';
       const hasHigherMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today && m.level === 'streak21');
       if (!hasHigherMedal) {
-        message = 'בלתי יאומן! 21 ימים ברצף! את אלופת אלופות! מגיעה לך מדליית אלופה!';
+        message = 'בלתי יאומן! 21 ימים ברצף! מגיעה לך מדליית "רצף ראוי לציון"!';
         medal = '👑';
       }
-    } else if (streak >= 12) {
-      level = 'streak12';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today && (m.level === 'streak21' || m.level === 'streak12'));
+    } else if (effectiveStreak >= 14) {
+      level = 'streak14';
+      const hasHigherMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today && (m.level === 'streak21' || m.level === 'streak14'));
       if (!hasHigherMedal) {
-        message = 'יוצא מן הכלל! 12 ימים ברצף! ממשיכה חזק! מגיעה לך מדליית מרצפת!';
+        message = 'יוצא מן הכלל! 14 ימים ברצף! מגיעה לך מדליית "רצף נהדר"!';
         medal = '💎';
       }
-    } else if (streak >= 7) {
-      level = 'streak7';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today && (m.level === 'streak21' || m.level === 'streak12' || m.level === 'streak7'));
+    } else if (effectiveStreak >= 6) {
+      level = 'streak6';
+      const hasHigherMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today && (m.level === 'streak21' || m.level === 'streak14' || m.level === 'streak6'));
       if (!hasHigherMedal) {
-        message = 'וואוווו מהמם! שבוע שלם של אימונים! ככה תוכלי להגיע רחוק! מגיעה לך מדליית מרוצף!';
+        message = 'מדהים! 6 ימים ברצף! מגיעה לך מדליית "מרוצף"!';
         medal = '⚡';
       }
-    } else if (streak >= 4) {
-      level = 'streak4';
+    } else if (effectiveStreak >= 3) {
+      level = 'streak3';
       const hasAnyStreakMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today);
       if (!hasAnyStreakMedal) {
-        message = 'שמתי לב שהתאמנת ברצף 4 ימים. המשיכי כך! מגיעה לך מדליית רצוף!';
+        message = 'יפה מאוד! 3 ימים ברצף! מגיעה לך מדליית "רצף"!';
         medal = '🔥';
       }
     }
@@ -214,7 +216,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
         studentId,
         medalType: 'streak',
         level,
-        streakDays: streak,
+        streakDays: effectiveStreak,
         earnedDate: today,
       });
       
@@ -228,32 +230,26 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     
     let message = '';
     let medal = '';
-    let level: 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | null = null;
+    let level: 'bronze' | 'silver' | 'gold' | 'platinum' | null = null;
     
-    if (totalMinutes >= 150) {
-      level = 'diamond';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && m.level === 'diamond');
-      if (!hasHigherMedal) {
-        message = 'בלתי יאומן! 150 דקות אימון! את אלופה אמיתית! מגיעה לך מדליית יהלום!';
-        medal = '💠';
-      }
-    } else if (totalMinutes >= 100) {
+    // ✅ NEW LOGIC: 15 → Bronze, 40 → Silver, 150 → Gold, 270 → Platinum
+    if (totalMinutes >= 270) {
       level = 'platinum';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && (m.level === 'diamond' || m.level === 'platinum'));
+      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && m.level === 'platinum');
       if (!hasHigherMedal) {
-        message = 'יוצא מן הכלל! 100 דקות אימון! מגיעה לך מדליית פלטינום!';
+        message = 'בלתי יאומן! 270 דקות אימון! את אלופה אמיתית! מגיעה לך מדליית פלטינום!';
         medal = '💎';
       }
-    } else if (totalMinutes >= 60) {
+    } else if (totalMinutes >= 150) {
       level = 'gold';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && (m.level === 'diamond' || m.level === 'platinum' || m.level === 'gold'));
+      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && (m.level === 'platinum' || m.level === 'gold'));
       if (!hasHigherMedal) {
-        message = 'וואו! צברת היום 60 דקות אימון! את עושה עבודה מצוינת! מגיעה לך מדליית זהב!';
+        message = 'יוצא מן הכלל! 150 דקות אימון! מגיעה לך מדליית זהב!';
         medal = '🥇';
       }
     } else if (totalMinutes >= 40) {
       level = 'silver';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && (m.level === 'diamond' || m.level === 'platinum' || m.level === 'gold' || m.level === 'silver'));
+      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && (m.level === 'platinum' || m.level === 'gold' || m.level === 'silver'));
       if (!hasHigherMedal) {
         message = 'נפלא! צברת היום 40 דקות אימון. מגיעה לך מדליית כסף!';
         medal = '🥈';
@@ -262,7 +258,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
       level = 'bronze';
       const hasAnyDurationMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate);
       if (!hasAnyDurationMedal) {
-        message = 'מצוין! צברת 15 דקות אימון היום! את כמובן מוזמנת להתאמן עוד....אבל בינתיים קבלי מדליית נחושת!';
+        message = 'מצוין! צברת 15 דקות אימון היום! קבלי מדליית נחושת!';
         medal = '🥉';
       }
     }
@@ -477,16 +473,15 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
           
           allMedals.filter(m => m.earnedDate === date).forEach(m => {
             if (m.medalType === 'duration') {
-              if (m.level === 'diamond') medals.push('💠 יהלום');
-              else if (m.level === 'platinum') medals.push('💎 פלטינום');
+              if (m.level === 'platinum') medals.push('💎 פלטינום');
               else if (m.level === 'gold') medals.push('🥇 זהב');
               else if (m.level === 'silver') medals.push('🥈 כסף');
               else if (m.level === 'bronze') medals.push('🥉 נחושת');
             } else if (m.medalType === 'streak') {
-              if (m.level === 'streak21') medals.push('👑 אלופה');
-              else if (m.level === 'streak12') medals.push('💎 מרצפת');
-              else if (m.level === 'streak7') medals.push('⚡ מרוצף');
-              else if (m.level === 'streak4') medals.push('🔥 רצוף');
+              if (m.level === 'streak21') medals.push('👑 רצף ראוי לציון');
+              else if (m.level === 'streak14') medals.push('💎 רצף נהדר');
+              else if (m.level === 'streak6') medals.push('⚡ מרוצף');
+              else if (m.level === 'streak3') medals.push('🔥 רצף');
             }
           });
           
