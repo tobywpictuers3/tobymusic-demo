@@ -22,7 +22,7 @@ import {
   saveDraft
 } from "@/lib/messages";
 import { getStudents, updateSwapRequestStatus } from "@/lib/storage";
-import { Message, Student } from "@/lib/types";
+import { Message, Student, Attachment } from "@/lib/types";
 import { toast } from "sonner";
 import { 
   Send, 
@@ -38,10 +38,13 @@ import {
   ArrowLeftRight,
   Save,
   Forward,
-  RotateCcw
+  RotateCcw,
+  Paperclip
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MessageTypeBadge } from "../student/MessageTypeBadge";
+import { workerApi } from "@/lib/workerApi";
+import AttachmentPreview from "@/components/messages/AttachmentPreview";
 
 // Format message date: HH:MM for today, dd/MM for older
 const formatMessageDate = (createdAt: string): string => {
@@ -66,20 +69,23 @@ export default function MessagingTab() {
   const [composeRecipients, setComposeRecipients] = useState<string[]>(['all']);
   const [expirationDate, setExpirationDate] = useState('');
   const editorRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  // Handle paste for inline images
+  // Handle paste for inline images - upload to Worker
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
 
-    const handlePaste = (e: ClipboardEvent) => {
+    const handlePaste = async (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -88,17 +94,24 @@ export default function MessagingTab() {
           e.preventDefault();
           const file = item.getAsFile();
           if (!file) continue;
-          const reader = new FileReader();
-          reader.onload = () => {
+          
+          // Upload to Worker
+          setIsUploading(true);
+          const result = await workerApi.uploadAttachment(file);
+          setIsUploading(false);
+
+          if (result.success && result.data) {
+            // Insert img tag with URL from server
             const img = document.createElement('img');
-            img.src = reader.result as string;
+            img.src = result.data.url;
             img.style.maxWidth = '100%';
             img.style.borderRadius = '8px';
             img.style.marginTop = '8px';
             img.style.marginBottom = '8px';
             el.appendChild(img);
-          };
-          reader.readAsDataURL(file);
+          } else {
+            toast.error('שגיאה בהעלאת התמונה');
+          }
         }
       }
     };
@@ -163,6 +176,35 @@ export default function MessagingTab() {
     }
   };
 
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const result = await workerApi.uploadAttachment(file);
+      
+      if (result.success && result.data) {
+        setAttachments(prev => [...prev, result.data]);
+      } else {
+        toast.error(`שגיאה בהעלאת ${file.name}`);
+      }
+    }
+    setIsUploading(false);
+  };
+
+  const handleDeleteAttachment = async (index: number) => {
+    const attachment = attachments[index];
+    const result = await workerApi.deleteAttachment(attachment.path);
+    
+    if (result.success) {
+      setAttachments(prev => prev.filter((_, i) => i !== index));
+      toast.success('הקובץ נמחק');
+    } else {
+      toast.error('שגיאה במחיקת הקובץ');
+    }
+  };
+
   const handleCompose = () => {
     setIsComposing(true);
     setIsReplying(false);
@@ -171,6 +213,7 @@ export default function MessagingTab() {
     setComposeRecipients(['all']);
     setExpirationDate('');
     setSelectedMessage(null);
+    setAttachments([]);
   };
 
   const handleReply = (message: Message) => {
@@ -218,6 +261,7 @@ export default function MessagingTab() {
       subject: composeSubject,
       content: plain,
       contentHtml: html,
+      attachments: attachments.length > 0 ? attachments : undefined,
       expiresAt: expirationDate || undefined,
       inReplyTo: isReplying && selectedMessage ? selectedMessage.id : undefined,
       type: 'general',
@@ -231,6 +275,7 @@ export default function MessagingTab() {
     setComposeRecipients(['all']);
     setExpirationDate('');
     setSelectedMessage(null);
+    setAttachments([]);
     loadData();
   };
 
@@ -250,6 +295,7 @@ export default function MessagingTab() {
       subject: composeSubject,
       content: plain,
       contentHtml: html,
+      attachments: attachments.length > 0 ? attachments : undefined,
       type: 'general',
     });
 
@@ -259,6 +305,7 @@ export default function MessagingTab() {
     if (editorRef.current) editorRef.current.innerHTML = '';
     setComposeRecipients(['all']);
     setExpirationDate('');
+    setAttachments([]);
     loadData();
   };
 
@@ -573,6 +620,23 @@ export default function MessagingTab() {
                     >
                       A+
                     </Button>
+                    <div className="border-r h-6 mx-2" />
+                    <Button 
+                      type="button"
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e.target.files)}
+                    />
                     <div className="ml-auto flex gap-1">
                       {['🎵','⭐','😊','🔥','👏'].map(e => (
                         <button 
@@ -596,6 +660,28 @@ export default function MessagingTab() {
                   />
                 </div>
               </div>
+
+              {/* Attachments display */}
+              {attachments.length > 0 && (
+                <div className="space-y-2">
+                  <Label>קבצים מצורפים ({attachments.length})</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {attachments.map((att, idx) => (
+                      <AttachmentPreview 
+                        key={idx} 
+                        attachment={att} 
+                        onDelete={() => handleDeleteAttachment(idx)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isUploading && (
+                <div className="text-sm text-muted-foreground">
+                  מעלה קבצים...
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="expiration">תאריך תפוגה (אופציונלי)</Label>
@@ -660,6 +746,22 @@ export default function MessagingTab() {
                   <div className="whitespace-pre-wrap">{selectedMessage.content}</div>
                 )}
               </div>
+
+              {/* Attachments display in message view */}
+              {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
+                <div className="pt-4 border-t space-y-2">
+                  <Label>קבצים מצורפים ({selectedMessage.attachments.length})</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedMessage.attachments.map((att, idx) => (
+                      <AttachmentPreview 
+                        key={idx} 
+                        attachment={att} 
+                        readOnly
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Swap request actions */}
               {selectedMessage.metadata?.action === 'approve_or_reject' && selectedMessage.metadata.swapRequestId && (
