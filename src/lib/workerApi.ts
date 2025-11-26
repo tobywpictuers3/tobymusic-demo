@@ -187,6 +187,79 @@ export const workerApi = {
     }
   },
 
+  /**
+   * Upload attachment via multipart/form-data
+   * POST ?action=upload_attachment
+   */
+  uploadAttachment: async (file: File): Promise<WorkerResponse> => {
+    // 🔒 CRITICAL: Block all Worker access in dev mode
+    if (isDevMode()) {
+      logger.info('🔧 Dev mode: uploadAttachment blocked');
+      return { success: false, error: 'DEV_MODE_BLOCKED' };
+    }
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${WORKER_BASE_URL}?action=upload_attachment`, {
+        method: 'POST',
+        headers: getHeaders(), // No Content-Type - browser sets it with boundary
+        body: formData,
+        mode: 'cors',
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        logger.warn('Failed to upload attachment:', text);
+        return { success: false, error: text };
+      }
+
+      const result = await response.json();
+      logger.info('Attachment uploaded to Worker:', result);
+      return { success: true, data: result };
+    } catch (error) {
+      logger.error('Failed to upload attachment:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  /**
+   * Delete attachment via JSON
+   * POST ?action=delete_attachment
+   */
+  deleteAttachment: async (path: string): Promise<WorkerResponse> => {
+    // 🔒 CRITICAL: Block all Worker access in dev mode
+    if (isDevMode()) {
+      logger.info('🔧 Dev mode: deleteAttachment blocked');
+      return { success: false, error: 'DEV_MODE_BLOCKED' };
+    }
+    
+    try {
+      const response = await fetch(`${WORKER_BASE_URL}?action=delete_attachment`, {
+        method: 'POST',
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ path }),
+        mode: 'cors',
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        logger.warn('Failed to delete attachment:', text);
+        return { success: false, error: text };
+      }
+
+      const result = await response.json();
+      logger.info('Attachment deleted from Worker');
+      return { success: true, data: result };
+    } catch (error) {
+      logger.error('Failed to delete attachment:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   // Legacy methods for backward compatibility
   saveData: async (data: any) => {
     return workerApi.uploadVersioned(data);

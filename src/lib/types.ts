@@ -193,6 +193,14 @@ export interface LeaderboardEntry {
   maxStreak: number;
 }
 
+export interface Attachment {
+  url: string;        // Public URL from Worker
+  path: string;       // Path for deletion
+  name: string;       // Original filename
+  size: number;       // File size in bytes
+  type?: string;      // MIME type
+}
+
 export interface Message {
   id: string;
   senderId: string; // 'admin' or student ID
@@ -201,6 +209,7 @@ export interface Message {
   subject: string;
   content: string;
   contentHtml?: string; // HTML version for rich text
+  attachments?: Attachment[]; // File attachments
   createdAt: string;
   expiresAt?: string; // optional expiration date
   scheduledFor?: string; // scheduled send time

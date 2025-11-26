@@ -19,7 +19,7 @@ import {
   canUserRemoveStar,
   saveDraft
 } from "@/lib/messages";
-import { Message } from "@/lib/types";
+import { Message, Attachment } from "@/lib/types";
 import { toast } from "sonner";
 import { 
   Send, 
@@ -34,10 +34,13 @@ import {
   X,
   Save,
   Forward,
-  RotateCcw
+  RotateCcw,
+  Paperclip
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MessageTypeBadge } from "./MessageTypeBadge";
+import { workerApi } from "@/lib/workerApi";
+import AttachmentPreview from "@/components/messages/AttachmentPreview";
 
 // Format message date: HH:MM for today, dd/MM for older
 const formatMessageDate = (createdAt: string): string => {
@@ -66,21 +69,24 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
   const [composeSubject, setComposeSubject] = useState('');
   const [composeRecipients, setComposeRecipients] = useState<string[]>(['admin']);
   const editorRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     loadMessages();
     loadStudents();
   }, [studentId]);
 
-  // Handle paste for inline images
+  // Handle paste for inline images - upload to Worker
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
 
-    const handlePaste = (e: ClipboardEvent) => {
+    const handlePaste = async (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -89,17 +95,24 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
           e.preventDefault();
           const file = item.getAsFile();
           if (!file) continue;
-          const reader = new FileReader();
-          reader.onload = () => {
+          
+          // Upload to Worker
+          setIsUploading(true);
+          const result = await workerApi.uploadAttachment(file);
+          setIsUploading(false);
+
+          if (result.success && result.data) {
+            // Insert img tag with URL from server
             const img = document.createElement('img');
-            img.src = reader.result as string;
+            img.src = result.data.url;
             img.style.maxWidth = '100%';
             img.style.borderRadius = '8px';
             img.style.marginTop = '8px';
             img.style.marginBottom = '8px';
             el.appendChild(img);
-          };
-          reader.readAsDataURL(file);
+          } else {
+            toast.error('שגיאה בהעלאת התמונה');
+          }
         }
       }
     };
@@ -162,6 +175,35 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     }
   };
 
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const result = await workerApi.uploadAttachment(file);
+      
+      if (result.success && result.data) {
+        setAttachments(prev => [...prev, result.data]);
+      } else {
+        toast.error(`שגיאה בהעלאת ${file.name}`);
+      }
+    }
+    setIsUploading(false);
+  };
+
+  const handleDeleteAttachment = async (index: number) => {
+    const attachment = attachments[index];
+    const result = await workerApi.deleteAttachment(attachment.path);
+    
+    if (result.success) {
+      setAttachments(prev => prev.filter((_, i) => i !== index));
+      toast.success('הקובץ נמחק');
+    } else {
+      toast.error('שגיאה במחיקת הקובץ');
+    }
+  };
+
   const handleCompose = () => {
     setIsComposing(true);
     setIsReplying(false);
@@ -169,6 +211,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     if (editorRef.current) editorRef.current.innerHTML = '';
     setComposeRecipients(['admin']);
     setSelectedMessage(null);
+    setAttachments([]);
   };
 
   const handleReply = (message: Message) => {
@@ -216,6 +259,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
       subject: composeSubject,
       content: plain,
       contentHtml: html,
+      attachments: attachments.length > 0 ? attachments : undefined,
       inReplyTo: isReplying && selectedMessage ? selectedMessage.id : undefined,
       type: 'general',
     });
@@ -227,6 +271,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     if (editorRef.current) editorRef.current.innerHTML = '';
     setComposeRecipients(['admin']);
     setSelectedMessage(null);
+    setAttachments([]);
     loadMessages();
   };
 
@@ -246,6 +291,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
       subject: composeSubject,
       content: plain,
       contentHtml: html,
+      attachments: attachments.length > 0 ? attachments : undefined,
       type: 'general',
     });
 
@@ -254,6 +300,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     setComposeSubject('');
     if (editorRef.current) editorRef.current.innerHTML = '';
     setComposeRecipients(['admin']);
+    setAttachments([]);
     loadMessages();
   };
 
@@ -539,6 +586,23 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                     >
                       A+
                     </Button>
+                    <div className="border-r h-6 mx-2" />
+                    <Button 
+                      type="button"
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e.target.files)}
+                    />
                     <div className="ml-auto flex gap-1">
                       {['🎵','⭐','😊','🔥','👏'].map(e => (
                         <button 
@@ -562,6 +626,28 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                   />
                 </div>
               </div>
+
+              {/* Attachments display */}
+              {attachments.length > 0 && (
+                <div className="space-y-2">
+                  <Label>קבצים מצורפים ({attachments.length})</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {attachments.map((att, idx) => (
+                      <AttachmentPreview 
+                        key={idx} 
+                        attachment={att} 
+                        onDelete={() => handleDeleteAttachment(idx)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isUploading && (
+                <div className="text-sm text-muted-foreground">
+                  מעלה קבצים...
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Button onClick={handleSend}>
@@ -616,6 +702,22 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
                   <div className="whitespace-pre-wrap">{selectedMessage.content}</div>
                 )}
               </div>
+
+              {/* Attachments display in message view */}
+              {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
+                <div className="pt-4 border-t space-y-2">
+                  <Label>קבצים מצורפים ({selectedMessage.attachments.length})</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedMessage.attachments.map((att, idx) => (
+                      <AttachmentPreview 
+                        key={idx} 
+                        attachment={att} 
+                        readOnly
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2 pt-4 border-t">
                 <Button
