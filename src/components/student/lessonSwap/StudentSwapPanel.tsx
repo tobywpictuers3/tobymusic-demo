@@ -501,7 +501,7 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
                       disabled={currentStep < 4}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      הזיני קוד רק אם יש לך את הקוד של התלמידה השנייה - אחרת הבקשה תישלח למנהלת לאישור
+                      לשתי התלמידות חייב להיות קוד החלפה נכון. אם אין לך את הקוד של התלמידה השנייה – לא ניתן לבצע החלפה.
                     </p>
                   </div>
 
