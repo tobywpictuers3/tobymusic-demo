@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Calendar } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { calculateYearlyAchievements } from '@/lib/practiceEngine';
+import { getStudentStatistics } from '@/lib/storage';
+import { recalcAllForStudent } from '@/lib/practiceEngine';
 
 interface YearlyAchievementsProps {
   studentId: string;
@@ -16,8 +17,16 @@ const YearlyAchievements = ({ studentId }: YearlyAchievementsProps) => {
   const [yearlyStats, setYearlyStats] = useState<YearlyStats[]>([]);
 
   useEffect(() => {
-    const yearly = calculateYearlyAchievements(studentId);
-    setYearlyStats(yearly);
+    // Try to read from cache first
+    const cached = getStudentStatistics(studentId);
+    
+    if (cached?.yearly) {
+      setYearlyStats(cached.yearly);
+    } else {
+      // No cache - recalculate
+      const stats = recalcAllForStudent(studentId);
+      setYearlyStats(stats.yearly);
+    }
   }, [studentId]);
 
   if (yearlyStats.length === 0) {

@@ -20,6 +20,7 @@ import {
   getPracticeSessions,
   getStudentPracticeSessions,
   updateMonthlyAchievement,
+  saveStudentStatistics,
 } from '@/lib/storage';
 import { Lesson, PracticeSession } from '@/lib/types';
 
@@ -251,6 +252,15 @@ export function recalcAllForStudent(studentId: string) {
   const maxDaily = calculateMaxDailyMinutes(studentId);
   const monthly = calculateMonthlyAchievements(studentId);
   const yearly = calculateYearlyAchievements(studentId);
+
+  // Save to storage and trigger sync
+  saveStudentStatistics(studentId, {
+    intervals,
+    streak,
+    maxDaily,
+    monthly,
+    yearly,
+  });
 
   return {
     intervals,

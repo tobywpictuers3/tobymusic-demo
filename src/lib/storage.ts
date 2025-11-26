@@ -28,7 +28,8 @@ const devData: Record<string, any> = {
   monthlyAchievements: [],
   leaderboard: [],
   medals: [],
-  messages: []
+  messages: [],
+  studentStats: {}
 };
 
 export const setDevMode = (isActive: boolean) => {
@@ -1097,4 +1098,35 @@ export const clearPracticeAndMedalData = async (): Promise<void> => {
   } else {
     logger.info('ℹ️ Practice data cleared (no sync - empty system)');
   }
+};
+
+// Student Statistics Cache
+export const saveStudentStatistics = (studentId: string, stats: {
+  intervals: any[];
+  streak: number;
+  maxDaily: number;
+  monthly: Record<string, any>;
+  yearly: any[];
+}) => {
+  if (devModeActive) {
+    if (!devData['studentStats']) devData['studentStats'] = {};
+    devData['studentStats'][studentId] = {
+      ...stats,
+      lastUpdated: new Date().toISOString()
+    };
+  } else {
+    if (!inMemoryStorage['studentStats']) inMemoryStorage['studentStats'] = {};
+    inMemoryStorage['studentStats'][studentId] = {
+      ...stats,
+      lastUpdated: new Date().toISOString()
+    };
+    hybridSync.onDataChange();
+  }
+};
+
+export const getStudentStatistics = (studentId: string) => {
+  if (devModeActive) {
+    return devData['studentStats']?.[studentId] || null;
+  }
+  return inMemoryStorage['studentStats']?.[studentId] || null;
 };

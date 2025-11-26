@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Trophy } from 'lucide-react';
 import { Lesson } from '@/lib/types';
-import { calculateLessonIntervals } from '@/lib/practiceEngine';
+import { getStudentStatistics } from '@/lib/storage';
+import { recalcAllForStudent } from '@/lib/practiceEngine';
 
 interface LessonPracticeStatsProps {
   studentId: string;
@@ -14,7 +15,16 @@ const LessonPracticeStats = ({ studentId, lesson }: LessonPracticeStatsProps) =>
   const [medals, setMedals] = useState<string[]>([]);
 
   useEffect(() => {
-    const intervals = calculateLessonIntervals(studentId);
+    const cached = getStudentStatistics(studentId);
+    let intervals: any[];
+
+    if (cached?.intervals) {
+      intervals = cached.intervals;
+    } else {
+      const stats = recalcAllForStudent(studentId);
+      intervals = stats.intervals;
+    }
+
     const interval = intervals.find(i => i.lessonId === lesson.id);
     
     if (!interval) {

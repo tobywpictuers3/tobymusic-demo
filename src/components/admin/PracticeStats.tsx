@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Trophy } from 'lucide-react';
-import { getStudentPracticeSessions } from '@/lib/storage';
-import { calculateStreak, calculateMaxDailyMinutes } from '@/lib/practiceEngine';
+import { getStudentPracticeSessions, getStudentStatistics } from '@/lib/storage';
+import { recalcAllForStudent } from '@/lib/practiceEngine';
 
 interface PracticeStatsProps {
   studentId: string;
@@ -15,7 +15,7 @@ const PracticeStats = ({ studentId }: PracticeStatsProps) => {
   useEffect(() => {
     const sessions = getStudentPracticeSessions(studentId);
     
-    // Calculate weekly total (last 7 days)
+    // Calculate weekly total (last 7 days) - real-time calculation
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const weekAgoStr = oneWeekAgo.toISOString().split('T')[0];
@@ -26,12 +26,23 @@ const PracticeStats = ({ studentId }: PracticeStatsProps) => {
     
     setWeeklyMinutes(weeklyTotal);
 
-    // Calculate medals using central engine
+    // Streak and maxDaily from cache
+    const cached = getStudentStatistics(studentId);
+    let maxStreak: number;
+    let maxDaily: number;
+
+    if (cached) {
+      maxStreak = cached.streak;
+      maxDaily = cached.maxDaily;
+    } else {
+      const stats = recalcAllForStudent(studentId);
+      maxStreak = stats.streak;
+      maxDaily = stats.maxDaily;
+    }
+
+    // Calculate medals based on cached values
     const allMedals: string[] = [];
     
-    const maxStreak = calculateStreak(studentId);
-    const maxDaily = calculateMaxDailyMinutes(studentId);
-
     if (maxStreak >= 7) allMedals.push('🥇 שבוע רצוף');
     else if (maxStreak >= 6) allMedals.push('🥈 6 ימים רצופים');
     else if (maxStreak >= 3) allMedals.push('🥉 ' + maxStreak + ' ימים רצופים');

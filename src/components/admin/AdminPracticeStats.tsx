@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Trophy, Flame, Calendar, User } from 'lucide-react';
-import { getStudents, getPracticeSessions, getStudentPracticeSessions, getStudentMedalRecords } from '@/lib/storage';
+import { getStudents, getPracticeSessions, getStudentPracticeSessions, getStudentMedalRecords, getStudentStatistics } from '@/lib/storage';
 import { Student, PracticeSession } from '@/lib/types';
-import { calculateStreak, calculateMaxDailyMinutes } from '@/lib/practiceEngine';
+import { recalcAllForStudent } from '@/lib/practiceEngine';
 
 interface LeaderboardEntry {
   studentId: string;
@@ -49,9 +49,19 @@ const AdminPracticeStats = () => {
       // Calculate total minutes
       const totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
 
-      // Use central engine for calculations
-      const maxStreak = calculateStreak(student.id);
-      const maxDailyMinutes = calculateMaxDailyMinutes(student.id);
+      // Try cache first
+      const cached = getStudentStatistics(student.id);
+      let maxStreak: number;
+      let maxDailyMinutes: number;
+
+      if (cached) {
+        maxStreak = cached.streak;
+        maxDailyMinutes = cached.maxDaily;
+      } else {
+        const stats = recalcAllForStudent(student.id);
+        maxStreak = stats.streak;
+        maxDailyMinutes = stats.maxDaily;
+      }
 
       return {
         studentId: student.id,
