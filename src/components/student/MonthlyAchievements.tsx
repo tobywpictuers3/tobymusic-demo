@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, TrendingUp } from 'lucide-react';
-import { getStudentMonthlyAchievements, getStudentPracticeSessions } from '@/lib/storage';
+import { getStudentMonthlyAchievements } from '@/lib/storage';
 import { useEffect, useState } from 'react';
 import { MonthlyAchievement } from '@/lib/types';
+import { calculateMonthlyAchievements } from '@/lib/practiceEngine';
 
 interface MonthlyAchievementsProps {
   studentId: string;
@@ -14,26 +15,19 @@ const MonthlyAchievements = ({ studentId }: MonthlyAchievementsProps) => {
   const [monthlyTotals, setMonthlyTotals] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    loadAchievements();
-    calculateMonthlyTotals();
-  }, [studentId]);
+    const monthly = calculateMonthlyAchievements(studentId);
+    
+    // Convert to monthlyTotals format
+    const totals: Record<string, number> = {};
+    Object.entries(monthly).forEach(([month, data]) => {
+      totals[month] = data.total;
+    });
+    setMonthlyTotals(totals);
 
-  const loadAchievements = () => {
+    // Load saved achievements from storage
     const data = getStudentMonthlyAchievements(studentId);
     setAchievements(data.sort((a, b) => b.month.localeCompare(a.month)));
-  };
-
-  const calculateMonthlyTotals = () => {
-    const sessions = getStudentPracticeSessions(studentId);
-    const totals: Record<string, number> = {};
-
-    sessions.forEach(session => {
-      const month = session.date.slice(0, 7); // YYYY-MM
-      totals[month] = (totals[month] || 0) + session.durationMinutes;
-    });
-
-    setMonthlyTotals(totals);
-  };
+  }, [studentId]);
 
   const formatMonth = (month: string) => {
     const [year, monthNum] = month.split('-');

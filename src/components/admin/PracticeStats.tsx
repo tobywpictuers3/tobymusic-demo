@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Trophy } from 'lucide-react';
 import { getStudentPracticeSessions } from '@/lib/storage';
+import { calculateStreak, calculateMaxDailyMinutes } from '@/lib/practiceEngine';
 
 interface PracticeStatsProps {
   studentId: string;
@@ -25,51 +26,19 @@ const PracticeStats = ({ studentId }: PracticeStatsProps) => {
     
     setWeeklyMinutes(weeklyTotal);
 
-    // Calculate medals (from all time, most impressive achievements)
+    // Calculate medals using central engine
     const allMedals: string[] = [];
     
-    // Group by date
-    const grouped = sessions.reduce((acc, session) => {
-      if (!acc[session.date]) {
-        acc[session.date] = [];
-      }
-      acc[session.date].push(session);
-      return acc;
-    }, {} as Record<string, typeof sessions>);
-
-    // Check for streaks
-    const dates = Object.keys(grouped).sort();
-    let currentStreak = 0;
-    let maxStreak = 0;
-    let prevDate = new Date(0);
-
-    dates.forEach(dateStr => {
-      const date = new Date(dateStr);
-      const dayDiff = Math.floor((date.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (dayDiff === 1 || currentStreak === 0) {
-        currentStreak++;
-        maxStreak = Math.max(maxStreak, currentStreak);
-      } else {
-        currentStreak = 1;
-      }
-      prevDate = date;
-    });
+    const maxStreak = calculateStreak(studentId);
+    const maxDaily = calculateMaxDailyMinutes(studentId);
 
     if (maxStreak >= 7) allMedals.push('🥇 שבוע רצוף');
     else if (maxStreak >= 6) allMedals.push('🥈 6 ימים רצופים');
     else if (maxStreak >= 3) allMedals.push('🥉 ' + maxStreak + ' ימים רצופים');
 
-    // Check for daily duration records
-    let maxDailyMinutes = 0;
-    Object.values(grouped).forEach(daySessions => {
-      const dailyTotal = daySessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-      maxDailyMinutes = Math.max(maxDailyMinutes, dailyTotal);
-    });
-
-    if (maxDailyMinutes >= 60) allMedals.push('🥇 60 דק\' ביום');
-    else if (maxDailyMinutes >= 30) allMedals.push('🥈 30 דק\' ביום');
-    else if (maxDailyMinutes >= 15) allMedals.push('🥉 15 דק\' ביום');
+    if (maxDaily >= 60) allMedals.push('🥇 60 דק\' ביום');
+    else if (maxDaily >= 30) allMedals.push('🥈 30 דק\' ביום');
+    else if (maxDaily >= 15) allMedals.push('🥉 15 דק\' ביום');
 
     setMedals(allMedals);
   }, [studentId]);

@@ -19,6 +19,7 @@ import MonthlyAchievements from './MonthlyAchievements';
 import YearlyAchievements from './YearlyAchievements';
 import StreakProgress from './StreakProgress';
 import { hybridSync } from '@/lib/hybridSync';
+import { recalcAllForStudent, calculateLessonIntervals } from '@/lib/practiceEngine';
 
 interface PracticeTrackingProps {
   studentId: string;
@@ -71,6 +72,9 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   const loadSessions = () => {
     const studentSessions = getStudentPracticeSessions(studentId);
     setSessions(studentSessions);
+    
+    // Recalculate all stats using central engine
+    recalcAllForStudent(studentId);
   };
 
   const calculateDailyStats = () => {
@@ -110,7 +114,6 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     setDailyStats(stats);
-    checkStreaks(stats);
   };
 
   const checkStreaks = (stats: DailyStats[]) => {
@@ -411,6 +414,8 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     setElapsedSeconds(0);
 
     if (saved) {
+      // Recalculate all stats after adding session
+      recalcAllForStudent(studentId);
       loadSessions();
       // Check for duration milestones - for THIS session only, not total
       showDurationCongrats(durationMinutes);
@@ -451,7 +456,10 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     const saved = await saveWithRetry(sessionData);
 
     if (saved) {
-      // Reload sessions and recalculate stats after adding manual entry
+      // Recalculate all stats after manual entry
+      recalcAllForStudent(studentId);
+      
+      // Reload sessions and recalculate stats
       const allSessions = getStudentPracticeSessions(studentId);
       const allMedals = getStudentMedalRecords(studentId);
       
@@ -487,7 +495,6 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       setDailyStats(stats);
-      checkStreaks(stats);
       
       setManualStartTime('');
       setManualEndTime('');
@@ -509,40 +516,12 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   };
 
   const calculateDailyAverage = () => {
-    // Get student's lessons to find the periods between lessons
-    const lessons = getLessons().filter(l => l.studentId === studentId && l.status === 'completed');
-    if (lessons.length < 2) return 0;
-
-    // Sort lessons by date
-    const sortedLessons = lessons.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Use central engine to calculate intervals
+    const intervals = calculateLessonIntervals(studentId);
+    if (intervals.length === 0) return 0;
     
-    let maxAverage = 0;
-    
-    // Loop through ALL consecutive lesson pairs
-    for (let i = 0; i < sortedLessons.length - 1; i++) {
-      const currentLesson = sortedLessons[i];
-      const nextLesson = sortedLessons[i + 1];
-      
-      const startDate = new Date(currentLesson.date);
-      const endDate = new Date(nextLesson.date);
-      
-      // Get practice sessions between these two lessons (exclusive start, inclusive end)
-      const periodSessions = sessions.filter(s => {
-        const sessionDate = new Date(s.date);
-        return sessionDate > startDate && sessionDate <= endDate;
-      });
-      
-      if (periodSessions.length === 0) continue;
-      
-      // Count unique PRACTICE days (not calendar days!)
-      const practiceDays = new Set(periodSessions.map(s => s.date)).size;
-      
-      if (practiceDays > 0) {
-        const totalMinutes = periodSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-        const average = totalMinutes / practiceDays;
-        maxAverage = Math.max(maxAverage, average);
-      }
-    }
+    // Find max average from all intervals
+    const maxAverage = Math.max(...intervals.map(i => i.average));
     
     // Update monthly achievement with the maximum average found
     updateMonthlyAchievement(studentId, { maxDailyAverage: maxAverage });
@@ -555,6 +534,8 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
       deletePracticeSession(sessionId);
       await hybridSync.onDataChange();
       
+      // Recalculate all stats after deletion
+      recalcAllForStudent(studentId);
       loadSessions();
       
       toast({
@@ -575,62 +556,21 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     }
   };
 
-  // Recalculate medals for all days - handles retroactive entries
+  // Recalculate medals and stats for all days - uses central engine
   const recalculateMedalsForAllDays = () => {
     setIsRecalculating(true);
     
     try {
-      let medalsAwarded = 0;
-      const existingMedals = getStudentMedalRecords(studentId);
+      // Use central engine to recalculate everything
+      recalcAllForStudent(studentId);
       
-      // Process each day
-      dailyStats.forEach(day => {
-        // Check for duration medals (20, 40, 60 minutes)
-        const milestones = [
-          { minutes: 60, level: 'gold' as const, name: 'אלופה! 60 דקות' },
-          { minutes: 40, level: 'silver' as const, name: 'מצוינת! 40 דקות' },
-          { minutes: 20, level: 'bronze' as const, name: 'כל הכבוד! 20 דקות' }
-        ];
-        
-        milestones.forEach(milestone => {
-          if (day.totalMinutes >= milestone.minutes) {
-            // Check if medal already exists for this date and level
-            const alreadyHasMedal = existingMedals.some(m => 
-              m.earnedDate === day.date && 
-              m.medalType === 'duration' &&
-              m.durationMinutes === milestone.minutes &&
-              !m.used
-            );
-            
-            if (!alreadyHasMedal) {
-              addMedalRecord({
-                studentId,
-                medalType: 'duration',
-                level: milestone.level,
-                durationMinutes: milestone.minutes,
-                earnedDate: day.date,
-                used: false
-              });
-              medalsAwarded++;
-            }
-          }
-        });
+      // Reload sessions to update UI
+      loadSessions();
+      
+      toast({
+        title: '✅ מדליות עודכנו בהצלחה!',
+        description: 'כל החישובים והמדליות עודכנו',
       });
-      
-      if (medalsAwarded > 0) {
-        toast({
-          title: `הוענקו ${medalsAwarded} מדליות חדשות! 🏅`,
-          description: 'המדליות נוספו על אימונים קודמים',
-        });
-        
-        // Reload sessions to update UI
-        loadSessions();
-      } else {
-        toast({
-          title: 'כל המדליות כבר הוענקו ✓',
-          description: 'לא נמצאו אימונים שזכאים למדליות נוספות',
-        });
-      }
     } catch (error) {
       console.error('Error recalculating medals:', error);
       toast({

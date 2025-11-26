@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Calendar } from 'lucide-react';
-import { getStudentPracticeSessions, getLessons } from '@/lib/storage';
 import { useEffect, useState } from 'react';
+import { calculateYearlyAchievements } from '@/lib/practiceEngine';
 
 interface YearlyAchievementsProps {
   studentId: string;
@@ -16,74 +16,9 @@ const YearlyAchievements = ({ studentId }: YearlyAchievementsProps) => {
   const [yearlyStats, setYearlyStats] = useState<YearlyStats[]>([]);
 
   useEffect(() => {
-    calculateYearlyStats();
+    const yearly = calculateYearlyAchievements(studentId);
+    setYearlyStats(yearly);
   }, [studentId]);
-
-  const calculateYearlyStats = () => {
-    const sessions = getStudentPracticeSessions(studentId);
-    const lessons = getLessons().filter(l => l.studentId === studentId && l.status === 'completed');
-
-    if (lessons.length === 0) {
-      setYearlyStats([]);
-      return;
-    }
-
-    // Group by academic year (Sept-Aug)
-    const yearlyData: Record<string, { sessions: typeof sessions; lessons: typeof lessons }> = {};
-
-    sessions.forEach(session => {
-      const date = new Date(session.date);
-      const month = date.getMonth(); // 0-11
-      const year = date.getFullYear();
-      
-      // Academic year: Sept (8) - Aug (7)
-      const academicYear = month >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
-      
-      if (!yearlyData[academicYear]) {
-        yearlyData[academicYear] = { sessions: [], lessons: [] };
-      }
-      yearlyData[academicYear].sessions.push(session);
-    });
-
-    lessons.forEach(lesson => {
-      const date = new Date(lesson.date);
-      const month = date.getMonth();
-      const year = date.getFullYear();
-      
-      const academicYear = month >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
-      
-      if (yearlyData[academicYear]) {
-        yearlyData[academicYear].lessons.push(lesson);
-      }
-    });
-
-    // Calculate max daily average for each year
-    const stats: YearlyStats[] = Object.entries(yearlyData).map(([year, data]) => {
-      const sortedLessons = data.lessons.sort((a, b) => a.date.localeCompare(b.date));
-      let maxAverage = 0;
-
-      for (let i = 0; i < sortedLessons.length; i++) {
-        const currentLesson = sortedLessons[i];
-        const nextLesson = sortedLessons[i + 1];
-
-        if (!nextLesson) continue;
-
-        const start = new Date(currentLesson.date);
-        const end = new Date(nextLesson.date);
-        const daysBetween = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-
-        const intervalSessions = data.sessions.filter(s => s.date >= currentLesson.date && s.date < nextLesson.date);
-        const totalMinutes = intervalSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-        const average = totalMinutes / daysBetween;
-
-        maxAverage = Math.max(maxAverage, average);
-      }
-
-      return { year, maxDailyAverage: maxAverage };
-    }).sort((a, b) => b.year.localeCompare(a.year));
-
-    setYearlyStats(stats);
-  };
 
   if (yearlyStats.length === 0) {
     return null;

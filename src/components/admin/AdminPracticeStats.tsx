@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Trophy, Flame, Calendar, User } from 'lucide-react';
-import { getStudents, getPracticeSessions, getStudentPracticeSessions, getStudentMedalRecords, getLessons } from '@/lib/storage';
+import { getStudents, getPracticeSessions, getStudentPracticeSessions, getStudentMedalRecords } from '@/lib/storage';
 import { Student, PracticeSession } from '@/lib/types';
+import { calculateStreak, calculateMaxDailyMinutes } from '@/lib/practiceEngine';
 
 interface LeaderboardEntry {
   studentId: string;
@@ -44,39 +45,13 @@ const AdminPracticeStats = () => {
   const calculateLeaderboard = (studentList: Student[]) => {
     const entries: LeaderboardEntry[] = studentList.map(student => {
       const sessions = getStudentPracticeSessions(student.id);
-      const lessons = getLessons().filter(l => l.studentId === student.id && l.status === 'completed').sort((a, b) => a.date.localeCompare(b.date));
-
-      let totalMinutes = 0;
-      let maxDailyMinutes = 0;
-      let maxStreak = 0;
-
+      
       // Calculate total minutes
-      totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+      const totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
 
-      // Calculate max daily minutes
-      const dailyTotals: Record<string, number> = {};
-      sessions.forEach(session => {
-        dailyTotals[session.date] = (dailyTotals[session.date] || 0) + session.durationMinutes;
-      });
-      maxDailyMinutes = Math.max(...Object.values(dailyTotals), 0);
-
-      // Calculate max streak
-      const dates = Object.keys(dailyTotals).sort();
-      let currentStreak = 0;
-      let prevDate = new Date(0);
-
-      dates.forEach(dateStr => {
-        const date = new Date(dateStr);
-        const dayDiff = Math.floor((date.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (dayDiff === 1 || currentStreak === 0) {
-          currentStreak++;
-          maxStreak = Math.max(maxStreak, currentStreak);
-        } else {
-          currentStreak = 1;
-        }
-        prevDate = date;
-      });
+      // Use central engine for calculations
+      const maxStreak = calculateStreak(student.id);
+      const maxDailyMinutes = calculateMaxDailyMinutes(student.id);
 
       return {
         studentId: student.id,

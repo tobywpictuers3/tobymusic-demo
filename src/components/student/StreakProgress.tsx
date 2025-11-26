@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Flame, Calendar } from 'lucide-react';
-import { getStudentPracticeSessions } from '@/lib/storage';
 import { useEffect, useState } from 'react';
+import { calculateStreak } from '@/lib/practiceEngine';
 
 interface StreakProgressProps {
   studentId: string;
@@ -13,44 +13,7 @@ const StreakProgress = ({ studentId }: StreakProgressProps) => {
   const [daysToNextMedal, setDaysToNextMedal] = useState<{ days: number; medal: string } | null>(null);
 
   useEffect(() => {
-    calculateStreak();
-  }, [studentId]);
-
-  const calculateStreak = () => {
-    const sessions = getStudentPracticeSessions(studentId);
-    if (sessions.length === 0) {
-      setCurrentStreak(0);
-      setDaysToNextMedal({ days: 3, medal: '🥉 רצף 3 ימים' });
-      return;
-    }
-
-    // Group by date
-    const grouped = sessions.reduce((acc, session) => {
-      if (!acc[session.date]) {
-        acc[session.date] = [];
-      }
-      acc[session.date].push(session);
-      return acc;
-    }, {} as Record<string, typeof sessions>);
-
-    const dates = Object.keys(grouped).sort().reverse();
-    const today = new Date().toISOString().split('T')[0];
-    
-    let streak = 0;
-    let checkDate = new Date(today);
-
-    // Check backwards from today
-    for (let i = 0; i < 365; i++) {
-      const dateStr = checkDate.toISOString().split('T')[0];
-      if (grouped[dateStr]) {
-        streak++;
-      } else if (dateStr < today) {
-        // If we find a gap in the past, streak is broken
-        break;
-      }
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-
+    const streak = calculateStreak(studentId);
     setCurrentStreak(streak);
 
     // Calculate days to next medal
@@ -69,7 +32,7 @@ const StreakProgress = ({ studentId }: StreakProgressProps) => {
     } else {
       setDaysToNextMedal(null);
     }
-  };
+  }, [studentId]);
 
   if (currentStreak === 0 && !daysToNextMedal) {
     return null;
