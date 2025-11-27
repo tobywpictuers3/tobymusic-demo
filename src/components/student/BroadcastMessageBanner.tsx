@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/safe-ui/alert";
+import { Button } from "@/components/safe-ui/button";
 import { getMessagesForStudent, markMessageAsRead } from "@/lib/messages";
 import { Message } from "@/lib/types";
 import { Megaphone, X } from "lucide-react";

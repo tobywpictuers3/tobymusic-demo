@@ -1,6 +1,6 @@
 import { Attachment } from "@/lib/types";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "@/components/safe-ui/button";
+import { Card } from "@/components/safe-ui/card";
 import { Download, X, FileText, Music, Video, FileIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 

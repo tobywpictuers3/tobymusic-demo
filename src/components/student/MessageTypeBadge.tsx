@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/safe-ui/badge";
 import { Message } from "@/lib/types";
 import { getMessageType } from "@/lib/messages";
 

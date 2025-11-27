@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
+import { Alert, AlertTitle, AlertDescription } from '@/components/safe-ui/alert';
+import { Button } from '@/components/safe-ui/button';
 import { Star, X } from 'lucide-react';
 import { getStarredMessages, markMessageAsRead, toggleMessageStar, canUserRemoveStar } from '@/lib/messages';
 import { Message } from '@/lib/types';

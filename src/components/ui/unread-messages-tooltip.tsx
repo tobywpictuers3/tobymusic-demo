@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/safe-ui/tooltip";
 import { getMessagesForStudent, getMessagesForAdmin } from "@/lib/messages";
 import { Message } from "@/lib/types";
 

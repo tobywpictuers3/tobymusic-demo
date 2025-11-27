@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/safe-ui/badge";
 import { getUnreadCount } from "@/lib/messages";
 import { Mail } from "lucide-react";
 import { UnreadMessagesTooltip } from "./unread-messages-tooltip";
