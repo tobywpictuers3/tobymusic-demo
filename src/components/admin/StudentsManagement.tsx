@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/safe-ui/card';
+import { Button } from '@/components/safe-ui/button';
+import { Input } from '@/components/safe-ui/input';
+import { Textarea } from '@/components/safe-ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/safe-ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/safe-ui/dialog';
+import { Label } from '@/components/safe-ui/label';
 import { Grid, List, UserPlus, Edit, Trash2, Users, History } from 'lucide-react';
 import { getStudents, addStudent, updateStudent, deleteStudent } from '@/lib/storage';
 import { Student } from '@/lib/types';

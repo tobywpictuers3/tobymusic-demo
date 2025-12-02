@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/safe-ui/card';
+import { Button } from '@/components/safe-ui/button';
+import { Input } from '@/components/safe-ui/input';
+import { Label } from '@/components/safe-ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/safe-ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/safe-ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/safe-ui/table';
 import { Calendar, Plus, Edit, Trash2, Check, X } from 'lucide-react';
 import { getStudents, getScheduleTemplates, addScheduleTemplate, updateScheduleTemplate, deleteScheduleTemplate, activateScheduleTemplate } from '@/lib/storage';
 import { Student, ScheduleTemplate, WeeklyScheduleData } from '@/lib/types';

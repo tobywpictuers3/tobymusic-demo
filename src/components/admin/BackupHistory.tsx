@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/safe-ui/card';
+import { Button } from '@/components/safe-ui/button';
+import { Badge } from '@/components/safe-ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { workerApi } from '@/lib/workerApi';
 import { logger } from '@/lib/logger';
@@ -24,7 +24,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/safe-ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +34,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/components/safe-ui/alert-dialog";
 
 interface VersionInfo {
   path: string;

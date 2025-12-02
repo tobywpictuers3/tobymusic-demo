@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/safe-ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/safe-ui/table';
+import { Button } from '@/components/safe-ui/button';
+import { Badge } from '@/components/safe-ui/badge';
 import { Star, Trash2, Undo2 } from 'lucide-react';
 import { getLessons, updateLesson } from '@/lib/storage';
 import { Student, Lesson } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
-import { Textarea } from '@/components/ui/textarea';
+import { Textarea } from '@/components/safe-ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +17,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from '@/components/safe-ui/alert-dialog';
 import LessonPracticeStats from './LessonPracticeStats';
 
 interface StudentLessonHistoryProps {

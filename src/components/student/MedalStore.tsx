@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/safe-ui/card';
+import { Button } from '@/components/safe-ui/button';
 import { ShoppingBag, Trophy, Undo2, ShoppingCart } from 'lucide-react';
 import { getStudentMedalRecords, updateMedalAsUsed, refundMedal } from '@/lib/storage';
 import { useEffect, useState } from 'react';
@@ -14,7 +14,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/components/safe-ui/alert-dialog";
 
 interface MedalStoreProps {
   studentId: string;

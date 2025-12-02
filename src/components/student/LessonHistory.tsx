@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/safe-ui/card';
+import { Badge } from '@/components/safe-ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/safe-ui/table';
+import { Button } from '@/components/safe-ui/button';
 import { ChevronLeft, ChevronRight, History } from 'lucide-react';
 import { getLessons } from '@/lib/storage';
 import { Student, Lesson } from '@/lib/types';

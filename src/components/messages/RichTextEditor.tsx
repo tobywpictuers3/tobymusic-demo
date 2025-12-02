@@ -16,7 +16,7 @@ import {
   RemoveFormatting,
   Paperclip
 } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/safe-ui/popover";
 import EmojiPicker from "./EmojiPicker";
 import { cn } from "@/lib/utils";
 

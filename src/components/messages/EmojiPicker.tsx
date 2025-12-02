@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/safe-ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/safe-ui/popover";
 import { Smile } from "lucide-react";
 import { cn } from "@/lib/utils";
 

@@ -20,7 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/safe-ui/dialog";
 
 interface AttachmentPreviewProps {
   attachment: Attachment;
