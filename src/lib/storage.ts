@@ -29,7 +29,8 @@ const devData: Record<string, any> = {
   leaderboard: [],
   medals: [],
   messages: [],
-  studentStats: {}
+  studentStats: {},
+  tithePaid: {}
 };
 
 export { isDevMode, setDevMode };
@@ -1190,4 +1191,19 @@ export const getStudentStatistics = (studentId: string) => {
     return devData['studentStats']?.[studentId] || null;
   }
   return inMemoryStorage['studentStats']?.[studentId] || null;
+};
+
+// Tithe Paid Management
+export const getTithePaid = (): Record<string, boolean> => {
+  if (isDevMode()) return devData['tithePaid'] || {};
+  return inMemoryStorage['tithePaid'] || {};
+};
+
+export const saveTithePaid = (tithePaid: Record<string, boolean>): void => {
+  if (isDevMode()) {
+    devData['tithePaid'] = tithePaid;
+  } else {
+    inMemoryStorage['tithePaid'] = tithePaid;
+    hybridSync.onDataChange();
+  }
 };

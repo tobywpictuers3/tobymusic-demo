@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/safe-ui/dialog';
 import { Label } from '@/components/safe-ui/label';
 import { CreditCard, ChevronRight, ChevronLeft, Undo2, Download } from 'lucide-react';
-import { getStudents, getPayments, savePayments, updateStudent, getPerformances, getOneTimePayments } from '@/lib/storage';
+import { getStudents, getPayments, savePayments, updateStudent, getPerformances, getOneTimePayments, saveOneTimePayments, getTithePaid, saveTithePaid } from '@/lib/storage';
 import { Payment, Student, OneTimePayment, Performance } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -37,10 +37,7 @@ const PaymentManagement = () => {
   const [showOneTimeDialog, setShowOneTimeDialog] = useState(false);
   const [newOneTimePayment, setNewOneTimePayment] = useState({ description: '', amount: '', month: '' });
   const [history, setHistory] = useState<Array<{ payments: Payment[]; oneTimePayments: OneTimePayment[] }>>([]);
-  const [tithePaid, setTithePaid] = useState<Record<string, boolean>>(() => {
-    const saved = localStorage.getItem('tithePaid');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [tithePaid, setTithePaid] = useState<Record<string, boolean>>(() => getTithePaid());
   const tableRef = useRef<HTMLDivElement>(null);
   const scrollBarRef = useRef<HTMLDivElement>(null);
   const scrollBarInnerRef = useRef<HTMLDivElement>(null);
@@ -49,7 +46,7 @@ const PaymentManagement = () => {
   const handleTitheToggle = (monthKey: string, isPaid: boolean) => {
     const updated = { ...tithePaid, [monthKey]: isPaid };
     setTithePaid(updated);
-    localStorage.setItem('tithePaid', JSON.stringify(updated));
+    saveTithePaid(updated);
     toast({ 
       description: isPaid ? 'מעשר סומן כהופרש ✓' : 'מעשר סומן כלא הופרש ⚠' 
     });
@@ -457,8 +454,8 @@ const PaymentManagement = () => {
       paidDate: new Date().toISOString()
     };
     const updatedPayments = [...oneTimePayments, payment];
+    saveOneTimePayments(updatedPayments);
     setOneTimePayments(updatedPayments);
-    localStorage.setItem('oneTimePayments', JSON.stringify(updatedPayments));
     setShowOneTimeDialog(false);
     setNewOneTimePayment({ description: '', amount: '', month: '' });
     toast({
