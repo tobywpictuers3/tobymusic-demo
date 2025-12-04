@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Edit, Plus, ArrowRight, ArrowLeft, Save, Settings, Trash2, Move } from 'lucide-react';
-import { getStudents, getLessons, addLesson, updateLesson, deleteLesson, getActiveScheduleTemplate, calculateLessonNumber } from '@/lib/storage';
+import { getStudents, getLessons, addLesson, updateLesson, deleteLesson, deleteLessonCascade, getActiveScheduleTemplate, calculateLessonNumber } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import ScheduleTemplateManager from './ScheduleTemplateManager';
 import { Lesson } from '@/lib/types';
@@ -209,7 +209,7 @@ const WeeklySchedule = () => {
     setEditingLesson(null);
   };
 
-  const handleDeleteLesson = async (lessonId: string) => {
+  const handleDeleteLesson = (lessonId: string) => {
     // Only delete if it's a real lesson, not a template-generated one
     if (lessonId.startsWith('template-')) {
       toast({
@@ -220,12 +220,10 @@ const WeeklySchedule = () => {
       return;
     }
     
-    const lesson = lessons.find(l => l.id === lessonId);
-    
-    deleteLesson(lessonId);
+    deleteLessonCascade(lessonId);
     toast({
       title: 'הצלחה',
-      description: 'השיעור נמחק בהצלחה'
+      description: 'השיעור נמחק בהצלחה (כולל בקשות החלפה קשורות)'
     });
   };
 

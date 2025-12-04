@@ -450,3 +450,53 @@ export const emptyTrash = async (userId: string): Promise<void> => {
   
   saveMessages(messages.filter(m => !m.isDeleted?.[userId]));
 };
+
+// Cascade delete messages for student (Policy C)
+export const deleteMessagesForStudentCascade = async (studentId: string): Promise<void> => {
+  const messages = getMessages();
+  const remaining: Message[] = [];
+  const { workerApi } = await import('./workerApi');
+
+  for (const msg of messages) {
+    const isSender = msg.senderId === studentId;
+    const isRecipient = msg.recipientIds.includes(studentId);
+
+    // 1. Student is sender → full delete
+    if (isSender) {
+      if (msg.attachments?.length) {
+        for (const att of msg.attachments) {
+          if (att.path) await workerApi.deleteAttachment(att.path).catch(() => {});
+        }
+      }
+      continue;
+    }
+
+    // 2. Private message (single non-broadcast recipient)
+    const nonSystemRecipients = msg.recipientIds.filter(r => r !== 'admin' && r !== 'all');
+    const singlePrivate = nonSystemRecipients.length === 1 && nonSystemRecipients[0] === studentId;
+    const isBroadcast = msg.recipientIds.includes('all');
+
+    if (isRecipient && !isBroadcast && singlePrivate) {
+      if (msg.attachments?.length) {
+        for (const att of msg.attachments) {
+          if (att.path) await workerApi.deleteAttachment(att.path).catch(() => {});
+        }
+      }
+      continue;
+    }
+
+    // 3. Broadcast/group message → remove student from recipients
+    if (isRecipient) {
+      msg.recipientIds = msg.recipientIds.filter(id => id !== studentId);
+      if (msg.isRead) delete msg.isRead[studentId];
+      if (msg.isDeleted) delete msg.isDeleted[studentId];
+      if (msg.starred) delete msg.starred[studentId];
+      if (msg.starExpiresAt) delete msg.starExpiresAt[studentId];
+      if (msg.reactions) delete msg.reactions[studentId];
+    }
+
+    remaining.push(msg);
+  }
+
+  saveMessages(remaining);
+};

@@ -231,6 +231,74 @@ export const deleteLesson = (id: string): boolean => {
   return true;
 };
 
+// Helper for cascade changes
+const persistCascadeChanges = (mutator: (store: typeof inMemoryStorage | typeof devData) => void) => {
+  if (isDevMode()) {
+    mutator(devData as any);
+  } else {
+    mutator(inMemoryStorage as any);
+    hybridSync.onDataChange();
+  }
+};
+
+// Cascade delete lesson - removes lesson and related swap requests
+export const deleteLessonCascade = (lessonId: string): boolean => {
+  const lessons = getLessons();
+  const lesson = lessons.find(l => l.id === lessonId);
+  if (!lesson) return false;
+
+  const { studentId, date, startTime } = lesson;
+
+  persistCascadeChanges(store => {
+    // 1. Delete the lesson itself
+    store['lessons'] = (store['lessons'] || []).filter((l: any) => l.id !== lessonId);
+
+    // 2. Delete related swap requests
+    store['swapRequests'] = (store['swapRequests'] || []).filter((r: any) => {
+      const byLessonId = r.requesterLessonId === lessonId || r.targetLessonId === lessonId;
+      const byLegacyFields =
+        (r.requesterId === studentId && r.date === date && r.time === startTime) ||
+        (r.targetId === studentId && r.targetDate === date && r.targetTime === startTime);
+      return !(byLessonId || byLegacyFields);
+    });
+  });
+
+  return true;
+};
+
+// Cascade delete student - removes student and all related data
+export const deleteStudentCascade = (studentId: string): boolean => {
+  const exists = getStudents().some(s => s.id === studentId);
+  if (!exists) return false;
+
+  persistCascadeChanges(store => {
+    store['students'] = (store['students'] || []).filter((s: any) => s.id !== studentId);
+    store['lessons'] = (store['lessons'] || []).filter((l: any) => l.studentId !== studentId);
+    store['payments'] = (store['payments'] || []).filter((p: any) => p.studentId !== studentId);
+    store['files'] = (store['files'] || []).filter((f: any) => f.studentId !== studentId);
+    store['practiceSessions'] = (store['practiceSessions'] || []).filter((s: any) => s.studentId !== studentId);
+    store['monthlyAchievements'] = (store['monthlyAchievements'] || []).filter((a: any) => a.studentId !== studentId);
+    store['medalRecords'] = (store['medalRecords'] || []).filter((m: any) => m.studentId !== studentId);
+
+    // Clean swap requests
+    store['swapRequests'] = (store['swapRequests'] || []).filter((r: any) => {
+      const oldShape = r.requesterId !== studentId && r.targetId !== studentId;
+      const newShape = r.requesterStudentId !== studentId && r.targetStudentId !== studentId;
+      return oldShape && newShape;
+    });
+
+    // Delete student statistics
+    const stats = store['studentStats'] || {};
+    if (stats[studentId]) {
+      const updated = { ...stats };
+      delete updated[studentId];
+      store['studentStats'] = updated;
+    }
+  });
+
+  return true;
+};
+
 // Payments
 export const getPayments = (): Payment[] => {
   if (isDevMode()) return devData['payments'] || [];

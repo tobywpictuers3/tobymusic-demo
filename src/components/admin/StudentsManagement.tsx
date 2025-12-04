@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/safe-ui/dialog';
 import { Label } from '@/components/safe-ui/label';
 import { Grid, List, UserPlus, Edit, Trash2, Users, History } from 'lucide-react';
-import { getStudents, addStudent, updateStudent, deleteStudent } from '@/lib/storage';
+import { getStudents, addStudent, updateStudent, deleteStudentCascade } from '@/lib/storage';
+import { deleteMessagesForStudentCascade } from '@/lib/messages';
 import { Student } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import StudentLessonHistory from './StudentLessonHistory';
@@ -165,14 +166,24 @@ const StudentsManagement = () => {
     resetForm();
   };
 
-  const handleDeleteStudent = (studentId: string) => {
-    if (window.confirm('האם את בטוחה שברצונך למחוק את התלמידה?')) {
-      deleteStudent(studentId);
-      refreshStudents();
-      toast({
-        title: 'הצלחה',
-        description: 'התלמידה נמחקה בהצלחה'
-      });
+  const handleDeleteStudent = async (studentId: string) => {
+    if (window.confirm('האם את בטוחה שברצונך למחוק את התלמידה? כל הנתונים שלה יימחקו לצמיתות.')) {
+      try {
+        await deleteMessagesForStudentCascade(studentId);
+        deleteStudentCascade(studentId);
+        refreshStudents();
+        toast({
+          title: 'הצלחה',
+          description: 'התלמידה וכל הנתונים שלה נמחקו בהצלחה'
+        });
+      } catch (error) {
+        console.error('Error deleting student:', error);
+        toast({
+          title: 'שגיאה',
+          description: 'שגיאה במחיקת התלמידה',
+          variant: 'destructive'
+        });
+      }
     }
   };
 
