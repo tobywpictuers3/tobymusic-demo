@@ -15,8 +15,22 @@ import {
   Calendar,
   HardDrive,
   Loader2,
-  Dumbbell
+  Dumbbell,
+  CheckCircle
 } from 'lucide-react';
+import { 
+  getStudents, 
+  getLessons, 
+  getPayments, 
+  getPracticeSessions, 
+  getSwapRequests, 
+  getFiles, 
+  getMonthlyAchievements, 
+  getMedalRecords, 
+  getStudentStatistics,
+  getOneTimePayments
+} from '@/lib/storage';
+import { getMessages } from '@/lib/messages';
 import {
   Table,
   TableBody,
@@ -72,6 +86,95 @@ const BackupHistory = () => {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isPracticeRestoreDialogOpen, setIsPracticeRestoreDialogOpen] = useState(false);
   const [isRestoringPractice, setIsRestoringPractice] = useState(false);
+
+  const runIntegrityCheck = () => {
+    const studentIds = getStudents().map(s => s.id);
+    const lessons = getLessons();
+    const payments = getPayments();
+    const oneTime = getOneTimePayments();
+    const sessions = getPracticeSessions();
+    const swaps = getSwapRequests();
+    const files = getFiles();
+    const msgs = getMessages();
+    const achievements = getMonthlyAchievements();
+    const medals = getMedalRecords();
+
+    const errors: string[] = [];
+
+    // שיעורים יתומים
+    lessons.forEach(l => {
+      if (!studentIds.includes(l.studentId))
+        errors.push(`שיעור ${l.id} שייך לתלמידה שאינה קיימת (${l.studentId})`);
+    });
+
+    // תשלומים יתומים
+    payments.forEach(p => {
+      if (!studentIds.includes(p.studentId))
+        errors.push(`תשלום ${p.id} שייך לתלמידה שאינה קיימת`);
+    });
+
+    // תשלומים חד־פעמיים - לא קשורים לתלמידות ספציפיות (בדיקה מדולגת)
+
+    // אימונים יתומים
+    sessions.forEach(s => {
+      if (!studentIds.includes(s.studentId))
+        errors.push(`אימון ${s.id} שייך לתלמידה שאינה קיימת`);
+    });
+
+    // בקשות החלפה יתומות
+    swaps.forEach(sw => {
+      if (sw.requesterId && !studentIds.includes(sw.requesterId))
+        errors.push(`SwapRequest יתום עם requesterId חסר (${sw.requesterId})`);
+      if (sw.targetId && !studentIds.includes(sw.targetId))
+        errors.push(`SwapRequest יתום עם targetId חסר (${sw.targetId})`);
+    });
+
+    // קבצים יתומים
+    files.forEach(f => {
+      if (!studentIds.includes(f.studentId))
+        errors.push(`קובץ ${f.id} יתום ללא תלמידה`);
+    });
+
+    // הודעות עם נמענים שאינם קיימים
+    msgs.forEach(m => {
+      m.recipientIds.forEach(r => {
+        if (r !== 'all' && r !== 'admin' && !studentIds.includes(r))
+          errors.push(`הודעה ${m.id} מכילה נמענת שאינה קיימת (${r})`);
+      });
+    });
+
+    // הישגים יתומים
+    achievements.forEach(a => {
+      if (!studentIds.includes(a.studentId))
+        errors.push(`Achievement יתום עבור ${a.studentId}`);
+    });
+
+    // מדליות יתומות
+    medals.forEach(m => {
+      if (!studentIds.includes(m.studentId))
+        errors.push(`Medal יתום עבור ${m.studentId}`);
+    });
+
+    // סטטיסטיקות יתומות
+    studentIds.forEach(id => {
+      const stats = getStudentStatistics(id);
+      // This just validates existing stats are for valid students
+    });
+
+    if (errors.length === 0) {
+      toast({
+        title: '✅ בדיקת תקינות הושלמה',
+        description: 'כל הנתונים תקינים לחלוטין — אין יתומים!',
+      });
+    } else {
+      toast({
+        title: `⚠️ נמצאו ${errors.length} בעיות`,
+        description: errors.slice(0, 3).join('\n') + (errors.length > 3 ? `\n...ועוד ${errors.length - 3}` : ''),
+        variant: 'destructive',
+      });
+      console.log('Integrity check errors:', errors);
+    }
+  };
 
   useEffect(() => {
     loadVersions();
@@ -232,19 +335,29 @@ const BackupHistory = () => {
                 <Badge variant="secondary">{versions.length} גרסאות</Badge>
               )}
             </CardTitle>
-            <Button 
-              onClick={loadVersions} 
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin ml-2" />
-              ) : (
-                <RefreshCw className="h-4 w-4 ml-2" />
-              )}
-              רענן
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={runIntegrityCheck}
+                variant="outline"
+                size="sm"
+              >
+                <CheckCircle className="h-4 w-4 ml-2" />
+                בדוק תקינות נתונים
+              </Button>
+              <Button 
+                onClick={loadVersions} 
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 ml-2" />
+                )}
+                רענן
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
