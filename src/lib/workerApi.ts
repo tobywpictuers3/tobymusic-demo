@@ -157,6 +157,11 @@ export const workerApi = {
 
       if (!r.ok) {
         const txt = await r.text();
+        // Handle file already deleted in Dropbox as success
+        if (txt.includes("path_lookup/not_found")) {
+          logger.warn("deleteAttachment: file already missing in Dropbox, treating as success");
+          return { success: true, data: { ignored: true, reason: "path_lookup/not_found" } };
+        }
         logger.error("deleteAttachment failed:", txt);
         return { success: false, error: txt };
       }
