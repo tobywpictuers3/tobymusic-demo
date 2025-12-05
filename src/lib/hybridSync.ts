@@ -58,7 +58,8 @@ class HybridSyncManager {
       // Only retry if we have pending changes and think we're offline
       if (this.syncState.pendingChanges > 0 && !this.syncState.isOnline) {
         logger.info('🔄 Retrying offline sync (2min interval)...');
-        this.syncToWorker().then(success => {
+        // Use direct upload on retry to prevent merge from restoring deleted records
+        this.directUpload().then(success => {
           if (success) {
             logger.info('✅ Offline retry succeeded!');
             this.syncState.isOnline = true; // Update online status
