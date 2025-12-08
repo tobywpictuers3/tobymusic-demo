@@ -19,7 +19,8 @@ import {
   emptyTrash,
   toggleReaction,
   canUserRemoveStar,
-  saveDraft
+  saveDraft,
+  syncMailboxFromGmail
 } from "@/lib/messages";
 import { Message, Attachment, Student } from "@/lib/types";
 import { toast } from "sonner";
@@ -40,7 +41,8 @@ import {
   Paperclip,
   ChevronRight,
   ChevronLeft,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MessageTypeBadge } from "./MessageTypeBadge";
@@ -88,6 +90,7 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
   const [students, setStudents] = useState<Student[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSyncingGmail, setIsSyncingGmail] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
     return saved === 'true';
@@ -126,6 +129,20 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
   const handleLayoutChange = (sizes: number[]) => {
     setPanelSizes(sizes);
     localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(sizes));
+  };
+
+  const handleSyncGmail = async () => {
+    setIsSyncingGmail(true);
+    try {
+      await syncMailboxFromGmail({ max: 20 });
+      loadMessages();
+      toast.success('סנכרון מג\'ימייל הושלם');
+    } catch (error) {
+      console.error('Gmail sync error:', error);
+      toast.error('שגיאה בסנכרון מג\'ימייל');
+    } finally {
+      setIsSyncingGmail(false);
+    }
   };
 
   const handlePasteImage = async (file: File): Promise<string | null> => {
@@ -414,10 +431,19 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
             </div>
             
             {/* Compose Button */}
-            <div className="p-2 border-b">
-              <Button onClick={handleCompose} className="w-full">
+            <div className="p-2 border-b flex gap-2">
+              <Button onClick={handleCompose} className="flex-1">
                 <Plus className="w-4 h-4 mr-2" />
                 הודעה חדשה
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={handleSyncGmail}
+                disabled={isSyncingGmail}
+                title="סנכרן מג'ימייל"
+              >
+                <RefreshCw className={cn("w-4 h-4", isSyncingGmail && "animate-spin")} />
               </Button>
             </div>
 
@@ -529,11 +555,23 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
           className="bg-muted/30"
         >
           <div className="h-full flex flex-col">
-            <div className="p-2 flex items-center justify-between border-b">
+            <div className="p-2 flex items-center justify-between border-b gap-1">
               {!sidebarCollapsed && (
-                <Button onClick={handleCompose} size="sm" className="flex-1 mr-2">
+                <Button onClick={handleCompose} size="sm" className="flex-1">
                   <Plus className="w-4 h-4 mr-1" />
                   חדש
+                </Button>
+              )}
+              {!sidebarCollapsed && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleSyncGmail}
+                  disabled={isSyncingGmail}
+                  title="סנכרן מג'ימייל"
+                  className="h-8 w-8"
+                >
+                  <RefreshCw className={cn("w-4 h-4", isSyncingGmail && "animate-spin")} />
                 </Button>
               )}
               <Button

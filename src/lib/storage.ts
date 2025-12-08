@@ -37,6 +37,23 @@ export { isDevMode, setDevMode };
 
 export const getDevStore = () => devData;
 
+// Local messages helpers for Gmail sync
+export const loadLocalMessages = (): any[] => {
+  if (isDevMode()) {
+    return devData.messages || [];
+  }
+  return inMemoryStorage['messages'] || [];
+};
+
+export const saveLocalMessages = (messages: any[]): void => {
+  if (isDevMode()) {
+    devData.messages = messages;
+  } else {
+    inMemoryStorage['messages'] = messages;
+    hybridSync.onDataChange();
+  }
+};
+
 // Initialize data from Worker
 export const initializeStorage = (data: any) => {
   if (!data || typeof data !== 'object') {

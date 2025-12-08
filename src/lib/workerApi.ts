@@ -26,6 +26,53 @@ const getJsonHeaders = () => ({
 /// 4. Setting Content-Type manually breaks multipart upload
 
 /* ===========================================================
+   GMAIL API HELPERS
+   =========================================================== */
+
+async function callWorkerGmail<T>(
+  action: string,
+  opts: {
+    method?: "GET" | "POST";
+    body?: any;
+    query?: Record<string, string | number>;
+  } = {}
+): Promise<T> {
+  const method = opts.method || "GET";
+
+  const queryString = new URLSearchParams({
+    action,
+    ...(opts.query ? Object.fromEntries(
+      Object.entries(opts.query).map(([k, v]) => [k, String(v)])
+    ) : {}),
+  }).toString();
+
+  const url = `${WORKER_BASE_URL}/?${queryString}`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Sonata-Manager-Code": getManagerCode(),
+  };
+
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: method === "POST" ? JSON.stringify(opts.body || {}) : null,
+    cache: "no-store",
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.ok === false) {
+    const msg =
+      data?.error ||
+      `Worker request failed: ${response.status} ${response.statusText}`;
+    throw new Error(msg);
+  }
+
+  return data as T;
+}
+
+/* ===========================================================
    EXPORT: Worker API
    =========================================================== */
 
@@ -244,5 +291,88 @@ export const workerApi = {
 
   loadData: async (): Promise<WorkerResponse> => {
     return workerApi.downloadLatest();
+  },
+
+  /* -----------------------------------------------------------
+     Gmail: Import Recent Messages
+     ----------------------------------------------------------- */
+  gmailImportRecent: async (params?: {
+    max?: number;
+    q?: string;
+  }): Promise<WorkerResponse<{ imported: number; messages: any[] }>> => {
+    if (isDevMode()) {
+      logger.warn("DEV MODE: gmailImportRecent blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
+    }
+
+    try {
+      const result = await callWorkerGmail<{
+        ok: true;
+        imported: number;
+        messages: any[];
+      }>("gmail_import_recent", {
+        method: "GET",
+        query: {
+          max: params?.max ?? 20,
+          q: params?.q ?? "",
+        },
+      });
+
+      return { success: true, data: result };
+    } catch (err) {
+      logger.error("gmailImportRecent error:", err);
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  /* -----------------------------------------------------------
+     Gmail: Send Message and Add to Local
+     ----------------------------------------------------------- */
+  gmailSendAndAdd: async (message: any): Promise<WorkerResponse<{ message: any }>> => {
+    if (isDevMode()) {
+      logger.warn("DEV MODE: gmailSendAndAdd blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
+    }
+
+    try {
+      const result = await callWorkerGmail<{ ok: true; message: any }>(
+        "gmail_send_and_add",
+        {
+          method: "POST",
+          body: { message },
+        }
+      );
+
+      return { success: true, data: result };
+    } catch (err) {
+      logger.error("gmailSendAndAdd error:", err);
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  /* -----------------------------------------------------------
+     Gmail: Modify Labels (Read/Star/Trash)
+     ----------------------------------------------------------- */
+  gmailModifyLabels: async (args: {
+    gmailMessageId: string;
+    add?: string[];
+    remove?: string[];
+  }): Promise<WorkerResponse> => {
+    if (isDevMode()) {
+      logger.warn("DEV MODE: gmailModifyLabels blocked");
+      return { success: false, error: "DEV_MODE_BLOCKED" };
+    }
+
+    try {
+      const result = await callWorkerGmail<{ ok: true }>("gmail_modify_labels", {
+        method: "POST",
+        body: args,
+      });
+
+      return { success: true, data: result };
+    } catch (err) {
+      logger.error("gmailModifyLabels error:", err);
+      return { success: false, error: (err as Error).message };
+    }
   },
 };

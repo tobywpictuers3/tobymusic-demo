@@ -1,6 +1,7 @@
 import { Message } from './types';
-import { isDevMode, getDevStore, getStudents } from './storage';
+import { isDevMode, getDevStore, getStudents, loadLocalMessages, saveLocalMessages } from './storage';
 import { hybridSync } from './hybridSync';
+import { workerApi } from './workerApi';
 
 // Get storage location
 const getStorage = () => {
@@ -499,4 +500,143 @@ export const deleteMessagesForStudentCascade = async (studentId: string): Promis
   }
 
   saveMessages(remaining);
+};
+
+/* ===========================================================
+   Gmail Sync Functions
+   =========================================================== */
+
+// Import recent messages from Gmail
+export const syncMailboxFromGmail = async (params?: { max?: number; q?: string }): Promise<Message[]> => {
+  const result = await workerApi.gmailImportRecent(params);
+  if (result.success && result.data?.messages) {
+    // The worker already saves to messages.json, we just need to reload
+    const local = loadLocalMessages();
+    return local;
+  }
+  return loadLocalMessages();
+};
+
+// Enhanced markMessageAsRead with Gmail sync
+export const markMessageAsReadWithGmail = async (messageId: string, userId: string, isRead: boolean = true): Promise<void> => {
+  const messages = getMessages();
+  const message = messages.find(m => m.id === messageId);
+  if (!message) return;
+  
+  if (!message.isRead) {
+    message.isRead = {};
+  }
+  message.isRead[userId] = isRead;
+  saveMessages(messages);
+
+  // Sync to Gmail if message has gmailMessageId
+  if ((message as any).gmailMessageId) {
+    try {
+      await workerApi.gmailModifyLabels({
+        gmailMessageId: (message as any).gmailMessageId,
+        add: isRead ? [] : ["UNREAD"],
+        remove: isRead ? ["UNREAD"] : [],
+      });
+    } catch (err) {
+      console.error('Failed to sync read status to Gmail:', err);
+    }
+  }
+};
+
+// Enhanced toggleMessageStar with Gmail sync
+export const toggleMessageStarWithGmail = async (messageId: string, userId: string): Promise<boolean> => {
+  const messages = getMessages();
+  const message = messages.find(m => m.id === messageId);
+  if (!message) return false;
+  
+  if (!message.starred) {
+    message.starred = {};
+  }
+  
+  const isCurrentlyStarred = message.starred[userId];
+  
+  if (isCurrentlyStarred && !canUserRemoveStar(message, userId)) {
+    return false;
+  }
+  
+  message.starred[userId] = !message.starred[userId];
+  
+  if (message.starred[userId] && message.senderId === 'admin' && message.recipientIds.includes('all')) {
+    if (!message.starExpiresAt) {
+      message.starExpiresAt = {};
+    }
+    if (!message.starExpiresAt[userId]) {
+      const now = new Date();
+      message.starExpiresAt[userId] = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+    }
+  }
+  
+  saveMessages(messages);
+
+  // Sync to Gmail if message has gmailMessageId
+  if ((message as any).gmailMessageId) {
+    try {
+      await workerApi.gmailModifyLabels({
+        gmailMessageId: (message as any).gmailMessageId,
+        add: message.starred[userId] ? ["STARRED"] : [],
+        remove: message.starred[userId] ? [] : ["STARRED"],
+      });
+    } catch (err) {
+      console.error('Failed to sync star to Gmail:', err);
+    }
+  }
+
+  return true;
+};
+
+// Move to trash with Gmail sync
+export const moveToTrashWithGmail = async (messageId: string, userId: string): Promise<void> => {
+  const messages = getMessages();
+  const message = messages.find(m => m.id === messageId);
+  if (!message) return;
+
+  if (!message.isDeleted) {
+    message.isDeleted = {};
+  }
+  message.isDeleted[userId] = true;
+  saveMessages(messages);
+
+  // Sync to Gmail if message has gmailMessageId
+  if ((message as any).gmailMessageId) {
+    try {
+      await workerApi.gmailModifyLabels({
+        gmailMessageId: (message as any).gmailMessageId,
+        add: ["TRASH"],
+        remove: ["INBOX", "SENT", "STARRED"],
+      });
+    } catch (err) {
+      console.error('Failed to sync trash to Gmail:', err);
+    }
+  }
+};
+
+// Restore from trash with Gmail sync
+export const restoreFromTrashWithGmail = async (messageId: string, userId: string): Promise<void> => {
+  const messages = getMessages();
+  const message = messages.find(m => m.id === messageId);
+  if (!message) return;
+
+  if (message.isDeleted) {
+    message.isDeleted[userId] = false;
+  }
+  saveMessages(messages);
+
+  // Sync to Gmail if message has gmailMessageId
+  if ((message as any).gmailMessageId) {
+    try {
+      const restoreLabel = message.senderId === userId ? "SENT" : "INBOX";
+      await workerApi.gmailModifyLabels({
+        gmailMessageId: (message as any).gmailMessageId,
+        add: [restoreLabel],
+        remove: ["TRASH"],
+      });
+    } catch (err) {
+      console.error('Failed to sync restore to Gmail:', err);
+    }
+  }
 };
