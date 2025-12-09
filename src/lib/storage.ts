@@ -1,4 +1,4 @@
-import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord } from './types';
+import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase } from './types';
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 import { isDevMode, setDevMode } from './devMode';
@@ -30,7 +30,9 @@ const devData: Record<string, any> = {
   medals: [],
   messages: [],
   studentStats: {},
-  tithePaid: {}
+  tithePaid: {},
+  storeItems: [],
+  storePurchases: []
 };
 
 export { isDevMode, setDevMode };
@@ -1252,4 +1254,214 @@ export const saveTithePaid = (tithePaid: Record<string, boolean>): void => {
     inMemoryStorage['tithePaid'] = tithePaid;
     hybridSync.onDataChange();
   }
+};
+
+// ==================== STORE MANAGEMENT ====================
+
+// Store Items
+export const getStoreItems = (): StoreItem[] => {
+  if (isDevMode()) return devData['storeItems'] || [];
+  return inMemoryStorage['storeItems'] || [];
+};
+
+export const upsertStoreItem = (item: Partial<StoreItem> & { name: string; priceCredits: number; stock: number; isActive: boolean }): StoreItem => {
+  const items = getStoreItems();
+  const now = new Date().toISOString();
+  
+  if (item.id) {
+    // Update existing
+    const index = items.findIndex(i => i.id === item.id);
+    if (index !== -1) {
+      items[index] = { ...items[index], ...item, lastModified: now };
+      if (isDevMode()) {
+        devData['storeItems'] = items;
+      } else {
+        inMemoryStorage['storeItems'] = items;
+        hybridSync.onDataChange();
+      }
+      return items[index];
+    }
+  }
+  
+  // Create new
+  const newItem: StoreItem = {
+    id: generateId(),
+    createdAt: now,
+    lastModified: now,
+    ...item
+  };
+  items.push(newItem);
+  
+  if (isDevMode()) {
+    devData['storeItems'] = items;
+  } else {
+    inMemoryStorage['storeItems'] = items;
+    hybridSync.onDataChange();
+  }
+  return newItem;
+};
+
+export const deleteStoreItem = async (id: string): Promise<boolean> => {
+  const items = getStoreItems();
+  const updatedItems = items.filter(i => i.id !== id);
+  if (updatedItems.length === items.length) return false;
+  
+  if (isDevMode()) {
+    devData['storeItems'] = updatedItems;
+  } else {
+    inMemoryStorage['storeItems'] = updatedItems;
+    await hybridSync.onDestructiveChange();
+  }
+  return true;
+};
+
+// Store Purchases
+export const getStorePurchases = (): StorePurchase[] => {
+  if (isDevMode()) return devData['storePurchases'] || [];
+  return inMemoryStorage['storePurchases'] || [];
+};
+
+export const addStorePurchase = (purchase: Omit<StorePurchase, 'id' | 'lastModified'>): StorePurchase => {
+  const purchases = getStorePurchases();
+  const now = new Date().toISOString();
+  
+  const newPurchase: StorePurchase = {
+    ...purchase,
+    id: generateId(),
+    lastModified: now
+  };
+  purchases.push(newPurchase);
+  
+  if (isDevMode()) {
+    devData['storePurchases'] = purchases;
+  } else {
+    inMemoryStorage['storePurchases'] = purchases;
+    hybridSync.onDataChange();
+  }
+  return newPurchase;
+};
+
+export const getStudentPurchases = (studentId: string): StorePurchase[] => {
+  return getStorePurchases().filter(p => p.studentId === studentId);
+};
+
+// Credits Management
+export const getStudentCredits = (studentId: string): number => {
+  const students = getStudents();
+  const student = students.find(s => s.id === studentId);
+  return student?.credits || 0;
+};
+
+export const setStudentCredits = (studentId: string, value: number): boolean => {
+  const students = getStudents();
+  const index = students.findIndex(s => s.id === studentId);
+  if (index === -1) return false;
+  
+  students[index] = { 
+    ...students[index], 
+    credits: Math.max(0, value),
+    lastModified: new Date().toISOString()
+  };
+  
+  if (isDevMode()) {
+    devData['students'] = students;
+  } else {
+    inMemoryStorage['students'] = students;
+    hybridSync.onDataChange();
+  }
+  return true;
+};
+
+export const addStudentCredits = (studentId: string, delta: number): number => {
+  const current = getStudentCredits(studentId);
+  const newValue = Math.max(0, current + delta);
+  setStudentCredits(studentId, newValue);
+  return newValue;
+};
+
+// Purchase Store Item
+export const purchaseStoreItem = async (
+  studentId: string, 
+  itemId: string, 
+  sessions: any[]
+): Promise<{ ok: boolean; reason?: string }> => {
+  const items = getStoreItems();
+  const item = items.find(i => i.id === itemId);
+  
+  if (!item) {
+    return { ok: false, reason: 'המוצר לא נמצא' };
+  }
+  
+  if (!item.isActive) {
+    return { ok: false, reason: 'המוצר אינו זמין כרגע' };
+  }
+  
+  if (item.stock <= 0) {
+    return { ok: false, reason: 'המוצר אזל מהמלאי' };
+  }
+  
+  const credits = getStudentCredits(studentId);
+  if (credits < item.priceCredits) {
+    return { ok: false, reason: `אין מספיק קרדיטים (יש לך ${credits}, צריך ${item.priceCredits})` };
+  }
+  
+  // Check requirements
+  if (item.requirements) {
+    const { minStreakDays, minMinutesInLastNDays, windowDays = 7 } = item.requirements;
+    
+    if (minStreakDays && minStreakDays > 0) {
+      // Import dynamically to avoid circular dependency
+      const { recalcAllForStudent } = await import('./practiceEngine');
+      const stats = recalcAllForStudent(studentId);
+      if (stats.streak < minStreakDays) {
+        return { ok: false, reason: `נדרש רצף של ${minStreakDays} ימים (יש לך ${stats.streak})` };
+      }
+    }
+    
+    if (minMinutesInLastNDays && minMinutesInLastNDays > 0) {
+      const now = new Date();
+      const windowStart = new Date(now);
+      windowStart.setDate(windowStart.getDate() - windowDays);
+      
+      const minutesInWindow = sessions
+        .filter((s: any) => {
+          const sessionDate = new Date(s.date);
+          return sessionDate >= windowStart && sessionDate <= now;
+        })
+        .reduce((sum: number, s: any) => sum + s.durationMinutes, 0);
+      
+      if (minutesInWindow < minMinutesInLastNDays) {
+        return { ok: false, reason: `נדרשות ${minMinutesInLastNDays} דקות אימון ב-${windowDays} ימים אחרונים (יש לך ${minutesInWindow})` };
+      }
+    }
+  }
+  
+  // All checks passed - perform purchase
+  // 1. Reduce stock
+  const itemIndex = items.findIndex(i => i.id === itemId);
+  items[itemIndex] = { ...items[itemIndex], stock: items[itemIndex].stock - 1, lastModified: new Date().toISOString() };
+  
+  if (isDevMode()) {
+    devData['storeItems'] = items;
+  } else {
+    inMemoryStorage['storeItems'] = items;
+  }
+  
+  // 2. Reduce credits
+  addStudentCredits(studentId, -item.priceCredits);
+  
+  // 3. Create purchase record
+  addStorePurchase({
+    studentId,
+    itemId,
+    purchasedAt: new Date().toISOString(),
+    priceCreditsAtPurchase: item.priceCredits
+  });
+  
+  // 4. Sync
+  if (!isDevMode()) {
+    hybridSync.onDataChange();
+  }
+  
+  return { ok: true };
 };

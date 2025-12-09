@@ -19,6 +19,7 @@ export interface Student {
   calculatedAmount?: number; // Proportional amount when starting mid-year (overrides annualAmount for payment calculation)
   monthlyAmount: number; // Calculated: (calculatedAmount || annualAmount) / paymentMonths
   notes?: string;
+  credits?: number; // Store credits for purchasing items (default: 0)
   lastModified?: string; // Optimistic locking timestamp
 }
 
@@ -227,5 +228,34 @@ export interface Message {
     action?: 'approve_or_reject';
     [key: string]: any;
   };
+}
+
+// Store Item for the medal store
+export interface StoreItem {
+  id: string;
+  name: string;
+  description?: string;
+  priceCredits: number;
+  stock: number;
+  imageUrl?: string;
+  imagePath?: string;
+  createdAt: string;
+  isActive: boolean;
+  requirements?: {
+    minStreakDays?: number;
+    minMinutesInLastNDays?: number;
+    windowDays?: number; // default 7
+  };
+  lastModified?: string;
+}
+
+// Store Purchase record
+export interface StorePurchase {
+  id: string;
+  studentId: string;
+  itemId: string;
+  purchasedAt: string;
+  priceCreditsAtPurchase: number;
+  lastModified?: string;
 }
 
