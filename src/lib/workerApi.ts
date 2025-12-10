@@ -38,9 +38,12 @@ async function callWorkerGmail<T>(
   } = {}
 ): Promise<T> {
   const method = opts.method || "GET";
+  const managerCode = getManagerCode();
 
+  // Include managerCode in query string for Worker authentication
   const queryString = new URLSearchParams({
     action,
+    managerCode,
     ...(opts.query ? Object.fromEntries(
       Object.entries(opts.query).map(([k, v]) => [k, String(v)])
     ) : {}),
@@ -50,7 +53,7 @@ async function callWorkerGmail<T>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "X-Sonata-Manager-Code": getManagerCode(),
+    "X-Sonata-Manager-Code": managerCode,
   };
 
   const response = await fetch(url, {
