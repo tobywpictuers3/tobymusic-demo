@@ -10,11 +10,12 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { 
   getMailbox,
   formatRecipients,
-  markMessageAsRead, 
+  markMessageAsReadWithGmail, 
   markMessageAsUnread,
   addMessage,
-  toggleMessageStar,
-  markMessageAsDeleted,
+  toggleMessageStarWithGmail,
+  moveToTrashWithGmail,
+  restoreFromTrashWithGmail,
   hardDeleteMessage,
   emptyTrash,
   toggleReaction,
@@ -308,21 +309,21 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     setAttachments([]);
   };
 
-  const handleToggleStar = (messageId: string) => {
-    toggleMessageStar(messageId, studentId);
+  const handleToggleStar = async (messageId: string) => {
+    await toggleMessageStarWithGmail(messageId, studentId);
     loadMessages();
   };
 
-  const handleMoveToTrash = (messageId: string) => {
-    markMessageAsDeleted(messageId, studentId, true);
+  const handleMoveToTrash = async (messageId: string) => {
+    await moveToTrashWithGmail(messageId, studentId);
     loadMessages();
     setSelectedMessage(null);
     toast.success('ההודעה הועברה לאשפה');
     if (isMobile) setMobileView('list');
   };
 
-  const handleRestore = (messageId: string) => {
-    markMessageAsDeleted(messageId, studentId, false);
+  const handleRestore = async (messageId: string) => {
+    await restoreFromTrashWithGmail(messageId, studentId);
     loadMessages();
     setSelectedMessage(null);
     toast.success('ההודעה שוחזרה');
@@ -369,9 +370,9 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     }
   };
 
-  const handleMarkAsRead = (message: Message) => {
+  const handleMarkAsRead = async (message: Message) => {
     if (!message.isRead?.[studentId]) {
-      markMessageAsRead(message.id, studentId, true);
+      await markMessageAsReadWithGmail(message.id, studentId, true);
       loadMessages();
     }
     

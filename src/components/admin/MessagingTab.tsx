@@ -11,17 +11,20 @@ import {
   getMailbox,
   formatRecipients,
   getMessagesForAdmin,
-  markMessageAsRead, 
+  markMessageAsReadWithGmail, 
   markMessageAsUnread,
   addMessage,
-  toggleMessageStar,
-  markMessageAsDeleted,
+  toggleMessageStarWithGmail,
+  moveToTrashWithGmail,
+  restoreFromTrashWithGmail,
   hardDeleteMessage,
   emptyTrash,
   toggleReaction,
   canUserRemoveStar,
   saveDraft,
-  getMessages
+  getMessages,
+  syncMailboxFromGmail,
+  sendMessageViaGmail
 } from "@/lib/messages";
 import { getStudents, updateSwapRequestStatus } from "@/lib/storage";
 import { Message, Student, Attachment } from "@/lib/types";
@@ -44,7 +47,8 @@ import {
   Paperclip,
   ChevronRight,
   ChevronLeft,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MessageTypeBadge } from "../student/MessageTypeBadge";
@@ -89,6 +93,7 @@ export default function MessagingTab() {
   const [students, setStudents] = useState<Student[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSyncingGmail, setIsSyncingGmail] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
     return saved === 'true';
@@ -125,6 +130,20 @@ export default function MessagingTab() {
   const handleLayoutChange = (sizes: number[]) => {
     setPanelSizes(sizes);
     localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(sizes));
+  };
+
+  const handleSyncGmail = async () => {
+    setIsSyncingGmail(true);
+    try {
+      await syncMailboxFromGmail({ max: 20 });
+      loadData();
+      toast.success('סנכרון מג\'ימייל הושלם');
+    } catch (error) {
+      console.error('Gmail sync error:', error);
+      toast.error('שגיאה בסנכרון מג\'ימייל');
+    } finally {
+      setIsSyncingGmail(false);
+    }
   };
 
   const handleApproveSwap = (swapRequestId: string) => {
@@ -252,7 +271,7 @@ export default function MessagingTab() {
     if (isMobile) setMobileView('message');
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!composeSubject.trim()) {
       toast.error('נא למלא נושא');
       return;
@@ -261,7 +280,34 @@ export default function MessagingTab() {
     const html = editorRef.current?.getHtml() || '';
     const plain = editorRef.current?.getText() || '';
 
-    addMessage({
+    // Check if recipients have email addresses for Gmail sending
+    const recipientEmails: string[] = [];
+    if (!composeRecipients.includes('all')) {
+      for (const rid of composeRecipients) {
+        if (rid !== 'admin') {
+          const student = students.find(s => s.id === rid);
+          if (student?.email) {
+            recipientEmails.push(student.email);
+            // Also add additional emails if available
+            if (student.additionalEmails?.length) {
+              recipientEmails.push(...student.additionalEmails);
+            }
+          }
+        }
+      }
+    } else {
+      // For broadcast to all, gather all student emails
+      for (const student of students) {
+        if (student.email) {
+          recipientEmails.push(student.email);
+        }
+        if (student.additionalEmails?.length) {
+          recipientEmails.push(...student.additionalEmails);
+        }
+      }
+    }
+
+    const messageData = {
       senderId: 'admin',
       senderName: 'המנהל',
       recipientIds: composeRecipients,
@@ -271,9 +317,24 @@ export default function MessagingTab() {
       attachments: attachments.length > 0 ? attachments : undefined,
       expiresAt: expirationDate || undefined,
       inReplyTo: isReplying && selectedMessage ? selectedMessage.id : undefined,
-      type: 'general',
-    });
+      type: 'general' as const,
+    };
 
+    // Try to send via Gmail if we have recipient emails
+    if (recipientEmails.length > 0) {
+      const result = await sendMessageViaGmail(messageData, recipientEmails);
+      if (result) {
+        toast.success('ההודעה נשלחה בהצלחה דרך Gmail');
+        resetCompose();
+        loadData();
+        return;
+      }
+      // If Gmail send failed, fall back to local
+      console.warn('Gmail send failed, falling back to local message');
+    }
+
+    // Fallback: save locally only
+    addMessage(messageData);
     toast.success('ההודעה נשלחה בהצלחה');
     resetCompose();
     loadData();
@@ -315,21 +376,21 @@ export default function MessagingTab() {
     setAttachments([]);
   };
 
-  const handleToggleStar = (messageId: string) => {
-    toggleMessageStar(messageId, 'admin');
+  const handleToggleStar = async (messageId: string) => {
+    await toggleMessageStarWithGmail(messageId, 'admin');
     loadData();
   };
 
-  const handleMoveToTrash = (messageId: string) => {
-    markMessageAsDeleted(messageId, 'admin', true);
+  const handleMoveToTrash = async (messageId: string) => {
+    await moveToTrashWithGmail(messageId, 'admin');
     loadData();
     setSelectedMessage(null);
     toast.success('ההודעה הועברה לאשפה');
     if (isMobile) setMobileView('list');
   };
 
-  const handleRestore = (messageId: string) => {
-    markMessageAsDeleted(messageId, 'admin', false);
+  const handleRestore = async (messageId: string) => {
+    await restoreFromTrashWithGmail(messageId, 'admin');
     loadData();
     setSelectedMessage(null);
     toast.success('ההודעה שוחזרה');
@@ -376,9 +437,9 @@ export default function MessagingTab() {
     }
   };
 
-  const handleMarkAsRead = (message: Message) => {
+  const handleMarkAsRead = async (message: Message) => {
     if (!message.isRead?.['admin']) {
-      markMessageAsRead(message.id, 'admin', true);
+      await markMessageAsReadWithGmail(message.id, 'admin', true);
       loadData();
     }
     
@@ -440,10 +501,19 @@ export default function MessagingTab() {
             </div>
             
             {/* Compose Button */}
-            <div className="p-2 border-b">
-              <Button onClick={handleCompose} className="w-full">
+            <div className="p-2 border-b flex gap-2">
+              <Button onClick={handleCompose} className="flex-1">
                 <Plus className="w-4 h-4 mr-2" />
                 הודעה חדשה
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={handleSyncGmail}
+                disabled={isSyncingGmail}
+                title="סנכרן מג'ימייל"
+              >
+                <RefreshCw className={cn("w-4 h-4", isSyncingGmail && "animate-spin")} />
               </Button>
             </div>
 
@@ -559,10 +629,22 @@ export default function MessagingTab() {
           <div className="h-full flex flex-col">
             <div className="p-2 flex items-center justify-between border-b">
               {!sidebarCollapsed && (
-                <Button onClick={handleCompose} size="sm" className="flex-1 mr-2">
-                  <Plus className="w-4 h-4 mr-1" />
-                  חדש
-                </Button>
+                <>
+                  <Button onClick={handleCompose} size="sm" className="flex-1 mr-2">
+                    <Plus className="w-4 h-4 mr-1" />
+                    חדש
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleSyncGmail}
+                    disabled={isSyncingGmail}
+                    title="סנכרן מג'ימייל"
+                    className="h-8 w-8 mr-2"
+                  >
+                    <RefreshCw className={cn("w-4 h-4", isSyncingGmail && "animate-spin")} />
+                  </Button>
+                </>
               )}
               <Button
                 variant="ghost"

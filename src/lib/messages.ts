@@ -506,15 +506,169 @@ export const deleteMessagesForStudentCascade = async (studentId: string): Promis
    Gmail Sync Functions
    =========================================================== */
 
+// Convert Worker message format to App Message format
+const workerMessageToAppMessage = (workerMsg: any): Message => {
+  const now = new Date().toISOString();
+  
+  // Extract sender info
+  const senderId = workerMsg.sender?.id || (workerMsg.direction === 'out' ? 'admin' : 'unknown');
+  const senderName = workerMsg.sender?.name || (senderId === 'admin' ? 'המנהל' : 'לא ידוע');
+  
+  // Extract recipient IDs
+  const recipientIds: string[] = workerMsg.recipients?.map((r: any) => r.id || r.email) || [];
+  
+  // Build isRead object from state.readBy
+  const isRead: Record<string, boolean> = {};
+  if (workerMsg.state?.readBy) {
+    for (const userId of workerMsg.state.readBy) {
+      isRead[userId] = true;
+    }
+  }
+  
+  // Build starred object from state.starredBy
+  const starred: Record<string, boolean> = {};
+  if (workerMsg.state?.starredBy) {
+    for (const userId of workerMsg.state.starredBy) {
+      starred[userId] = true;
+    }
+  }
+  
+  // Build isDeleted object from state.deletedBy
+  const isDeleted: Record<string, boolean> = {};
+  if (workerMsg.state?.deletedBy) {
+    for (const userId of workerMsg.state.deletedBy) {
+      isDeleted[userId] = true;
+    }
+  }
+
+  return {
+    id: workerMsg.id || Date.now().toString(),
+    senderId,
+    senderName,
+    recipientIds,
+    subject: workerMsg.subject || '(ללא נושא)',
+    content: workerMsg.body?.text || '',
+    contentHtml: workerMsg.body?.html,
+    createdAt: workerMsg.timestamps?.createdAt || now,
+    type: 'general',
+    messageType: recipientIds.includes('all') ? 'broadcast' : recipientIds.length > 1 ? 'group' : 'direct-student',
+    gmailMessageId: workerMsg.gmailMessageId,
+    threadId: workerMsg.threadId,
+    isRead: Object.keys(isRead).length > 0 ? isRead : undefined,
+    starred: Object.keys(starred).length > 0 ? starred : undefined,
+    isDeleted: Object.keys(isDeleted).length > 0 ? isDeleted : undefined,
+  };
+};
+
+// Convert App Message to Worker format for sending
+const appMessageToWorkerFormat = (
+  message: Omit<Message, 'id' | 'createdAt'>,
+  recipientEmails: string[]
+): any => {
+  return {
+    direction: 'out',
+    sender: {
+      email: '', // Will be filled by worker
+      type: message.senderId === 'admin' ? 'admin' : 'student',
+      id: message.senderId,
+      name: message.senderName,
+    },
+    recipients: recipientEmails.map(email => ({
+      email,
+      type: 'student',
+    })),
+    subject: message.subject,
+    body: {
+      text: message.content,
+      html: message.contentHtml,
+    },
+    recipientIds: message.recipientIds,
+  };
+};
+
 // Import recent messages from Gmail
 export const syncMailboxFromGmail = async (params?: { max?: number; q?: string }): Promise<Message[]> => {
   const result = await workerApi.gmailImportRecent(params);
+  
   if (result.success && result.data?.messages) {
-    // The worker already saves to messages.json, we just need to reload
-    const local = loadLocalMessages();
-    return local;
+    const existingMessages = getMessages();
+    const existingGmailIds = new Set(existingMessages.filter(m => m.gmailMessageId).map(m => m.gmailMessageId));
+    
+    // Convert and merge new messages
+    const newMessages: Message[] = [];
+    for (const workerMsg of result.data.messages) {
+      if (workerMsg.gmailMessageId && !existingGmailIds.has(workerMsg.gmailMessageId)) {
+        const appMsg = workerMessageToAppMessage(workerMsg);
+        newMessages.push(appMsg);
+      }
+    }
+    
+    if (newMessages.length > 0) {
+      const allMessages = [...existingMessages, ...newMessages];
+      saveMessages(allMessages);
+      return allMessages;
+    }
   }
-  return loadLocalMessages();
+  
+  return getMessages();
+};
+
+// Send message via Gmail (for admin sending to students with email)
+export const sendMessageViaGmail = async (
+  message: Omit<Message, 'id' | 'createdAt'>,
+  recipientEmails: string[]
+): Promise<Message | null> => {
+  if (recipientEmails.length === 0) {
+    console.warn('sendMessageViaGmail: No recipient emails provided');
+    return null;
+  }
+
+  try {
+    const workerMessage = appMessageToWorkerFormat(message, recipientEmails);
+    const result = await workerApi.gmailSendAndAdd(workerMessage);
+    
+    if (result.success && result.data?.message) {
+      // Convert the returned message and save locally
+      const appMessage = workerMessageToAppMessage(result.data.message);
+      
+      // Apply auto-star logic
+      const allStudents = getStudents();
+      let autoStarred: Record<string, boolean> = {};
+      let starExpiresAt: Record<string, string> = {};
+      const now = new Date();
+      
+      if (message.recipientIds.includes('all')) {
+        autoStarred = allStudents.reduce((acc: Record<string, boolean>, s: any) => 
+          ({ ...acc, [s.id]: true }), {});
+        if (message.senderId === 'admin') {
+          const expiryTime = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+          starExpiresAt = allStudents.reduce((acc: Record<string, string>, s: any) => 
+            ({ ...acc, [s.id]: expiryTime }), {});
+        }
+      } else if (message.senderId === 'admin') {
+        autoStarred = message.recipientIds
+          .filter(id => id !== 'admin')
+          .reduce((acc, id) => ({ ...acc, [id]: true }), {});
+      }
+      
+      appMessage.starred = { ...appMessage.starred, ...autoStarred };
+      if (Object.keys(starExpiresAt).length > 0) {
+        appMessage.starExpiresAt = starExpiresAt;
+      }
+      
+      const messages = getMessages();
+      messages.push(appMessage);
+      saveMessages(messages);
+      
+      return appMessage;
+    }
+    
+    console.error('sendMessageViaGmail: Worker returned error', result.error);
+    return null;
+  } catch (err) {
+    console.error('sendMessageViaGmail error:', err);
+    return null;
+  }
 };
 
 // Enhanced markMessageAsRead with Gmail sync

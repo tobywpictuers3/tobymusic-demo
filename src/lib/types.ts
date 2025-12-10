@@ -223,6 +223,9 @@ export interface Message {
   type: 'general' | 'swap_request' | 'swap_approval' | 'swap_rejection' | 'swap_notice';
   messageType?: 'broadcast' | 'group' | 'direct-teacher' | 'direct-student';
   reactions?: { [userId: string]: string }; // emoji reactions per user
+  // Gmail sync fields
+  gmailMessageId?: string; // Gmail message ID for bidirectional sync
+  threadId?: string; // Gmail thread ID
   metadata?: {
     swapRequestId?: string;
     action?: 'approve_or_reject';
