@@ -684,10 +684,10 @@ export const markMessageAsReadWithGmail = async (messageId: string, userId: stri
   saveMessages(messages);
 
   // Sync to Gmail if message has gmailMessageId
-  if ((message as any).gmailMessageId) {
+  if (message.gmailMessageId) {
     try {
       await workerApi.gmailModifyLabels({
-        gmailMessageId: (message as any).gmailMessageId,
+        gmailMessageId: message.gmailMessageId,
         add: isRead ? [] : ["UNREAD"],
         remove: isRead ? ["UNREAD"] : [],
       });
@@ -728,10 +728,10 @@ export const toggleMessageStarWithGmail = async (messageId: string, userId: stri
   saveMessages(messages);
 
   // Sync to Gmail if message has gmailMessageId
-  if ((message as any).gmailMessageId) {
+  if (message.gmailMessageId) {
     try {
       await workerApi.gmailModifyLabels({
-        gmailMessageId: (message as any).gmailMessageId,
+        gmailMessageId: message.gmailMessageId,
         add: message.starred[userId] ? ["STARRED"] : [],
         remove: message.starred[userId] ? [] : ["STARRED"],
       });
@@ -756,10 +756,10 @@ export const moveToTrashWithGmail = async (messageId: string, userId: string): P
   saveMessages(messages);
 
   // Sync to Gmail if message has gmailMessageId
-  if ((message as any).gmailMessageId) {
+  if (message.gmailMessageId) {
     try {
       await workerApi.gmailModifyLabels({
-        gmailMessageId: (message as any).gmailMessageId,
+        gmailMessageId: message.gmailMessageId,
         add: ["TRASH"],
         remove: ["INBOX", "SENT", "STARRED"],
       });
@@ -781,11 +781,11 @@ export const restoreFromTrashWithGmail = async (messageId: string, userId: strin
   saveMessages(messages);
 
   // Sync to Gmail if message has gmailMessageId
-  if ((message as any).gmailMessageId) {
+  if (message.gmailMessageId) {
     try {
       const restoreLabel = message.senderId === userId ? "SENT" : "INBOX";
       await workerApi.gmailModifyLabels({
-        gmailMessageId: (message as any).gmailMessageId,
+        gmailMessageId: message.gmailMessageId,
         add: [restoreLabel],
         remove: ["TRASH"],
       });

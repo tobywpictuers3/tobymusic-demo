@@ -11,8 +11,7 @@ import {
   getMailbox,
   formatRecipients,
   getMessagesForAdmin,
-  markMessageAsReadWithGmail, 
-  markMessageAsUnread,
+  markMessageAsReadWithGmail,
   addMessage,
   toggleMessageStarWithGmail,
   moveToTrashWithGmail,
@@ -447,8 +446,8 @@ export default function MessagingTab() {
     if (isMobile) setMobileView('message');
   };
 
-  const handleMarkAsUnread = (messageId: string) => {
-    markMessageAsUnread(messageId, 'admin');
+  const handleMarkAsUnread = async (messageId: string) => {
+    await markMessageAsReadWithGmail(messageId, 'admin', false);
     loadData();
     toast.success('ההודעה סומנה כלא נקראה');
   };

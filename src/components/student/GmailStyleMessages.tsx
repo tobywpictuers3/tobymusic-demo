@@ -10,8 +10,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { 
   getMailbox,
   formatRecipients,
-  markMessageAsReadWithGmail, 
-  markMessageAsUnread,
+  markMessageAsReadWithGmail,
   addMessage,
   toggleMessageStarWithGmail,
   moveToTrashWithGmail,
@@ -380,8 +379,8 @@ export default function GmailStyleMessages({ studentId, studentName }: GmailStyl
     if (isMobile) setMobileView('message');
   };
 
-  const handleMarkAsUnread = (messageId: string) => {
-    markMessageAsUnread(messageId, studentId);
+  const handleMarkAsUnread = async (messageId: string) => {
+    await markMessageAsReadWithGmail(messageId, studentId, false);
     loadMessages();
     toast.success('ההודעה סומנה כלא נקראה');
   };
