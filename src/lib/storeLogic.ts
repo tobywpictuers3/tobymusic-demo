@@ -1,6 +1,7 @@
 import { StoreItem, PracticeSession } from './types';
 import { getAvailableCopper } from './storage';
 import { formatPriceCompact } from './storeCurrency';
+import { getCurrentStreak as getCurrentStreakFromEngine } from './medalEngine';
 
 export interface AvailabilityCheck {
   available: boolean;
@@ -33,11 +34,10 @@ export const getMinutesInLastNDays = (
 };
 
 /**
- * Get current streak for a student (from medalEngine)
+ * Get current streak for a student (delegates to medalEngine - single source of truth)
  */
 export const getCurrentStreak = (studentId: string): number => {
-  const { getCurrentStreak: getStreak } = require('./medalEngine');
-  return getStreak(studentId);
+  return getCurrentStreakFromEngine(studentId);
 };
 
 /**
