@@ -5,21 +5,27 @@ import { Input } from '@/components/safe-ui/input';
 import { Label } from '@/components/safe-ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/safe-ui/table';
 import { Badge } from '@/components/safe-ui/badge';
-import { Play, Square, Clock, Trophy, Sparkles, TrendingUp, Loader2, CheckCircle, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Play, Square, Clock, Trophy, Sparkles, TrendingUp, Loader2, Trash2, RefreshCw } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/safe-ui/alert-dialog';
-import { getPracticeSessions, addPracticeSession, getStudentPracticeSessions, updateMonthlyAchievement, getStudents, getLessons, addMedalRecord, getStudentMedalRecords, deletePracticeSession } from '@/lib/storage';
+import { addPracticeSession, getStudentPracticeSessions, deletePracticeSession } from '@/lib/storage';
 import { PracticeSession } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
-import { format } from 'date-fns';
-import { he } from 'date-fns/locale';
 import { CelebrationToast } from './CelebrationToast';
 import PracticeLeaderboard from './PracticeLeaderboard';
 import MonthlyAchievements from './MonthlyAchievements';
 import YearlyAchievements from './YearlyAchievements';
 import StreakProgress from './StreakProgress';
 import { hybridSync } from '@/lib/hybridSync';
-import { recalcAllForStudent, calculateLessonIntervals } from '@/lib/practiceEngine';
+import { 
+  getMedalSummary, 
+  getDailyMedalLevel, 
+  getDailyMedalInfo,
+  getNextDailyMedalInfo,
+  getCurrentStreak,
+  checkForNewDailyMilestone,
+  checkForNewStreakMilestone,
+} from '@/lib/medalEngine';
 
 interface PracticeTrackingProps {
   studentId: string;
@@ -29,7 +35,8 @@ interface DailyStats {
   date: string;
   sessions: PracticeSession[];
   totalMinutes: number;
-  medals: string[];
+  medalIcon: string;
+  medalName: string;
 }
 
 const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
@@ -41,15 +48,14 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   const [manualStartTime, setManualStartTime] = useState('');
   const [manualEndTime, setManualEndTime] = useState('');
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
-  const [shownCongrats, setShownCongrats] = useState<Set<string>>(new Set());
   const [activeCelebration, setActiveCelebration] = useState<{ message: string; medal: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     loadSessions();
-  }, [studentId]);
+  }, [studentId, refreshKey]);
 
   useEffect(() => {
     calculateDailyStats();
@@ -72,12 +78,10 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   const loadSessions = () => {
     const studentSessions = getStudentPracticeSessions(studentId);
     setSessions(studentSessions);
-    
-    // Recalculate all stats using central engine
-    recalcAllForStudent(studentId);
   };
 
   const calculateDailyStats = () => {
+    // Group sessions by date
     const grouped = sessions.reduce((acc, session) => {
       if (!acc[session.date]) {
         acc[session.date] = [];
@@ -86,206 +90,26 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
       return acc;
     }, {} as Record<string, PracticeSession[]>);
 
+    // Calculate stats with derived medals (not stored)
     const stats: DailyStats[] = Object.entries(grouped)
       .map(([date, daySessions]) => {
         const totalMinutes = daySessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-        const medals: string[] = [];
-        const allMedals = getStudentMedalRecords(studentId);
-        const dayMedals = allMedals.filter(m => m.earnedDate === date);
         
-        // Get current day medals
-        dayMedals.forEach(m => {
-          if (m.medalType === 'duration') {
-            if (m.level === 'platinum') medals.push('💎 פלטינום');
-            else if (m.level === 'gold') medals.push('🥇 זהב');
-            else if (m.level === 'silver') medals.push('🥈 כסף');
-            else if (m.level === 'bronze') medals.push('🥉 נחושת');
-          } else if (m.medalType === 'streak') {
-            if (m.level === 'streak21') medals.push('👑 רצף ראוי לציון');
-            else if (m.level === 'streak14') medals.push('💎 רצף נהדר');
-            else if (m.level === 'streak6') medals.push('⚡ מרוצף');
-            else if (m.level === 'streak3') medals.push('🔥 רצף');
-          }
-        });
+        // Get derived medal for this day
+        const level = getDailyMedalLevel(totalMinutes);
+        const medalInfo = getDailyMedalInfo(level);
 
-        return { date, sessions: daySessions, totalMinutes, medals };
+        return { 
+          date, 
+          sessions: daySessions, 
+          totalMinutes,
+          medalIcon: medalInfo.icon,
+          medalName: medalInfo.name,
+        };
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     setDailyStats(stats);
-  };
-
-  const checkStreaks = (stats: DailyStats[]) => {
-    if (stats.length === 0) return;
-
-    // Sort by date ascending for streak calculation
-    const sorted = [...stats].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const dates = sorted.map(s => s.date);
-    
-    // Calculate current streak
-    let streak = 0;
-    const today = new Date().toISOString().split('T')[0];
-    let currentDate = new Date();
-    
-    for (let i = 0; i < 7; i++) {
-      const checkDate = currentDate.toISOString().split('T')[0];
-      if (dates.includes(checkDate)) {
-        streak++;
-      } else if (checkDate !== today) {
-        // If we missed a day (and it's not today), streak is broken
-        break;
-      }
-      currentDate.setDate(currentDate.getDate() - 1);
-    }
-
-    showStreakCongrats(streak);
-    
-    // Update monthly achievement with max streak
-    updateMonthlyAchievement(studentId, { maxStreak: streak });
-  };
-
-  const getNextMedalInfo = (totalMinutes: number): { nextMedal: string; remaining: number } | null => {
-    if (totalMinutes < 15) return { nextMedal: 'נחושת (15 דקות)', remaining: 15 - totalMinutes };
-    if (totalMinutes < 40) return { nextMedal: 'כסף (40 דקות)', remaining: 40 - totalMinutes };
-    if (totalMinutes < 150) return { nextMedal: 'זהב (150 דקות)', remaining: 150 - totalMinutes };
-    if (totalMinutes < 270) return { nextMedal: 'פלטינום (270 דקות)', remaining: 270 - totalMinutes };
-    return null;
-  };
-
-  const getNextStreakInfo = (streak: number): { nextMedal: string; remaining: number } | null => {
-    const effectiveStreak = streak > 21 ? streak % 21 : streak;
-    if (effectiveStreak < 3) return { nextMedal: 'רצף (3 ימים)', remaining: 3 - effectiveStreak };
-    if (effectiveStreak < 6) return { nextMedal: 'מרוצף (6 ימים)', remaining: 6 - effectiveStreak };
-    if (effectiveStreak < 14) return { nextMedal: 'רצף נהדר (14 ימים)', remaining: 14 - effectiveStreak };
-    if (effectiveStreak < 21) return { nextMedal: 'רצף ראוי לציון (21 ימים)', remaining: 21 - effectiveStreak };
-    return null;
-  };
-
-  const showStreakCongrats = (streak: number) => {
-    const existingMedals = getStudentMedalRecords(studentId);
-    const today = new Date().toISOString().split('T')[0];
-    
-    // ✅ Reset streak after 21 days
-    const effectiveStreak = streak > 21 ? streak % 21 : streak;
-    
-    let message = '';
-    let medal = '';
-    let level: 'streak3' | 'streak6' | 'streak14' | 'streak21' | null = null;
-    
-    if (effectiveStreak >= 21 || streak === 21) {
-      level = 'streak21';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today && m.level === 'streak21');
-      if (!hasHigherMedal) {
-        message = 'בלתי יאומן! 21 ימים ברצף! מגיעה לך מדליית "רצף ראוי לציון"!';
-        medal = '👑';
-      }
-    } else if (effectiveStreak >= 14) {
-      level = 'streak14';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today && (m.level === 'streak21' || m.level === 'streak14'));
-      if (!hasHigherMedal) {
-        message = 'יוצא מן הכלל! 14 ימים ברצף! מגיעה לך מדליית "רצף נהדר"!';
-        medal = '💎';
-      }
-    } else if (effectiveStreak >= 6) {
-      level = 'streak6';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today && (m.level === 'streak21' || m.level === 'streak14' || m.level === 'streak6'));
-      if (!hasHigherMedal) {
-        message = 'מדהים! 6 ימים ברצף! מגיעה לך מדליית "מרוצף"!';
-        medal = '⚡';
-      }
-    } else if (effectiveStreak >= 3) {
-      level = 'streak3';
-      const hasAnyStreakMedal = existingMedals.find(m => m.medalType === 'streak' && m.earnedDate === today);
-      if (!hasAnyStreakMedal) {
-        message = 'יפה מאוד! 3 ימים ברצף! מגיעה לך מדליית "רצף"!';
-        medal = '🔥';
-      }
-    }
-
-    if (message && level) {
-      // Remove lower medals from today
-      const medalsToRemove = existingMedals.filter(m => m.medalType === 'streak' && m.earnedDate === today);
-      medalsToRemove.forEach(m => {
-        const allMedals = getStudentMedalRecords(studentId);
-        const filtered = allMedals.filter(medal => medal.id !== m.id);
-        localStorage.setItem('musicSystem_medalRecords', JSON.stringify(filtered));
-      });
-      
-      // Add new medal
-      addMedalRecord({
-        studentId,
-        medalType: 'streak',
-        level,
-        streakDays: effectiveStreak,
-        earnedDate: today,
-      });
-      
-      showCelebration(message, medal);
-    }
-  };
-
-  const showDurationCongrats = (totalMinutes: number, dateForMedal?: string) => {
-    const targetDate = dateForMedal || new Date().toISOString().split('T')[0];
-    const existingMedals = getStudentMedalRecords(studentId);
-    
-    let message = '';
-    let medal = '';
-    let level: 'bronze' | 'silver' | 'gold' | 'platinum' | null = null;
-    
-    // ✅ NEW LOGIC: 15 → Bronze, 40 → Silver, 150 → Gold, 270 → Platinum
-    if (totalMinutes >= 270) {
-      level = 'platinum';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && m.level === 'platinum');
-      if (!hasHigherMedal) {
-        message = 'בלתי יאומן! 270 דקות אימון! את אלופה אמיתית! מגיעה לך מדליית פלטינום!';
-        medal = '💎';
-      }
-    } else if (totalMinutes >= 150) {
-      level = 'gold';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && (m.level === 'platinum' || m.level === 'gold'));
-      if (!hasHigherMedal) {
-        message = 'יוצא מן הכלל! 150 דקות אימון! מגיעה לך מדליית זהב!';
-        medal = '🥇';
-      }
-    } else if (totalMinutes >= 40) {
-      level = 'silver';
-      const hasHigherMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate && (m.level === 'platinum' || m.level === 'gold' || m.level === 'silver'));
-      if (!hasHigherMedal) {
-        message = 'נפלא! צברת היום 40 דקות אימון. מגיעה לך מדליית כסף!';
-        medal = '🥈';
-      }
-    } else if (totalMinutes >= 15) {
-      level = 'bronze';
-      const hasAnyDurationMedal = existingMedals.find(m => m.medalType === 'duration' && m.earnedDate === targetDate);
-      if (!hasAnyDurationMedal) {
-        message = 'מצוין! צברת 15 דקות אימון היום! קבלי מדליית נחושת!';
-        medal = '🥉';
-      }
-    }
-
-    if (message && level) {
-      // Remove lower medals from the target date
-      const medalsToRemove = existingMedals.filter(m => m.medalType === 'duration' && m.earnedDate === targetDate);
-      medalsToRemove.forEach(m => {
-        const allMedals = getStudentMedalRecords(studentId);
-        const filtered = allMedals.filter(medal => medal.id !== m.id);
-        localStorage.setItem('musicSystem_medalRecords', JSON.stringify(filtered));
-      });
-      
-      // Add new medal with correct date
-      addMedalRecord({
-        studentId,
-        medalType: 'duration',
-        level,
-        durationMinutes: totalMinutes,
-        earnedDate: targetDate,
-      });
-      
-      showCelebration(message, medal);
-    }
-    
-    // Update monthly achievement with max daily minutes
-    updateMonthlyAchievement(studentId, { maxDailyMinutes: totalMinutes });
   };
 
   const showCelebration = (message: string, medal: string) => {
@@ -297,6 +121,35 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     });
 
     setActiveCelebration({ message, medal });
+  };
+
+  const checkAndShowCelebrations = (dateForCheck: string, newMinutes: number) => {
+    // Get previous total for this date (before adding new session)
+    const existingTotal = sessions
+      .filter(s => s.date === dateForCheck)
+      .reduce((sum, s) => sum + s.durationMinutes, 0);
+    
+    const previousMinutes = existingTotal;
+    const newTotal = previousMinutes + newMinutes;
+    
+    // Check for daily milestone
+    const dailyMilestone = checkForNewDailyMilestone(previousMinutes, newTotal);
+    if (dailyMilestone) {
+      showCelebration(dailyMilestone.message, dailyMilestone.medal);
+      return;
+    }
+    
+    // Check for streak milestone (only for today's date)
+    const today = new Date().toISOString().split('T')[0];
+    if (dateForCheck === today) {
+      const previousStreak = getCurrentStreak(studentId);
+      // After adding session, check if streak increased
+      // We need to reload to get accurate count, but for now estimate
+      const streakMilestone = checkForNewStreakMilestone(previousStreak - 1, previousStreak);
+      if (streakMilestone) {
+        showCelebration(streakMilestone.message, streakMilestone.medal);
+      }
+    }
   };
 
   const saveWithRetry = async (sessionData: Omit<PracticeSession, 'id' | 'createdAt'>): Promise<boolean> => {
@@ -322,28 +175,28 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
         return false;
       }
       
+      // Check celebrations before adding (to compare old vs new)
+      checkAndShowCelebrations(sessionData.date, sessionData.durationMinutes);
+      
       // Add session to local storage
-      const session = addPracticeSession(sessionData);
+      addPracticeSession(sessionData);
       
       // Try to sync to Dropbox
       const result = await hybridSync.onDataChange();
       
       if (result.synced) {
-        // Successfully synced to Dropbox
         toast({
           title: '✅ נשמר בדרופבוקס!',
           description: `${sessionData.durationMinutes} דקות נשמרו בהצלחה`,
           duration: 3000,
         });
       } else if (result.success) {
-        // Saved locally but not synced (offline)
         toast({
           title: '💾 נשמר מקומית',
           description: 'האימון נשמר. יסונכרן אוטומטית בעוד 2 דקות',
           duration: 4000,
         });
       } else {
-        // Save failed
         toast({
           title: '❌ שמירה נכשלה',
           description: result.message || 'בדקי חיבור לאינטרנט',
@@ -410,11 +263,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     setElapsedSeconds(0);
 
     if (saved) {
-      // Recalculate all stats after adding session
-      recalcAllForStudent(studentId);
-      loadSessions();
-      // Check for duration milestones - for THIS session only, not total
-      showDurationCongrats(durationMinutes);
+      setRefreshKey(k => k + 1);
     }
   };
 
@@ -452,51 +301,10 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     const saved = await saveWithRetry(sessionData);
 
     if (saved) {
-      // Recalculate all stats after manual entry
-      recalcAllForStudent(studentId);
-      
-      // Reload sessions and recalculate stats
-      const allSessions = getStudentPracticeSessions(studentId);
-      const allMedals = getStudentMedalRecords(studentId);
-      
-      // Group by date
-      const grouped = allSessions.reduce((acc, session) => {
-        if (!acc[session.date]) acc[session.date] = [];
-        acc[session.date].push(session);
-        return acc;
-      }, {} as Record<string, PracticeSession[]>);
-      
-      const stats = Object.entries(grouped)
-        .map(([date, daySessions]) => {
-          const totalMinutes = daySessions.reduce((sum, s) => sum + s.durationMinutes, 0);
-          const medals: string[] = [];
-          
-          allMedals.filter(m => m.earnedDate === date).forEach(m => {
-            if (m.medalType === 'duration') {
-              if (m.level === 'platinum') medals.push('💎 פלטינום');
-              else if (m.level === 'gold') medals.push('🥇 זהב');
-              else if (m.level === 'silver') medals.push('🥈 כסף');
-              else if (m.level === 'bronze') medals.push('🥉 נחושת');
-            } else if (m.medalType === 'streak') {
-              if (m.level === 'streak21') medals.push('👑 רצף ראוי לציון');
-              else if (m.level === 'streak14') medals.push('💎 רצף נהדר');
-              else if (m.level === 'streak6') medals.push('⚡ מרוצף');
-              else if (m.level === 'streak3') medals.push('🔥 רצף');
-            }
-          });
-          
-          return { date, sessions: daySessions, totalMinutes, medals };
-        })
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      setDailyStats(stats);
-      
       setManualStartTime('');
       setManualEndTime('');
       setManualDate(new Date().toISOString().split('T')[0]);
-      
-      // Award medal for the ENTERED DATE, not today
-      showDurationCongrats(durationMinutes, manualDate);
+      setRefreshKey(k => k + 1);
     }
   };
 
@@ -511,17 +319,8 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
   };
 
   const calculateDailyAverage = () => {
-    // Use central engine to calculate intervals
-    const intervals = calculateLessonIntervals(studentId);
-    if (intervals.length === 0) return 0;
-    
-    // Find max average from all intervals
-    const maxAverage = Math.max(...intervals.map(i => i.average));
-    
-    // Update monthly achievement with the maximum average found
-    updateMonthlyAchievement(studentId, { maxDailyAverage: maxAverage });
-    
-    return maxAverage;
+    const weeklyTotal = getWeeklyTotal();
+    return weeklyTotal / 7;
   };
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -529,9 +328,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
       deletePracticeSession(sessionId);
       await hybridSync.onDataChange();
       
-      // Recalculate all stats after deletion
-      recalcAllForStudent(studentId);
-      loadSessions();
+      setRefreshKey(k => k + 1);
       
       toast({
         title: '✅ נמחק בהצלחה',
@@ -551,30 +348,12 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
     }
   };
 
-  // Recalculate medals and stats for all days - uses central engine
-  const recalculateMedalsForAllDays = () => {
-    setIsRecalculating(true);
-    
-    try {
-      // Use central engine to recalculate everything
-      recalcAllForStudent(studentId);
-      
-      // Reload sessions to update UI
-      loadSessions();
-      
-      toast({
-        title: '✅ מדליות עודכנו בהצלחה!',
-        description: 'כל החישובים והמדליות עודכנו',
-      });
-    } catch (error) {
-      console.error('Error recalculating medals:', error);
-      toast({
-        title: 'שגיאה בעדכון מדליות',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsRecalculating(false);
-    }
+  // Get today's progress for medal info
+  const getTodayProgress = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayStats = dailyStats.find(d => d.date === today);
+    const todayMinutes = todayStats?.totalMinutes || 0;
+    return getNextDailyMedalInfo(todayMinutes);
   };
 
   return (
@@ -597,23 +376,6 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Retroactive Medal Calculation Button */}
-          <div className="pb-4 border-b">
-            <Button
-              onClick={recalculateMedalsForAllDays}
-              disabled={isRecalculating}
-              variant="outline"
-              size="sm"
-              className="w-full"
-            >
-              <RefreshCw className={`w-4 h-4 ml-2 ${isRecalculating ? 'animate-spin' : ''}`} />
-              {isRecalculating ? 'מחשב מדליות...' : 'עדכן מדליות למפרע'}
-            </Button>
-            <p className="text-xs text-muted-foreground mt-2">
-              לחצי כאן אם הזנת אימונים למפרע ולא קיבלת מדליות
-            </p>
-          </div>
-          
           <div className="flex items-center justify-center gap-4">
             {!isTracking ? (
               <Button
@@ -745,10 +507,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
           <CardContent className="pt-6">
             <div className="space-y-2">
               {(() => {
-                const today = new Date().toISOString().split('T')[0];
-                const todayStats = dailyStats.find(d => d.date === today);
-                const todayMinutes = todayStats?.totalMinutes || 0;
-                const nextMedalInfo = getNextMedalInfo(todayMinutes);
+                const nextMedalInfo = getTodayProgress();
                 
                 return nextMedalInfo ? (
                   <div className="text-center">
@@ -791,7 +550,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
                 <TableHead>תאריך</TableHead>
                 <TableHead>אימונים</TableHead>
                 <TableHead>סה"כ דקות</TableHead>
-                <TableHead>הישגים</TableHead>
+                <TableHead>מדליה</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -832,13 +591,11 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
                     <Badge variant="outline">{day.totalMinutes} דקות</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
-                      {day.medals.map((medal, idx) => (
-                        <Badge key={idx} variant="secondary" className="text-xs">
-                          {medal}
-                        </Badge>
-                      ))}
-                    </div>
+                    {day.medalIcon && (
+                      <Badge variant="secondary" className="text-xs">
+                        {day.medalIcon} {day.medalName}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell></TableCell>
                 </TableRow>

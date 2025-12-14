@@ -57,12 +57,14 @@ const AdminPracticeStats = () => {
       let maxStreak: number;
       let maxDailyMinutes: number;
 
+      // Use medalEngine for streak (derived, not stored)
+      const { getCurrentStreak } = await import('@/lib/medalEngine');
+      maxStreak = getCurrentStreak(student.id);
+      
       if (cached) {
-        maxStreak = cached.streak;
         maxDailyMinutes = cached.maxDaily;
       } else {
         const stats = recalcAllForStudent(student.id);
-        maxStreak = stats.streak;
         maxDailyMinutes = stats.maxDaily;
       }
 

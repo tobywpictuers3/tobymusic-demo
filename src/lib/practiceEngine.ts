@@ -5,21 +5,15 @@
  * - intervals between lessons
  * - minutes per interval
  * - averages per interval
- * - streaks
- * - max daily minutes
- * - monthly achievements
- * - yearly achievements
- * - retroactive recalculations
+ * - daily totals
  *
- * All logic in the app MUST call these functions instead of
- * doing calculations inside components.
+ * NOTE: Medal calculations are now DERIVED in medalEngine.ts
+ * This file no longer stores or persists medal data.
  */
 
 import {
   getLessons,
-  getPracticeSessions,
   getStudentPracticeSessions,
-  updateMonthlyAchievement,
   saveStudentStatistics,
 } from '@/lib/storage';
 import { Lesson, PracticeSession } from '@/lib/types';
@@ -91,7 +85,7 @@ export function calculateLessonIntervals(studentId: string) {
 }
 
 /* -----------------------------------------------------------
-   2. DAILY TOTALS (for streaks, daily medals, monthly stats)
+   2. DAILY TOTALS (for UI display)
 ----------------------------------------------------------- */
 
 export function calculateDailyStats(studentId: string) {
@@ -107,35 +101,7 @@ export function calculateDailyStats(studentId: string) {
 }
 
 /* -----------------------------------------------------------
-   3. STREAK CALCULATION
------------------------------------------------------------ */
-
-export function calculateStreak(studentId: string) {
-  const daily = calculateDailyStats(studentId);
-  if (daily.length === 0) return 0;
-
-  let maxStreak = 1;
-  let currentStreak = 1;
-
-  for (let i = 1; i < daily.length; i++) {
-    const prev = new Date(daily[i - 1].date);
-    const curr = new Date(daily[i].date);
-
-    const diff = daysBetween(prev, curr);
-
-    if (diff === 1 || diff === 0) {
-      currentStreak++;
-      maxStreak = Math.max(maxStreak, currentStreak);
-    } else {
-      currentStreak = 1;
-    }
-  }
-
-  return maxStreak;
-}
-
-/* -----------------------------------------------------------
-   4. MAX DAILY MINUTES
+   3. MAX DAILY MINUTES
 ----------------------------------------------------------- */
 
 export function calculateMaxDailyMinutes(studentId: string) {
@@ -145,69 +111,7 @@ export function calculateMaxDailyMinutes(studentId: string) {
 }
 
 /* -----------------------------------------------------------
-   5. MONTHLY ACHIEVEMENTS
------------------------------------------------------------ */
-
-export function calculateMonthlyAchievements(studentId: string) {
-  const sessions = getStudentPracticeSessions(studentId);
-
-  const monthly: Record<
-    string,
-    { total: number; maxDaily: number; maxStreak: number }
-  > = {};
-
-  const grouped = groupByDate(sessions);
-
-  // Organize by month
-  Object.entries(grouped).forEach(([date, daySessions]) => {
-    const month = date.slice(0, 7);
-    const totalDay = daySessions.reduce(
-      (sum, s) => sum + s.durationMinutes,
-      0
-    );
-
-    if (!monthly[month])
-      monthly[month] = { total: 0, maxDaily: 0, maxStreak: 0 };
-
-    monthly[month].total += totalDay;
-    monthly[month].maxDaily = Math.max(monthly[month].maxDaily, totalDay);
-  });
-
-  // Streaks per month (correct handling)
-  Object.keys(monthly).forEach((month) => {
-    const sameMonthDates = Object.keys(grouped)
-      .filter((d) => d.startsWith(month))
-      .sort();
-
-    let maxStreak = 1;
-    let current = 1;
-
-    for (let i = 1; i < sameMonthDates.length; i++) {
-      const prev = new Date(sameMonthDates[i - 1]);
-      const curr = new Date(sameMonthDates[i]);
-      const diff = daysBetween(prev, curr);
-      if (diff === 1 || diff === 0) {
-        current++;
-        maxStreak = Math.max(maxStreak, current);
-      } else {
-        current = 1;
-      }
-    }
-
-    monthly[month].maxStreak = maxStreak;
-
-    // Save monthly result directly:
-    updateMonthlyAchievement(studentId, {
-      maxDailyMinutes: monthly[month].maxDaily,
-      maxStreak: maxStreak,
-    });
-  });
-
-  return monthly;
-}
-
-/* -----------------------------------------------------------
-   6. YEARLY ACHIEVEMENTS
+   4. YEARLY ACHIEVEMENTS (based on lesson intervals)
 ----------------------------------------------------------- */
 
 export function calculateYearlyAchievements(studentId: string) {
@@ -243,14 +147,13 @@ function academicYearOf(dateStr: string) {
 }
 
 /* -----------------------------------------------------------
-   7. FULL RECALC FOR A STUDENT (RETROACTIVE)
+   5. RECALC FOR STUDENT (saves statistics for caching)
+   NOTE: No longer handles medals - those are derived in medalEngine.ts
 ----------------------------------------------------------- */
 
 export function recalcAllForStudent(studentId: string) {
   const intervals = calculateLessonIntervals(studentId);
-  const streak = calculateStreak(studentId);
   const maxDaily = calculateMaxDailyMinutes(studentId);
-  const monthly = calculateMonthlyAchievements(studentId);
   const yearly = calculateYearlyAchievements(studentId);
 
   // Calculate weekly average from the last interval
@@ -258,21 +161,17 @@ export function recalcAllForStudent(studentId: string) {
     ? intervals[intervals.length - 1].average 
     : 0;
 
-  // Save to storage and trigger sync
+  // Save to storage for caching (statistics only, not medals)
   saveStudentStatistics(studentId, {
     intervals,
-    streak,
     maxDaily,
-    monthly,
     yearly,
     weeklyAverage,
   });
 
   return {
     intervals,
-    streak,
     maxDaily,
-    monthly,
     yearly,
     weeklyAverage,
   };

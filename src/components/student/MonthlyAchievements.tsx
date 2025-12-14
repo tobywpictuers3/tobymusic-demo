@@ -25,10 +25,12 @@ const MonthlyAchievements = ({ studentId }: MonthlyAchievementsProps) => {
       });
       setMonthlyTotals(totals);
     } else {
-      const stats = recalcAllForStudent(studentId);
+      // Calculate from practice sessions directly
+      const sessions = getStudentPracticeSessions(studentId);
       const totals: Record<string, number> = {};
-      Object.entries(stats.monthly).forEach(([month, data]: [string, any]) => {
-        totals[month] = data.total;
+      sessions.forEach((s: any) => {
+        const month = s.date.slice(0, 7);
+        totals[month] = (totals[month] || 0) + s.durationMinutes;
       });
       setMonthlyTotals(totals);
     }

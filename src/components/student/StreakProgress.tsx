@@ -2,41 +2,43 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Flame, Calendar } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { calculateStreak } from '@/lib/practiceEngine';
+import { getCurrentStreak, getNextStreakMedalInfo, getStreakMedalLevel, getStreakMedalInfo } from '@/lib/medalEngine';
 
 interface StreakProgressProps {
   studentId: string;
 }
 
 const StreakProgress = ({ studentId }: StreakProgressProps) => {
-  const [currentStreak, setCurrentStreak] = useState(0);
+  const [currentStreakDays, setCurrentStreakDays] = useState(0);
   const [daysToNextMedal, setDaysToNextMedal] = useState<{ days: number; medal: string } | null>(null);
+  const [currentMedalInfo, setCurrentMedalInfo] = useState<{ icon: string; name: string } | null>(null);
 
   useEffect(() => {
-    const streak = calculateStreak(studentId);
-    setCurrentStreak(streak);
+    // Derive streak from practice history (calendar-based)
+    const streak = getCurrentStreak(studentId);
+    setCurrentStreakDays(streak);
 
-    // Calculate days to next medal - NEW LOGIC
-    const effectiveStreak = streak > 21 ? streak % 21 : streak;
-    const nextMilestones = [
-      { days: 3, medal: '🔥 רצף' },
-      { days: 6, medal: '⚡ מרוצף' },
-      { days: 14, medal: '💎 רצף נהדר' },
-      { days: 21, medal: '👑 רצף ראוי לציון' },
-    ];
+    // Get current medal info
+    const level = getStreakMedalLevel(streak);
+    if (level) {
+      setCurrentMedalInfo(getStreakMedalInfo(level));
+    } else {
+      setCurrentMedalInfo(null);
+    }
 
-    const nextMilestone = nextMilestones.find(m => m.days > effectiveStreak);
-    if (nextMilestone) {
+    // Calculate days to next medal using new thresholds (4/7/13/21)
+    const nextInfo = getNextStreakMedalInfo(streak);
+    if (nextInfo) {
       setDaysToNextMedal({
-        days: nextMilestone.days - streak,
-        medal: nextMilestone.medal,
+        days: nextInfo.remaining,
+        medal: nextInfo.nextMedal,
       });
     } else {
       setDaysToNextMedal(null);
     }
   }, [studentId]);
 
-  if (currentStreak === 0 && !daysToNextMedal) {
+  if (currentStreakDays === 0 && !daysToNextMedal) {
     return null;
   }
 
@@ -54,8 +56,15 @@ const StreakProgress = ({ studentId }: StreakProgressProps) => {
             <div className="text-sm text-muted-foreground mb-2">הרצף הנוכחי שלך</div>
             <div className="text-4xl font-bold text-orange-600 flex items-center justify-center gap-2">
               <Flame className="h-8 w-8" />
-              {currentStreak} ימים
+              {currentStreakDays} ימים
             </div>
+            {currentMedalInfo && (
+              <div className="mt-2">
+                <Badge variant="secondary" className="text-sm">
+                  {currentMedalInfo.icon} {currentMedalInfo.name}
+                </Badge>
+              </div>
+            )}
           </div>
 
           {daysToNextMedal && (

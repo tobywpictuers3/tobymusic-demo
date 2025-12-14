@@ -1410,11 +1410,11 @@ export const purchaseStoreItem = async (
     const { minStreakDays, minMinutesInLastNDays, windowDays = 7 } = item.requirements;
     
     if (minStreakDays && minStreakDays > 0) {
-      // Import dynamically to avoid circular dependency
-      const { recalcAllForStudent } = await import('./practiceEngine');
-      const stats = recalcAllForStudent(studentId);
-      if (stats.streak < minStreakDays) {
-        return { ok: false, reason: `נדרש רצף של ${minStreakDays} ימים (יש לך ${stats.streak})` };
+      // Use medalEngine for streak calculation (derived, not stored)
+      const { getCurrentStreak } = await import('./medalEngine');
+      const streak = getCurrentStreak(studentId);
+      if (streak < minStreakDays) {
+        return { ok: false, reason: `נדרש רצף של ${minStreakDays} ימים (יש לך ${streak})` };
       }
     }
     
