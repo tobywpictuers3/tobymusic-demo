@@ -59,7 +59,8 @@ interface CommitDeltaResponse {
   newVersion?: string;
   error?: string;
   currentVersion?: string;
-  record?: Record<string, any>;
+  data?: Record<string, any>;   // client-friendly
+  record?: Record<string, any>; // keep existing
 }
 
 // ============================================================================
@@ -77,7 +78,11 @@ const DB_REGISTRY: Record<EntityType, EntityDefinition> = {
       { entity: 'practiceSessions', foreignKey: 'studentId' },
       { entity: 'monthlyAchievements', foreignKey: 'studentId' },
       { entity: 'medalRecords', foreignKey: 'studentId' },
-      { entity: 'swapRequests', foreignKey: 'studentId' },
+      // swapRequests: delete if student is requester OR target (new + legacy shapes)
+      { entity: 'swapRequests', foreignKey: 'requesterStudentId' },
+      { entity: 'swapRequests', foreignKey: 'targetStudentId' },
+      { entity: 'swapRequests', foreignKey: 'requesterId' },
+      { entity: 'swapRequests', foreignKey: 'targetId' },
     ],
   },
   lessons: {
@@ -644,7 +649,8 @@ async function handleCommitDelta(
 
   // For create actions, include the created record with server-generated ID
   if (delta.action === 'create' && result.record) {
-    response.record = result.record;
+    response.data = result.record;   // client-friendly
+    response.record = result.record; // keep existing
   }
 
   // For cascade deletes, include counts
