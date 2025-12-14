@@ -2,6 +2,7 @@ import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, Int
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 import { isDevMode, setDevMode } from './devMode';
+import { commitChange } from './commitGateway';
 import { calculateEarnedCopper, formatPriceCompact } from './storeCurrency';
 
 // In-Memory Storage - No localStorage for sensitive data
@@ -292,26 +293,41 @@ export const deleteLessonCascade = async (lessonId: string): Promise<boolean> =>
   const lesson = lessons.find(l => l.id === lessonId);
   if (!lesson) return false;
 
-  const { studentId, date, startTime } = lesson;
-
-  await persistCascadeChanges(store => {
-    // 1. Delete the lesson itself
-    store['lessons'] = (store['lessons'] || []).filter((l: any) => l.id !== lessonId);
-
-    // 2. Delete related swap requests
-    store['swapRequests'] = (store['swapRequests'] || []).filter((r: any) => {
+  // Dev mode: use legacy path
+  if (isDevMode()) {
+    const { studentId, date, startTime } = lesson;
+    devData['lessons'] = (devData['lessons'] || []).filter((l: any) => l.id !== lessonId);
+    devData['swapRequests'] = (devData['swapRequests'] || []).filter((r: any) => {
       const byLessonId = r.requesterLessonId === lessonId || r.targetLessonId === lessonId;
       const byLegacyFields =
         (r.requesterId === studentId && r.date === date && r.time === startTime) ||
         (r.targetId === studentId && r.targetDate === date && r.targetTime === startTime);
       return !(byLessonId || byLegacyFields);
     });
+    return true;
+  }
+
+  // Production: use commitGateway (Worker handles cascade)
+  const result = await commitChange({
+    entity: 'lessons',
+    action: 'delete',
+    id: lessonId,
   });
 
-  // Use onDestructiveChange to directly upload without merge
-  await hybridSync.onDestructiveChange();
+  if (result.confirmed) {
+    // Update local memory to reflect Worker state
+    inMemoryStorage['lessons'] = (inMemoryStorage['lessons'] || []).filter((l: any) => l.id !== lessonId);
+    // Note: Worker handles swapRequests cascade - we could refresh from Worker or trust it
+    return true;
+  }
 
-  return true;
+  if (result.queued) {
+    logger.warn('⚠️ deleteLessonCascade: Queued for sync - deletion pending');
+    return false;
+  }
+
+  logger.error(`❌ deleteLessonCascade failed: ${result.error}`);
+  return false;
 };
 
 // Cascade delete student - removes student and all related data
@@ -319,35 +335,66 @@ export const deleteStudentCascade = async (studentId: string): Promise<boolean> 
   const exists = getStudents().some(s => s.id === studentId);
   if (!exists) return false;
 
-  await persistCascadeChanges(store => {
-    store['students'] = (store['students'] || []).filter((s: any) => s.id !== studentId);
-    store['lessons'] = (store['lessons'] || []).filter((l: any) => l.studentId !== studentId);
-    store['payments'] = (store['payments'] || []).filter((p: any) => p.studentId !== studentId);
-    store['files'] = (store['files'] || []).filter((f: any) => f.studentId !== studentId);
-    store['practiceSessions'] = (store['practiceSessions'] || []).filter((s: any) => s.studentId !== studentId);
-    store['monthlyAchievements'] = (store['monthlyAchievements'] || []).filter((a: any) => a.studentId !== studentId);
-    store['medalRecords'] = (store['medalRecords'] || []).filter((m: any) => m.studentId !== studentId);
-
-    // Clean swap requests
-    store['swapRequests'] = (store['swapRequests'] || []).filter((r: any) => {
+  // Dev mode: use legacy path
+  if (isDevMode()) {
+    devData['students'] = (devData['students'] || []).filter((s: any) => s.id !== studentId);
+    devData['lessons'] = (devData['lessons'] || []).filter((l: any) => l.studentId !== studentId);
+    devData['payments'] = (devData['payments'] || []).filter((p: any) => p.studentId !== studentId);
+    devData['files'] = (devData['files'] || []).filter((f: any) => f.studentId !== studentId);
+    devData['practiceSessions'] = (devData['practiceSessions'] || []).filter((s: any) => s.studentId !== studentId);
+    devData['monthlyAchievements'] = (devData['monthlyAchievements'] || []).filter((a: any) => a.studentId !== studentId);
+    devData['medalRecords'] = (devData['medalRecords'] || []).filter((m: any) => m.studentId !== studentId);
+    devData['swapRequests'] = (devData['swapRequests'] || []).filter((r: any) => {
       const oldShape = r.requesterId !== studentId && r.targetId !== studentId;
       const newShape = r.requesterStudentId !== studentId && r.targetStudentId !== studentId;
       return oldShape && newShape;
     });
-
-    // Delete student statistics
-    const stats = store['studentStats'] || {};
+    const stats = devData['studentStats'] || {};
     if (stats[studentId]) {
       const updated = { ...stats };
       delete updated[studentId];
-      store['studentStats'] = updated;
+      devData['studentStats'] = updated;
     }
+    return true;
+  }
+
+  // Production: use commitGateway (Worker handles cascade)
+  const result = await commitChange({
+    entity: 'students',
+    action: 'delete',
+    id: studentId,
   });
 
-  // Use onDestructiveChange to directly upload without merge
-  await hybridSync.onDestructiveChange();
+  if (result.confirmed) {
+    // Update local memory to reflect Worker state
+    inMemoryStorage['students'] = (inMemoryStorage['students'] || []).filter((s: any) => s.id !== studentId);
+    inMemoryStorage['lessons'] = (inMemoryStorage['lessons'] || []).filter((l: any) => l.studentId !== studentId);
+    inMemoryStorage['payments'] = (inMemoryStorage['payments'] || []).filter((p: any) => p.studentId !== studentId);
+    inMemoryStorage['files'] = (inMemoryStorage['files'] || []).filter((f: any) => f.studentId !== studentId);
+    inMemoryStorage['practiceSessions'] = (inMemoryStorage['practiceSessions'] || []).filter((s: any) => s.studentId !== studentId);
+    inMemoryStorage['monthlyAchievements'] = (inMemoryStorage['monthlyAchievements'] || []).filter((a: any) => a.studentId !== studentId);
+    inMemoryStorage['medalRecords'] = (inMemoryStorage['medalRecords'] || []).filter((m: any) => m.studentId !== studentId);
+    inMemoryStorage['swapRequests'] = (inMemoryStorage['swapRequests'] || []).filter((r: any) => {
+      const oldShape = r.requesterId !== studentId && r.targetId !== studentId;
+      const newShape = r.requesterStudentId !== studentId && r.targetStudentId !== studentId;
+      return oldShape && newShape;
+    });
+    const stats = inMemoryStorage['studentStats'] || {};
+    if (stats[studentId]) {
+      const updated = { ...stats };
+      delete updated[studentId];
+      inMemoryStorage['studentStats'] = updated;
+    }
+    return true;
+  }
 
-  return true;
+  if (result.queued) {
+    logger.warn('⚠️ deleteStudentCascade: Queued for sync - deletion pending');
+    return false;
+  }
+
+  logger.error(`❌ deleteStudentCascade failed: ${result.error}`);
+  return false;
 };
 
 // Payments
