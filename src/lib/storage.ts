@@ -453,13 +453,32 @@ export const updatePayment = (studentId: string, month: string, updatedFields: P
 
 export const deletePayment = async (id: string): Promise<boolean> => {
   const payments = getPayments();
-  const updatedPayments = payments.filter(payment => payment.id !== id);
-  if (updatedPayments.length === payments.length) {
-    return false; // No payment was deleted
+  if (!payments.some(p => p.id === id)) return false;
+
+  // Dev mode: legacy path
+  if (isDevMode()) {
+    devData['payments'] = payments.filter(p => p.id !== id);
+    return true;
   }
-  inMemoryStorage['payments'] = updatedPayments;
-  await hybridSync.onDestructiveChange();
-  return true;
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'payments',
+    action: 'delete',
+    id,
+  });
+
+  if (result.confirmed) {
+    inMemoryStorage['payments'] = payments.filter(p => p.id !== id);
+    return true;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ deletePayment: Queued for sync - deletion pending');
+  } else {
+    logger.error(`❌ deletePayment failed: ${result.error}`);
+  }
+  return false;
 };
 
 // Swap Requests
@@ -614,17 +633,32 @@ export const updateFile = (id: string, updatedFields: Partial<FileEntry>): FileE
 
 export const deleteFile = async (id: string): Promise<boolean> => {
   const files = getFiles();
-  const updatedFiles = files.filter(file => file.id !== id);
-  if (updatedFiles.length === files.length) {
-    return false; // No file was deleted
-  }
+  if (!files.some(f => f.id === id)) return false;
+
+  // Dev mode: legacy path
   if (isDevMode()) {
-    devData['files'] = updatedFiles;
-  } else {
-    inMemoryStorage['files'] = updatedFiles;
-    await hybridSync.onDestructiveChange();
+    devData['files'] = files.filter(f => f.id !== id);
+    return true;
   }
-  return true;
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'files',
+    action: 'delete',
+    id,
+  });
+
+  if (result.confirmed) {
+    inMemoryStorage['files'] = files.filter(f => f.id !== id);
+    return true;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ deleteFile: Queued for sync - deletion pending');
+  } else {
+    logger.error(`❌ deleteFile failed: ${result.error}`);
+  }
+  return false;
 };
 
 // Schedule Templates
@@ -716,17 +750,32 @@ export const updateScheduleTemplate = (id: string, updatedFields: Partial<Schedu
 
 export const deleteScheduleTemplate = async (id: string): Promise<boolean> => {
   const templates = getScheduleTemplates();
-  const updatedTemplates = templates.filter(template => template.id !== id);
-  if (updatedTemplates.length === templates.length) {
-    return false; // No template was deleted
-  }
+  if (!templates.some(t => t.id === id)) return false;
+
+  // Dev mode: legacy path
   if (isDevMode()) {
-    devData['scheduleTemplates'] = updatedTemplates;
-  } else {
-    inMemoryStorage['scheduleTemplates'] = updatedTemplates;
-    await hybridSync.onDestructiveChange();
+    devData['scheduleTemplates'] = templates.filter(t => t.id !== id);
+    return true;
   }
-  return true;
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'scheduleTemplates',
+    action: 'delete',
+    id,
+  });
+
+  if (result.confirmed) {
+    inMemoryStorage['scheduleTemplates'] = templates.filter(t => t.id !== id);
+    return true;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ deleteScheduleTemplate: Queued for sync - deletion pending');
+  } else {
+    logger.error(`❌ deleteScheduleTemplate failed: ${result.error}`);
+  }
+  return false;
 };
 
 export const syncStudentWithTemplate = (studentId: string, dayOfWeek: number, timeSlot: string, add: boolean): void => {
@@ -857,17 +906,32 @@ export const updatePerformance = (id: string, updatedFields: Partial<Performance
 
 export const deletePerformance = async (id: string): Promise<boolean> => {
   const performances = getPerformances();
-  const updatedPerformances = performances.filter(perf => perf.id !== id);
-  if (updatedPerformances.length === performances.length) {
-    return false;
-  }
+  if (!performances.some(p => p.id === id)) return false;
+
+  // Dev mode: legacy path
   if (isDevMode()) {
-    devData['performances'] = updatedPerformances;
-  } else {
-    inMemoryStorage['performances'] = updatedPerformances;
-    await hybridSync.onDestructiveChange();
+    devData['performances'] = performances.filter(p => p.id !== id);
+    return true;
   }
-  return true;
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'performances',
+    action: 'delete',
+    id,
+  });
+
+  if (result.confirmed) {
+    inMemoryStorage['performances'] = performances.filter(p => p.id !== id);
+    return true;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ deletePerformance: Queued for sync - deletion pending');
+  } else {
+    logger.error(`❌ deletePerformance failed: ${result.error}`);
+  }
+  return false;
 };
 
 // One Time Payments
@@ -911,19 +975,35 @@ export const addHoliday = (date: string, description?: string): Holiday => {
   return newHoliday;
 };
 
-export const deleteHoliday = async (date: string): Promise<boolean> => {
+export const deleteHoliday = async (id: string): Promise<boolean> => {
   const holidays = getHolidays();
-  const updatedHolidays = holidays.filter(h => h.date !== date);
-  if (updatedHolidays.length === holidays.length) {
-    return false;
-  }
+  const holiday = holidays.find(h => h.date === id || h.id === id);
+  if (!holiday) return false;
+
+  // Dev mode: legacy path
   if (isDevMode()) {
-    devData['holidays'] = updatedHolidays;
-  } else {
-    inMemoryStorage['holidays'] = updatedHolidays;
-    await hybridSync.onDestructiveChange();
+    devData['holidays'] = holidays.filter(h => h.id !== holiday.id);
+    return true;
   }
-  return true;
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'holidays',
+    action: 'delete',
+    id: holiday.id,
+  });
+
+  if (result.confirmed) {
+    inMemoryStorage['holidays'] = holidays.filter(h => h.id !== holiday.id);
+    return true;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ deleteHoliday: Queued for sync - deletion pending');
+  } else {
+    logger.error(`❌ deleteHoliday failed: ${result.error}`);
+  }
+  return false;
 };
 
 export const isHoliday = (date: string): boolean => {
@@ -984,17 +1064,32 @@ export const updatePracticeSession = (id: string, updatedFields: Partial<Practic
 
 export const deletePracticeSession = async (id: string): Promise<boolean> => {
   const sessions = getPracticeSessions();
-  const updatedSessions = sessions.filter(s => s.id !== id);
-  if (updatedSessions.length === sessions.length) {
-    return false;
-  }
+  if (!sessions.some(s => s.id === id)) return false;
+
+  // Dev mode: legacy path
   if (isDevMode()) {
-    devData['practiceSessions'] = updatedSessions;
-  } else {
-    inMemoryStorage['practiceSessions'] = updatedSessions;
-    await hybridSync.onDestructiveChange();
+    devData['practiceSessions'] = sessions.filter(s => s.id !== id);
+    return true;
   }
-  return true;
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'practiceSessions',
+    action: 'delete',
+    id,
+  });
+
+  if (result.confirmed) {
+    inMemoryStorage['practiceSessions'] = sessions.filter(s => s.id !== id);
+    return true;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ deletePracticeSession: Queued for sync - deletion pending');
+  } else {
+    logger.error(`❌ deletePracticeSession failed: ${result.error}`);
+  }
+  return false;
 };
 
 // Monthly Achievements
@@ -1349,16 +1444,32 @@ export const upsertStoreItem = (item: Partial<StoreItem> & { name: string; price
 
 export const deleteStoreItem = async (id: string): Promise<boolean> => {
   const items = getStoreItems();
-  const updatedItems = items.filter(i => i.id !== id);
-  if (updatedItems.length === items.length) return false;
-  
+  if (!items.some(i => i.id === id)) return false;
+
+  // Dev mode: legacy path
   if (isDevMode()) {
-    devData['storeItems'] = updatedItems;
-  } else {
-    inMemoryStorage['storeItems'] = updatedItems;
-    await hybridSync.onDestructiveChange();
+    devData['storeItems'] = items.filter(i => i.id !== id);
+    return true;
   }
-  return true;
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'storeItems',
+    action: 'delete',
+    id,
+  });
+
+  if (result.confirmed) {
+    inMemoryStorage['storeItems'] = items.filter(i => i.id !== id);
+    return true;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ deleteStoreItem: Queued for sync - deletion pending');
+  } else {
+    logger.error(`❌ deleteStoreItem failed: ${result.error}`);
+  }
+  return false;
 };
 
 // Store Purchases
