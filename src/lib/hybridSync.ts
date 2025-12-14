@@ -2,6 +2,7 @@ import { workerApi } from './workerApi';
 import { logger } from './logger';
 import { exportAllData, initializeStorage, isDevMode } from './storage';
 import { recalculateAllMonthlyAchievements } from './recalculateAchievements';
+import { setCurrentVersion } from './commitGateway';
 
 /**
  * Hybrid Sync Manager - Worker as source of truth, localStorage as cache
@@ -179,6 +180,18 @@ class HybridSyncManager {
           logger.info('✅ Data loaded from Worker');
           this.updateInMemoryStorage(result.data);
           this.syncState.lastSyncTime = new Date().toISOString();
+          
+          // CRITICAL: Initialize commit gateway version from Worker response
+          if (result.data._version) {
+            setCurrentVersion(result.data._version);
+            logger.info(`📌 Commit Gateway version initialized: ${result.data._version}`);
+          } else {
+            // Worker doesn't have _version yet - generate a temporary one
+            // This will be replaced once Worker-side changes are deployed
+            const tempVersion = `v_${Date.now()}_init`;
+            setCurrentVersion(tempVersion);
+            logger.warn(`⚠️ Worker response missing _version - using temporary: ${tempVersion}`);
+          }
         }
       } else if (result && result.error === 'NO_VERSION_FOUND') {
         logger.info('ℹ️ No version found on Worker - starting fresh (first use)');

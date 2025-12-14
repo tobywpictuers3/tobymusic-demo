@@ -1,10 +1,33 @@
 import { logger } from "@/lib/logger";
 import { isDevMode, getManagerCode } from "@/lib/devMode";
+import type { EntityType } from "@/lib/dbRegistry";
 
 export interface WorkerResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// ============================================================================
+// COMMIT DELTA TYPES
+// ============================================================================
+
+export interface DeltaPayload {
+  entity: EntityType;
+  action: 'create' | 'update' | 'delete';
+  id?: string;
+  payload?: any;
+  baseVersion: string;
+  registryVersion: string;
+}
+
+export interface CommitDeltaResponse {
+  ok: boolean;
+  newVersion?: string;
+  status?: number;
+  error?: string;
+  data?: any;
+  conflictData?: any;
 }
 
 const WORKER_BASE_URL = "https://lovable-dropbox-api.w0504124161.workers.dev";
@@ -376,6 +399,64 @@ export const workerApi = {
     } catch (err) {
       logger.error("gmailModifyLabels error:", err);
       return { success: false, error: (err as Error).message };
+    }
+  },
+
+  /* -----------------------------------------------------------
+     Commit Delta - Worker-First Mutation Endpoint
+     
+     Route: POST ${WORKER_BASE_URL}?action=commit_delta
+     
+     Request: DeltaPayload { entity, action, id?, payload?, baseVersion, registryVersion }
+     
+     Success Response (200): { ok: true, newVersion: string, data?: any }
+     Conflict Response (409): { ok: false, error: "VERSION_CONFLICT", currentVersion: string, current?: any }
+     Error Response (400/500): { ok: false, error: string }
+     ----------------------------------------------------------- */
+  commitDelta: async (delta: DeltaPayload): Promise<CommitDeltaResponse> => {
+    if (isDevMode()) {
+      logger.warn("DEV MODE: commitDelta returning mock success");
+      return { ok: true, newVersion: 'dev-mode-v1', data: delta.payload };
+    }
+
+    try {
+      const response = await fetch(`${WORKER_BASE_URL}?action=commit_delta`, {
+        method: "POST",
+        headers: getJsonHeaders(),
+        body: JSON.stringify(delta),
+        cache: "no-store",
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 409) {
+        logger.warn("commitDelta: Version conflict detected");
+        return { 
+          ok: false, 
+          status: 409, 
+          error: 'VERSION_CONFLICT',
+          conflictData: data.current,
+        };
+      }
+
+      if (!response.ok) {
+        logger.error("commitDelta failed:", data.error || response.statusText);
+        return { 
+          ok: false, 
+          status: response.status,
+          error: data.error || `HTTP ${response.status}`,
+        };
+      }
+
+      logger.info("commitDelta success:", data.newVersion);
+      return { 
+        ok: true, 
+        newVersion: data.newVersion,
+        data: data.data,
+      };
+    } catch (err) {
+      logger.error("commitDelta network error:", err);
+      throw err; // Re-throw to let commitGateway handle as network error
     }
   },
 };
