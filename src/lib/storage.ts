@@ -149,44 +149,87 @@ export const getStudents = (): Student[] => {
   return inMemoryStorage['students'] || [];
 };
 
-export const addStudent = (student: Omit<Student, 'id'>): Student => {
-  const students = getStudents();
-  const newStudent: Student = {
+export const addStudent = async (student: Omit<Student, 'id'>): Promise<Student | null> => {
+  const now = new Date().toISOString();
+  const payload = {
     ...student,
-    id: generateId(),
-    lastModified: new Date().toISOString(),
+    lastModified: now,
   };
-  students.push(newStudent);
+
+  // Dev mode: legacy path
   if (isDevMode()) {
+    const newStudent: Student = {
+      ...payload,
+      id: generateId(),
+    };
+    const students = getStudents();
+    students.push(newStudent);
     devData['students'] = students;
-  } else {
-    inMemoryStorage['students'] = students;
-    hybridSync.onDataChange();
+    return newStudent;
   }
-  return newStudent;
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'students',
+    action: 'create',
+    payload,
+  });
+
+  if (result.confirmed && result.data) {
+    const newStudent: Student = result.data;
+    const students = getStudents();
+    students.push(newStudent);
+    inMemoryStorage['students'] = students;
+    return newStudent;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ addStudent: Queued for sync - creation pending');
+  } else {
+    logger.error(`❌ addStudent failed: ${result.error}`);
+  }
+  return null;
 };
 
-export const updateStudent = (id: string, updatedFields: Partial<Student>): Student | undefined => {
+export const updateStudent = async (id: string, updatedFields: Partial<Student>): Promise<Student | undefined> => {
   const students = getStudents();
   const studentIndex = students.findIndex(student => student.id === id);
+  if (studentIndex === -1) return undefined;
 
-  if (studentIndex === -1) {
-    return undefined; // Student not found
-  }
-
-  // Update the student with the provided fields
-  students[studentIndex] = { 
-    ...students[studentIndex], 
+  const now = new Date().toISOString();
+  const updatedStudent: Student = {
+    ...students[studentIndex],
     ...updatedFields,
-    lastModified: new Date().toISOString()
+    lastModified: now,
   };
+
+  // Dev mode: legacy path
   if (isDevMode()) {
+    students[studentIndex] = updatedStudent;
     devData['students'] = students;
-  } else {
-    inMemoryStorage['students'] = students;
-    hybridSync.onDataChange();
+    return updatedStudent;
   }
-  return students[studentIndex];
+
+  // Production: use commitGateway
+  const result = await commitChange({
+    entity: 'students',
+    action: 'update',
+    id,
+    payload: updatedStudent,
+  });
+
+  if (result.confirmed) {
+    students[studentIndex] = updatedStudent;
+    inMemoryStorage['students'] = students;
+    return updatedStudent;
+  }
+
+  if (result.queued) {
+    logger.warn('⚠️ updateStudent: Queued for sync - update pending');
+  } else {
+    logger.error(`❌ updateStudent failed: ${result.error}`);
+  }
+  return undefined;
 };
 
 export const deleteStudent = (id: string): boolean => {
