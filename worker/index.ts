@@ -470,12 +470,9 @@ async function handleDownloadLatest(env: Env): Promise<Response> {
   const data = await dropboxDownload(env, DATA_PATH);
 
   if (!data) {
-    // No data exists yet - return empty structure with INITIAL_VERSION
+    // No data exists yet - return raw data object with INITIAL_VERSION
     // HARD RULE: Never persist, never generate new version
-    return new Response(JSON.stringify({
-      success: true,
-      data: { _version: INITIAL_VERSION },
-    }), {
+    return new Response(JSON.stringify({ _version: INITIAL_VERSION }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -486,10 +483,8 @@ async function handleDownloadLatest(env: Env): Promise<Response> {
     data._version = INITIAL_VERSION;
   }
 
-  return new Response(JSON.stringify({
-    success: true,
-    data,
-  }), {
+  // Return raw data object as response root (NOT wrapped)
+  return new Response(JSON.stringify(data), {
     headers: { 'Content-Type': 'application/json' },
   });
 }
