@@ -1343,7 +1343,56 @@ export const getStudentPurchases = (studentId: string): StorePurchase[] => {
   return getStorePurchases().filter(p => p.studentId === studentId);
 };
 
-// Credits Management
+// ============= USED COPPER TRACKING =============
+
+/**
+ * Get total copper spent by a student (for medal-based purchases)
+ */
+export const getStudentUsedCopper = (studentId: string): number => {
+  if (isDevMode()) {
+    const usedCopper = devData['usedCopper'] || {};
+    return usedCopper[studentId] || 0;
+  }
+  const usedCopper = inMemoryStorage['usedCopper'] || {};
+  return usedCopper[studentId] || 0;
+};
+
+/**
+ * Set total used copper for a student
+ */
+export const setStudentUsedCopper = (studentId: string, value: number): void => {
+  if (isDevMode()) {
+    if (!devData['usedCopper']) devData['usedCopper'] = {};
+    devData['usedCopper'][studentId] = Math.max(0, value);
+  } else {
+    if (!inMemoryStorage['usedCopper']) inMemoryStorage['usedCopper'] = {};
+    inMemoryStorage['usedCopper'][studentId] = Math.max(0, value);
+  }
+};
+
+/**
+ * Add to student's used copper
+ */
+export const addStudentUsedCopper = (studentId: string, amount: number): number => {
+  const current = getStudentUsedCopper(studentId);
+  const newValue = current + amount;
+  setStudentUsedCopper(studentId, newValue);
+  return newValue;
+};
+
+/**
+ * Calculate available copper for a student
+ * availableCopper = earnedCopperTotal - usedCopperTotal
+ */
+export const getAvailableCopper = (studentId: string): number => {
+  // Dynamic import to avoid circular dependency
+  const { calculateEarnedCopper } = require('./storeCurrency');
+  const earned = calculateEarnedCopper(studentId);
+  const used = getStudentUsedCopper(studentId);
+  return Math.max(0, earned - used);
+};
+
+// Legacy Credits Management (kept for backward compatibility)
 export const getStudentCredits = (studentId: string): number => {
   const students = getStudents();
   const student = students.find(s => s.id === studentId);
@@ -1377,38 +1426,54 @@ export const addStudentCredits = (studentId: string, delta: number): number => {
   return newValue;
 };
 
-// Purchase Store Item
+// ============= ATOMIC PURCHASE STORE ITEM =============
+
+/**
+ * Atomic purchase of a store item using copper-based currency
+ * 
+ * Flow: validate stock & active -> compute availableCopper -> 
+ *       write purchase -> increment usedCopperTotal -> decrement stock -> single sync
+ */
 export const purchaseStoreItem = async (
   studentId: string, 
   itemId: string, 
   sessions: any[]
-): Promise<{ ok: boolean; reason?: string }> => {
+): Promise<{ ok: boolean; reason?: string; copperSpent?: number }> => {
   const items = getStoreItems();
   const item = items.find(i => i.id === itemId);
   
+  // 1. Validate item exists
   if (!item) {
     return { ok: false, reason: 'המוצר לא נמצא' };
   }
   
+  // 2. Validate item is active
   if (!item.isActive) {
     return { ok: false, reason: 'המוצר אינו זמין כרגע' };
   }
   
+  // 3. Validate stock
   if (item.stock <= 0) {
     return { ok: false, reason: 'המוצר אזל מהמלאי' };
   }
   
-  const credits = getStudentCredits(studentId);
-  if (credits < item.priceCredits) {
-    return { ok: false, reason: `אין מספיק קרדיטים (יש לך ${credits}, צריך ${item.priceCredits})` };
+  // 4. Compute available copper (priceCredits = copper equivalent)
+  const availableCopper = getAvailableCopper(studentId);
+  const priceCopper = item.priceCredits;
+  
+  if (availableCopper < priceCopper) {
+    const { formatPriceCompact } = require('./storeCurrency');
+    return { 
+      ok: false, 
+      reason: `אין מספיק מדליות (יש לך ${formatPriceCompact(availableCopper)}, צריך ${formatPriceCompact(priceCopper)})` 
+    };
   }
   
-  // Check requirements
+  // 5. Check additional requirements (streak, practice minutes)
   if (item.requirements) {
     const { minStreakDays, minMinutesInLastNDays, windowDays = 7 } = item.requirements;
     
     if (minStreakDays && minStreakDays > 0) {
-      // Use medalEngine for streak calculation (derived, not stored)
       const { getCurrentStreak } = await import('./medalEngine');
       const streak = getCurrentStreak(studentId);
       if (streak < minStreakDays) {
@@ -1434,32 +1499,46 @@ export const purchaseStoreItem = async (
     }
   }
   
-  // All checks passed - perform purchase
-  // 1. Reduce stock
-  const itemIndex = items.findIndex(i => i.id === itemId);
-  items[itemIndex] = { ...items[itemIndex], stock: items[itemIndex].stock - 1, lastModified: new Date().toISOString() };
+  // ===== ALL CHECKS PASSED - ATOMIC PURCHASE =====
+  const now = new Date().toISOString();
   
-  if (isDevMode()) {
-    devData['storeItems'] = items;
-  } else {
-    inMemoryStorage['storeItems'] = items;
-  }
-  
-  // 2. Reduce credits
-  addStudentCredits(studentId, -item.priceCredits);
-  
-  // 3. Create purchase record
-  addStorePurchase({
+  // 6. Create purchase record
+  const purchases = getStorePurchases();
+  const newPurchase: StorePurchase = {
+    id: generateId(),
     studentId,
     itemId,
-    purchasedAt: new Date().toISOString(),
-    priceCreditsAtPurchase: item.priceCredits
-  });
+    purchasedAt: now,
+    priceCreditsAtPurchase: priceCopper,
+    lastModified: now
+  };
+  purchases.push(newPurchase);
   
-  // 4. Sync
-  if (!isDevMode()) {
+  // 7. Increment usedCopper
+  const newUsedCopper = getStudentUsedCopper(studentId) + priceCopper;
+  
+  // 8. Decrement stock
+  const itemIndex = items.findIndex(i => i.id === itemId);
+  items[itemIndex] = { 
+    ...items[itemIndex], 
+    stock: items[itemIndex].stock - 1, 
+    lastModified: now 
+  };
+  
+  // 9. Persist all changes atomically (single sync)
+  if (isDevMode()) {
+    devData['storePurchases'] = purchases;
+    devData['storeItems'] = items;
+    if (!devData['usedCopper']) devData['usedCopper'] = {};
+    devData['usedCopper'][studentId] = newUsedCopper;
+  } else {
+    inMemoryStorage['storePurchases'] = purchases;
+    inMemoryStorage['storeItems'] = items;
+    if (!inMemoryStorage['usedCopper']) inMemoryStorage['usedCopper'] = {};
+    inMemoryStorage['usedCopper'][studentId] = newUsedCopper;
+    // Single sync call for all changes
     hybridSync.onDataChange();
   }
   
-  return { ok: true };
+  return { ok: true, copperSpent: priceCopper };
 };

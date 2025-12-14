@@ -3,16 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/safe-ui/c
 import { Button } from '@/components/safe-ui/button';
 import { Badge } from '@/components/safe-ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/safe-ui/select';
-import { ShoppingBag, Coins, Check, Info, Filter } from 'lucide-react';
+import { ShoppingBag, Check, Info, Filter } from 'lucide-react';
 import { 
   getStoreItems, 
-  getStudentCredits, 
   getStudentPurchases, 
   getStudentPracticeSessions,
+  getAvailableCopper,
   purchaseStoreItem 
 } from '@/lib/storage';
 import { StoreItem, StorePurchase, PracticeSession } from '@/lib/types';
 import { isStoreItemAvailableForStudent, buildRequirementExplanation } from '@/lib/storeLogic';
+import { 
+  getStudentMedalWallet, 
+  formatPrice, 
+  formatPriceCompact,
+  MEDAL_ICONS 
+} from '@/lib/storeCurrency';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -41,7 +47,8 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
   const [items, setItems] = useState<StoreItem[]>([]);
   const [purchases, setPurchases] = useState<StorePurchase[]>([]);
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
-  const [credits, setCredits] = useState(0);
+  const [availableCopper, setAvailableCopper] = useState(0);
+  const [wallet, setWallet] = useState({ bronze: 0, silver: 0, gold: 0, platinum: 0 });
   const [sortOption, setSortOption] = useState<SortOption>('default');
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
@@ -56,7 +63,8 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
     setItems(getStoreItems().filter(i => i.isActive));
     setPurchases(getStudentPurchases(studentId));
     setSessions(getStudentPracticeSessions(studentId));
-    setCredits(getStudentCredits(studentId));
+    setAvailableCopper(getAvailableCopper(studentId));
+    setWallet(getStudentMedalWallet(studentId));
   };
 
   const isPurchased = (itemId: string) => {
@@ -64,7 +72,7 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
   };
 
   const getAvailability = (item: StoreItem) => {
-    return isStoreItemAvailableForStudent(studentId, item, sessions, credits);
+    return isStoreItemAvailableForStudent(studentId, item, sessions);
   };
 
   const getSortedItems = () => {
@@ -167,14 +175,42 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Credits Display */}
-      <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border-2 border-yellow-400/50">
+      {/* Medal Wallet Display */}
+      <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border-2 border-amber-400/50">
         <CardContent className="pt-6">
-          <div className="text-center">
-            <div className="text-sm text-muted-foreground mb-2">הקרדיטים שלי</div>
-            <div className="text-5xl font-bold text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-3">
-              <Coins className="h-12 w-12" />
-              <span>{credits}</span>
+          <div className="text-center space-y-4">
+            <div className="text-sm text-muted-foreground">המדליות שלי</div>
+            
+            {/* Medal Counts */}
+            <div className="flex justify-center gap-6 text-2xl">
+              <div className="flex flex-col items-center">
+                <span className="text-3xl">{MEDAL_ICONS.platinum}</span>
+                <span className="font-bold">{wallet.platinum}</span>
+                <span className="text-xs text-muted-foreground">פלטינום</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-3xl">{MEDAL_ICONS.gold}</span>
+                <span className="font-bold">{wallet.gold}</span>
+                <span className="text-xs text-muted-foreground">זהב</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-3xl">{MEDAL_ICONS.silver}</span>
+                <span className="font-bold">{wallet.silver}</span>
+                <span className="text-xs text-muted-foreground">כסף</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-3xl">{MEDAL_ICONS.bronze}</span>
+                <span className="font-bold">{wallet.bronze}</span>
+                <span className="text-xs text-muted-foreground">נחושת</span>
+              </div>
+            </div>
+            
+            {/* Available Balance */}
+            <div className="pt-2 border-t border-amber-300/50">
+              <div className="text-sm text-muted-foreground">יתרה לקניות</div>
+              <div className="text-xl font-bold text-amber-700 dark:text-amber-400">
+                {formatPriceCompact(availableCopper)}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -208,7 +244,7 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
             <div className="text-center text-muted-foreground py-12">
               <ShoppingBag className="h-16 w-16 mx-auto mb-4 opacity-30" />
               <p>החנות תתעדכן בקרוב!</p>
-              <p className="text-sm">המורה תעלה פריטים שניתן לרכוש בקרדיטים</p>
+              <p className="text-sm">המורה תעלה פריטים שניתן לרכוש במדליות</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -259,9 +295,8 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
                       )}
                       
                       <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="gap-1">
-                          <Coins className="h-3 w-3" />
-                          {item.priceCredits} קרדיטים
+                        <Badge variant="secondary" className="gap-1 text-sm">
+                          {formatPriceCompact(item.priceCredits)}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           מלאי: {item.stock}
@@ -309,15 +344,33 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>אישור רכישה</AlertDialogTitle>
-            <AlertDialogDescription>
-              {selectedItem && (
-                <>
-                  את עומדת לרכוש את <strong>"{selectedItem.name}"</strong> תמורת{' '}
-                  <strong>{selectedItem.priceCredits} קרדיטים</strong>.
-                  <br /><br />
-                  לאחר הרכישה יישארו לך {credits - selectedItem.priceCredits} קרדיטים.
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                {selectedItem && (
+                  <div className="space-y-3">
+                    <p>
+                      את עומדת לרכוש את <strong>"{selectedItem.name}"</strong>
+                    </p>
+                    
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                      <div className="flex justify-between">
+                        <span>מחיר:</span>
+                        <span className="font-bold">{formatPrice(selectedItem.priceCredits)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>יתרה נוכחית:</span>
+                        <span>{formatPriceCompact(availableCopper)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span>יתרה לאחר רכישה:</span>
+                        <span className="font-bold text-amber-600">
+                          {formatPriceCompact(availableCopper - selectedItem.priceCredits)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -342,7 +395,7 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
               )}
               
               <div className="space-y-2 bg-muted/30 rounded-lg p-4">
-                {buildRequirementExplanation(studentId, infoItem, sessions, credits).details.map((detail, idx) => (
+                {buildRequirementExplanation(studentId, infoItem, sessions).details.map((detail, idx) => (
                   <div key={idx} className="text-sm">{detail}</div>
                 ))}
               </div>

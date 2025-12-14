@@ -1,6 +1,6 @@
-import { StoreItem, PracticeSession, Student } from './types';
-import { getStudentStatistics } from './storage';
-import { recalcAllForStudent } from './practiceEngine';
+import { StoreItem, PracticeSession } from './types';
+import { getAvailableCopper } from './storage';
+import { formatPriceCompact } from './storeCurrency';
 
 export interface AvailabilityCheck {
   available: boolean;
@@ -33,22 +33,22 @@ export const getMinutesInLastNDays = (
 };
 
 /**
- * Get current streak for a student
+ * Get current streak for a student (from medalEngine)
  */
 export const getCurrentStreak = (studentId: string): number => {
-  // Use medalEngine for streak calculation (derived, not stored)
   const { getCurrentStreak: getStreak } = require('./medalEngine');
   return getStreak(studentId);
 };
 
 /**
  * Check if a store item is available for purchase by a student
+ * Uses copper-based currency system (priceCredits = copper equivalent)
  */
 export const isStoreItemAvailableForStudent = (
   studentId: string,
   item: StoreItem,
   sessions: PracticeSession[],
-  credits: number
+  _credits?: number // Legacy param, ignored - we use availableCopper
 ): AvailabilityCheck => {
   // Check if item is active
   if (!item.isActive) {
@@ -60,11 +60,15 @@ export const isStoreItemAvailableForStudent = (
     return { available: false, reason: 'המוצר אזל מהמלאי' };
   }
 
-  // Check credits
-  if (credits < item.priceCredits) {
+  // Check copper balance (priceCredits = copper equivalent)
+  const availableCopper = getAvailableCopper(studentId);
+  const priceCopper = item.priceCredits;
+  
+  if (availableCopper < priceCopper) {
+    const missing = priceCopper - availableCopper;
     return { 
       available: false, 
-      reason: `חסרים ${item.priceCredits - credits} קרדיטים` 
+      reason: `חסרות ${formatPriceCompact(missing)} מדליות` 
     };
   }
 
@@ -100,22 +104,27 @@ export const isStoreItemAvailableForStudent = (
 
 /**
  * Build a detailed explanation of item requirements and student's status
+ * Uses copper-based currency system
  */
 export const buildRequirementExplanation = (
   studentId: string,
   item: StoreItem,
   sessions: PracticeSession[],
-  credits: number
+  _credits?: number // Legacy param, ignored
 ): RequirementExplanation => {
   const details: string[] = [];
   let meetsAllRequirements = true;
 
-  // Price check
-  details.push(`💰 מחיר: ${item.priceCredits} קרדיטים`);
-  if (credits >= item.priceCredits) {
-    details.push(`✅ יש לך ${credits} קרדיטים - מספיק!`);
+  // Get available copper
+  const availableCopper = getAvailableCopper(studentId);
+  const priceCopper = item.priceCredits;
+
+  // Price check with medal display
+  details.push(`💰 מחיר: ${formatPriceCompact(priceCopper)}`);
+  if (availableCopper >= priceCopper) {
+    details.push(`✅ יש לך ${formatPriceCompact(availableCopper)} - מספיק!`);
   } else {
-    details.push(`❌ יש לך ${credits} קרדיטים - חסרים ${item.priceCredits - credits}`);
+    details.push(`❌ יש לך ${formatPriceCompact(availableCopper)} - חסרות ${formatPriceCompact(priceCopper - availableCopper)}`);
     meetsAllRequirements = false;
   }
 
