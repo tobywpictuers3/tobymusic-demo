@@ -32,6 +32,9 @@ export interface CommitDeltaResponse {
 
 const WORKER_BASE_URL = "https://lovable-dropbox-api.w0504124161.workers.dev";
 
+// Fixed manager code for commit_delta auth
+const MANAGER_CODE = "1234";
+
 /* ===========================================================
    HEADERS HELPERS — VERY IMPORTANT !
    =========================================================== */
@@ -40,6 +43,11 @@ const getJsonHeaders = () => ({
   "Content-Type": "application/json",
   "Cache-Control": "no-store",
   "X-Sonata-Manager-Code": getManagerCode(),
+});
+
+const getCommitDeltaHeaders = () => ({
+  "Content-Type": "application/json",
+  "X-Sonata-Manager-Code": MANAGER_CODE,
 });
 
 // NOTICE:
@@ -422,7 +430,7 @@ export const workerApi = {
     try {
       const response = await fetch(`${WORKER_BASE_URL}?action=commit_delta`, {
         method: "POST",
-        headers: getJsonHeaders(),
+        headers: getCommitDeltaHeaders(),
         body: JSON.stringify(delta),
         cache: "no-store",
       });
