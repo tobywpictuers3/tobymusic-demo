@@ -13,10 +13,9 @@ const PracticeLeaderboard = ({ currentStudentId }: Props) => {
   const [leaderboards, setLeaderboards] = useState<ReturnType<typeof getAllLeaderboards> | null>(null);
   const [personalData, setPersonalData] = useState<StudentLeaderboardData | null>(null);
 
+  // Load on mount and when studentId changes - NO polling (updates via data changes only)
   useEffect(() => {
     loadLeaderboards();
-    const interval = setInterval(loadLeaderboards, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
   }, [currentStudentId]);
 
   const loadLeaderboards = () => {
@@ -102,7 +101,7 @@ const PracticeLeaderboard = ({ currentStudentId }: Props) => {
     },
     {
       key: 'dailyRecord',
-      title: 'דקות אימון יומי – שיא (7 ימים)',
+      title: 'דקות אימון יומי – שיא (168 שעות אחרונות)',
       icon: <Clock className="h-5 w-5 text-yellow-400" />,
       gradient: 'from-yellow-900/30 to-amber-900/30',
       border: 'border-yellow-600/50 hover:border-yellow-400',

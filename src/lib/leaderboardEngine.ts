@@ -462,7 +462,7 @@ export function getAllLeaderboards(): {
     }));
   
   return {
-    dailyRecord: { category: 'דקות אימון יומי – שיא (7 ימים)', entries: dailyRecordEntries },
+    dailyRecord: { category: 'דקות אימון יומי – שיא (168 שעות אחרונות)', entries: dailyRecordEntries },
     weeklyRecord: { category: 'דקות אימון שבועי – שיא', entries: weeklyRecordEntries },
     longestStreak: { category: 'רצף אימונים שנתי', entries: longestStreakEntries },
     bestLessonAverage: { category: 'ממוצע אימונים שבועי – שנתי', entries: bestLessonAverageEntries },

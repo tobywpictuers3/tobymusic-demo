@@ -1217,23 +1217,32 @@ export const deletePracticeSession = async (id: string): Promise<boolean> => {
   return false;
 };
 
-// Monthly Achievements
+// ============= MONTHLY ACHIEVEMENTS - DEPRECATED =============
+// These functions are kept for backward compatibility and backup integrity,
+// but are NOT used in the active leaderboard system.
+// The new leaderboard engine (leaderboardEngine.ts) calculates all achievements in real-time.
+// Do NOT import or use these in active UI components.
+
+/** @deprecated Use leaderboardEngine.ts functions instead */
 export const getMonthlyAchievements = (): MonthlyAchievement[] => {
   if (isDevMode()) return devData['monthlyAchievements'] || [];
   return inMemoryStorage['monthlyAchievements'] || [];
 };
 
+/** @deprecated Use leaderboardEngine.ts functions instead */
 export const getStudentMonthlyAchievements = (studentId: string): MonthlyAchievement[] => {
   const achievements = getMonthlyAchievements();
   return achievements.filter(a => a.studentId === studentId);
 };
 
+/** @deprecated Use leaderboardEngine.ts functions instead */
 export const getCurrentMonthAchievement = (studentId: string): MonthlyAchievement | null => {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const achievements = getMonthlyAchievements();
   return achievements.find(a => a.studentId === studentId && a.month === currentMonth) || null;
 };
 
+/** @deprecated Use leaderboardEngine.ts functions instead */
 export const updateMonthlyAchievement = (
   studentId: string,
   updates: { maxDailyAverage?: number; maxDailyMinutes?: number; maxStreak?: number }
@@ -1276,6 +1285,7 @@ export const updateMonthlyAchievement = (
   }
 };
 
+/** @deprecated Use leaderboardEngine.getAllLeaderboards() instead */
 export const getCurrentMonthLeaderboard = (): LeaderboardEntry[] => {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const achievements = getMonthlyAchievements().filter(a => a.month === currentMonth);
@@ -1298,6 +1308,7 @@ export const getCurrentMonthLeaderboard = (): LeaderboardEntry[] => {
     .sort((a, b) => b.dailyAverage - a.dailyAverage);
 };
 
+/** @deprecated Use leaderboardEngine.getAllLeaderboards() instead */
 export const getCurrentQuarterLeaderboard = (): LeaderboardEntry[] => {
   const now = new Date();
   const month = now.getMonth(); // 0-11

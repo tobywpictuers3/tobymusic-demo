@@ -1,7 +1,17 @@
+/**
+ * @deprecated ENTIRE FILE DEPRECATED
+ * ===================================
+ * This file and all its functions are NO LONGER USED.
+ * The leaderboard system now uses leaderboardEngine.ts for real-time calculations.
+ * Monthly achievements are NOT part of the active leaderboard.
+ * This file is kept for backward compatibility only - DO NOT IMPORT OR USE.
+ */
+
 import { getStudents, getPracticeSessions, getMonthlyAchievements, updateMonthlyAchievement } from './storage';
 import { logger } from './logger';
 
 /**
+ * @deprecated Use leaderboardEngine.ts instead
  * Recalculate monthly achievements for all students based on their practice sessions
  * This should be called after data sync to ensure achievements reflect current data
  */

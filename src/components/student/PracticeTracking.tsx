@@ -13,7 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
 import { CelebrationToast } from './CelebrationToast';
 import PracticeLeaderboard from './PracticeLeaderboard';
-import MonthlyAchievements from './MonthlyAchievements';
+// MonthlyAchievements - DEPRECATED: Component exists but not used in UI (no monthly achievements in system)
 import YearlyAchievements from './YearlyAchievements';
 import StreakProgress from './StreakProgress';
 import { hybridSync } from '@/lib/hybridSync';
@@ -536,7 +536,6 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
 
       {/* Achievements */}
       <YearlyAchievements studentId={studentId} />
-      <MonthlyAchievements studentId={studentId} />
 
       {/* Daily History */}
       <Card>
