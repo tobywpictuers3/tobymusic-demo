@@ -262,3 +262,31 @@ export interface StorePurchase {
   lastModified?: string;
 }
 
+// Academic Year Settings (dynamic, not hardcoded)
+export interface AcademicYearSettings {
+  startDate: string; // YYYY-MM-DD - e.g., "2024-09-01"
+  endDate: string;   // YYYY-MM-DD - e.g., "2025-08-31"
+}
+
+// Leaderboard Entry - Updated for 5 categories
+export interface LeaderboardEntryV2 {
+  studentId: string;
+  studentName: string;
+  // Category 1: Daily Record (Rolling 7×24h)
+  dailyRecordMinutes: number;
+  dailyRecordDate: string;
+  // Category 2: Weekly Record (Academic Year)
+  weeklyRecordMinutes: number;
+  weeklyRecordWeekStart: string;
+  // Category 3: Longest Streak (Academic Year)
+  longestStreakDays: number;
+  longestStreakStart: string;
+  longestStreakEnd: string;
+  // Category 4: Best Lesson Average (Academic Year)
+  bestLessonAverage: number;
+  bestLessonAverageStart: string;
+  bestLessonAverageEnd: string;
+  // Category 5: Medal Score (Academic Year)
+  medalScore: number;
+}
+

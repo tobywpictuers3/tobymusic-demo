@@ -1,4 +1,4 @@
-import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase } from './types';
+import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase, AcademicYearSettings } from './types';
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 import { isDevMode, setDevMode } from './devMode';
@@ -34,7 +34,8 @@ const devData: Record<string, any> = {
   studentStats: {},
   tithePaid: {},
   storeItems: [],
-  storePurchases: []
+  storePurchases: [],
+  academicYearSettings: null
 };
 
 export { isDevMode, setDevMode };
@@ -926,6 +927,21 @@ export const saveIntegrationSettings = (settings: IntegrationSettings): void => 
     hybridSync.onDataChange();
   }
 };
+
+// Academic Year Settings
+export const getAcademicYearSettings = (): { startDate: string; endDate: string } | null => {
+  if (isDevMode()) return devData['academicYearSettings'] || null;
+  return inMemoryStorage['academicYearSettings'] || null;
+};
+
+export const setAcademicYearSettings = (settings: { startDate: string; endDate: string }): void => {
+  if (isDevMode()) {
+    devData['academicYearSettings'] = settings;
+  } else {
+    inMemoryStorage['academicYearSettings'] = settings;
+    hybridSync.onDataChange();
+  }
+}
 
 // User Authentication - Only stored in sessionStorage
 export const setCurrentUser = (user: { type: string; studentId?: string; adminId?: string; adminCode?: string } | null): void => {

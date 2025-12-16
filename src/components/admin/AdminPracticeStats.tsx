@@ -5,13 +5,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/safe-ui/input';
 import { Label } from '@/components/safe-ui/label';
 import { Badge } from '@/components/safe-ui/badge';
+import { Button } from '@/components/safe-ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/safe-ui/tabs';
-import { TrendingUp, Trophy, Flame, Calendar, User, ShoppingBag } from 'lucide-react';
-import { getStudents, getPracticeSessions, getStudentPracticeSessions, getStudentMedalRecords, getStudentStatistics } from '@/lib/storage';
+import { TrendingUp, Trophy, Flame, Calendar, User, ShoppingBag, Settings, Save } from 'lucide-react';
+import { getStudents, getPracticeSessions, getStudentPracticeSessions, getStudentMedalRecords, getStudentStatistics, getAcademicYearSettings, setAcademicYearSettings } from '@/lib/storage';
 import { Student, PracticeSession } from '@/lib/types';
 import { recalcAllForStudent } from '@/lib/practiceEngine';
 import { getCurrentStreak } from '@/lib/medalEngine';
 import AdminStoreManagement from './AdminStoreManagement';
+import { toast } from '@/hooks/use-toast';
 
 interface LeaderboardEntry {
   studentId: string;
@@ -30,12 +32,35 @@ const AdminPracticeStats = () => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [studentSessions, setStudentSessions] = useState<PracticeSession[]>([]);
   const [dailySessions, setDailySessions] = useState<PracticeSession[]>([]);
-  const [activeTab, setActiveTab] = useState<'stats' | 'store'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'store' | 'settings'>('stats');
+  
+  // Academic year settings state
+  const [academicYearStart, setAcademicYearStart] = useState('');
+  const [academicYearEnd, setAcademicYearEnd] = useState('');
 
   useEffect(() => {
     const allStudents = getStudents();
     setStudents(allStudents);
     calculateLeaderboard(allStudents);
+    
+    // Load academic year settings
+    const savedSettings = getAcademicYearSettings();
+    if (savedSettings) {
+      setAcademicYearStart(savedSettings.startDate);
+      setAcademicYearEnd(savedSettings.endDate);
+    } else {
+      // Default to current academic year (Sep 1 - Aug 31)
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      if (month >= 8) { // Sep-Dec
+        setAcademicYearStart(`${year}-09-01`);
+        setAcademicYearEnd(`${year + 1}-08-31`);
+      } else { // Jan-Aug
+        setAcademicYearStart(`${year - 1}-09-01`);
+        setAcademicYearEnd(`${year}-08-31`);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -105,10 +130,23 @@ const AdminPracticeStats = () => {
     return medals.filter(m => !m.used);
   };
 
+  const handleSaveAcademicYear = () => {
+    if (!academicYearStart || !academicYearEnd) {
+      toast({ title: 'שגיאה', description: 'יש להזין תאריך התחלה וסיום', variant: 'destructive' });
+      return;
+    }
+    if (academicYearStart >= academicYearEnd) {
+      toast({ title: 'שגיאה', description: 'תאריך ההתחלה חייב להיות לפני תאריך הסיום', variant: 'destructive' });
+      return;
+    }
+    setAcademicYearSettings({ startDate: academicYearStart, endDate: academicYearEnd });
+    toast({ title: 'נשמר', description: 'הגדרות שנת הלימודים עודכנו' });
+  };
+
   return (
     <div className="space-y-6">
-      {/* Main Tabs for Stats vs Store */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'stats' | 'store')}>
+      {/* Main Tabs for Stats vs Store vs Settings */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'stats' | 'store' | 'settings')}>
         <TabsList className="mb-4">
           <TabsTrigger value="stats" className="gap-2">
             <Trophy className="h-4 w-4" />
@@ -118,7 +156,49 @@ const AdminPracticeStats = () => {
             <ShoppingBag className="h-4 w-4" />
             חנות
           </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2">
+            <Settings className="h-4 w-4" />
+            הגדרות
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                הגדרות שנת לימודים
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                הגדרת גבולות שנת הלימודים משפיעה על כל חישובי לוח ההישגים (קטגוריות 2-5).
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>תאריך התחלה</Label>
+                  <Input
+                    type="date"
+                    value={academicYearStart}
+                    onChange={(e) => setAcademicYearStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>תאריך סיום</Label>
+                  <Input
+                    type="date"
+                    value={academicYearEnd}
+                    onChange={(e) => setAcademicYearEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSaveAcademicYear} className="gap-2">
+                <Save className="h-4 w-4" />
+                שמור הגדרות
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="store">
           <AdminStoreManagement />

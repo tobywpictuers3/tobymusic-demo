@@ -530,7 +530,7 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
 
       {/* Leaderboard & Progress */}
       <div className="grid gap-6 md:grid-cols-2">
-        <PracticeLeaderboard />
+        <PracticeLeaderboard currentStudentId={studentId} />
         <StreakProgress studentId={studentId} />
       </div>
 
