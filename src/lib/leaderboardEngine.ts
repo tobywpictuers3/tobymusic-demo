@@ -18,8 +18,8 @@
  * - All categories 2-5 are filtered by academic year bounds
  */
 
-import { getStudents, getLessons, getStudentPracticeSessions, getAcademicYearSettings } from './storage';
-import { Student, PracticeSession, Lesson, LeaderboardEntryV2, AcademicYearSettings } from './types';
+import { getStudents, getLessons, getStudentPracticeSessions } from './storage';
+import { Student, PracticeSession, Lesson, LeaderboardEntryV2 } from './types';
 import { calculateTotalCopper, MEDAL_VALUES } from './storeCurrency';
 
 // ============= TYPES =============
@@ -52,37 +52,24 @@ export interface CategoryLeaderboard {
 
 // ============= HELPER FUNCTIONS =============
 
-/**
- * Get academic year bounds from system settings
- * Falls back to Sep 1 - Aug 31 only if no settings exist
- */
 export function getAcademicYearBounds(): { start: Date; end: Date } {
-  const settings = getAcademicYearSettings();
-  
-  if (settings) {
-    return {
-      start: new Date(settings.startDate + 'T00:00:00'),
-      end: new Date(settings.endDate + 'T23:59:59'),
-    };
-  }
-  
-  // Fallback only if no settings configured
-  console.warn('⚠️ Academic year settings not configured - using default Sep 1 - Aug 31');
   const now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth();
-  
-  if (month >= 8) { // Sep-Dec
+  const month = now.getMonth(); // 0–11
+
+  // אם אנחנו מספטמבר (8) עד דצמבר → השנה מתחילה השנה
+  if (month >= 8) {
     return {
-      start: new Date(year, 8, 1, 0, 0, 0),
-      end: new Date(year + 1, 7, 31, 23, 59, 59),
-    };
-  } else { // Jan-Aug
-    return {
-      start: new Date(year - 1, 8, 1, 0, 0, 0),
-      end: new Date(year, 7, 31, 23, 59, 59),
+      start: new Date(year, 8, 1, 0, 0, 0),          // 1/9 השנה
+      end: new Date(year + 1, 7, 31, 23, 59, 59),   // 31/8 שנה הבאה
     };
   }
+
+  // אם אנחנו מינואר עד אוגוסט → השנה התחילה בשנה הקודמת
+  return {
+    start: new Date(year - 1, 8, 1, 0, 0, 0),       // 1/9 שנה קודמת
+    end: new Date(year, 7, 31, 23, 59, 59),        // 31/8 השנה
+  };
 }
 
 /**
