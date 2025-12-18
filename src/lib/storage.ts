@@ -2,8 +2,35 @@ import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, Int
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 import { isDevMode, setDevMode } from './devMode';
-import { commitChange } from './commitGateway';
+import { commitDelta, CommitResult as NewCommitResult } from './commitGateway';
 import { calculateEarnedCopper, formatPriceCompact } from './storeCurrency';
+
+// Compatibility layer: adapt new commitDelta to old commitChange interface
+interface LegacyCommitResult {
+  confirmed: boolean;
+  queued: boolean;
+  error?: string;
+  data?: any;
+}
+
+async function commitChange(params: {
+  entity: string;
+  action: 'create' | 'update' | 'delete';
+  id?: string;
+  payload?: any;
+}): Promise<LegacyCommitResult> {
+  const { entity, action, id, payload } = params;
+  const result = await commitDelta(entity, action, id || null, payload);
+  
+  // Translate new interface to old interface
+  // New gateway is UI-first: ok=true means locally stored, state shows if queued to worker
+  return {
+    confirmed: result.ok && result.state !== 'error',
+    queued: result.state === 'queued' || result.state === 'local',
+    error: result.error,
+    data: payload, // UI-first model: return the payload as data since we apply locally
+  };
+}
 
 // In-Memory Storage - No localStorage for sensitive data
 const inMemoryStorage: Record<string, any> = {};

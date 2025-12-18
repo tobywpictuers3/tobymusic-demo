@@ -2,7 +2,7 @@ import { workerApi } from './workerApi';
 import { logger } from './logger';
 import { exportAllData, initializeStorage, isDevMode } from './storage';
 import { recalculateAllMonthlyAchievements } from './recalculateAchievements';
-import { setCurrentVersion, COMMIT_FLAGS } from './commitGateway';
+// Note: Old commitGateway exports removed. New gateway uses commitDelta/flushPendingCommits.
 
 /**
  * ============================================================================
@@ -176,18 +176,9 @@ class HybridSyncManager {
           this.updateInMemoryStorage(result.data);
           this.syncState.lastSyncTime = new Date().toISOString();
           
-          // CRITICAL: Initialize commit gateway version from Worker response
-          // PHASE 0.5: NO temporary versions allowed
+          // Note: Version tracking moved to new commitGateway (queue+flush model)
           if (result.data._version) {
-            setCurrentVersion(result.data._version);
-            logger.info(`📌 Commit Gateway version initialized: ${result.data._version}`);
-          } else {
-            // 🚨 PHASE 0.5: DO NOT generate temporary version
-            // commitGateway will remain disabled (isVersionInitialized() = false)
-            // This is intentional - no fake versions allowed
-            logger.error('🚨 CRITICAL: Worker response missing _version - commitGateway DISABLED');
-            logger.error('🚨 Worker-side must return _version in download_latest response');
-            // DO NOT call setCurrentVersion() - commits will be blocked
+            logger.info(`📌 Worker data version: ${result.data._version}`);
           }
         }
       } else if (result && result.error === 'NO_VERSION_FOUND') {
@@ -375,17 +366,9 @@ class HybridSyncManager {
    */
   async onDestructiveChange(): Promise<{ success: boolean; synced: boolean; message: string }> {
     // ⚠️ DEPRECATION WARNING
-    logger.warn('⚠️ DEPRECATED: hybridSync.onDestructiveChange() called - migrate to commitGateway.commitChange()');
+    logger.warn('⚠️ DEPRECATED: hybridSync.onDestructiveChange() called - migrate to commitDelta()');
     
-    // 🚫 PHASE 0.5: HARD BLOCK if commit flags are enabled
-    if (COMMIT_FLAGS.cascadeDeletes || COMMIT_FLAGS.allDeletes) {
-      logger.error('🚫 BLOCKED: Legacy onDestructiveChange() is disabled - use commitGateway.commitChange()');
-      return {
-        success: false,
-        synced: false,
-        message: 'Legacy delete path blocked - use commitGateway',
-      };
-    }
+    // Note: Legacy blocking via COMMIT_FLAGS removed in new commitGateway
     
     if (isDevMode()) {
       return { success: true, synced: true, message: 'נשמר במצב מפתחים' };
