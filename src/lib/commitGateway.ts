@@ -14,6 +14,8 @@
 // - commitDelta(...)
 // - flushPendingCommits()
 
+export const COMMIT_FLAGS = {};
+
 export type DeltaAction = "create" | "update" | "delete";
 
 // Keep entity as string to avoid tight coupling; Worker uses `musicSystem_${entity}`.
