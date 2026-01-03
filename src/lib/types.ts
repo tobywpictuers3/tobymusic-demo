@@ -25,6 +25,7 @@ export interface Student {
   paymentType?: 'annual' | 'per_lesson'; // Payment track (default: 'annual')
   lessonPrice?: number; // Price per lesson (for per_lesson type)
   paidLessonsCount?: number; // Number of lessons paid for (for per_lesson type)
+  perLessonBalance?: number; // Balance in NIS (positive = credit, negative = debt)
 }
 
 export interface Lesson {
@@ -62,6 +63,17 @@ export interface OneTimePayment {
   amount: number;
   description: string;
   paidDate: string;
+}
+
+// Per-lesson payment record
+export interface PerLessonPayment {
+  id: string;
+  studentId: string;
+  amount: number; // Amount paid in NIS
+  lessonsCount: number; // How many lessons this covers (calculated)
+  paymentDate: string; // Date of payment (YYYY-MM-DD)
+  month: string; // YYYY-MM format for monthly reporting
+  notes?: string;
 }
 
 export interface Performance {

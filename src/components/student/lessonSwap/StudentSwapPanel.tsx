@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { Student, Lesson, SwapRequest } from '@/lib/types';
-import { addSwapRequest, performLessonSwap, getLessons, addLesson } from '@/lib/storage';
+import { addSwapRequest, performLessonSwap, getLessons, addLesson, updateLesson } from '@/lib/storage';
 import { addMessage } from '@/lib/messages';
 import { ArrowLeftRight, X, MousePointerClick } from 'lucide-react';
 import { format } from 'date-fns';
@@ -239,26 +239,42 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
         }
 
         // Materialize template lessons before creating swap request
-        const materializeIfTemplate = (lesson: Lesson): Lesson => {
-          // If lesson is not from template, return as-is
+        // For swaps, we need to:
+        // 1. Create a real lesson for each party at their NEW slot
+        // 2. Create a "cancelled" marker at their ORIGINAL slot to prevent template regeneration
+        const materializeForSwap = (lesson: Lesson, newStudentId: string): Lesson => {
+          // If lesson is not from template, return as-is (no need to materialize)
           if (!lesson.isFromTemplate) return lesson;
           
-          // Create a real lesson from template
-          const realLesson = addLesson({
+          // Create a cancelled marker at the original slot to block template regeneration
+          addLesson({
             studentId: lesson.studentId,
             date: lesson.date,
             startTime: lesson.startTime,
             endTime: lesson.endTime,
+            status: 'cancelled' as const,
+            notes: 'שיעור שהוחלף - מיקום מקורי',
+            isOneOff: false
+          });
+          
+          // Create a real lesson at this slot with the NEW studentId
+          const realLesson = addLesson({
+            studentId: newStudentId,
+            date: lesson.date,
+            startTime: lesson.startTime,
+            endTime: lesson.endTime,
             status: 'scheduled' as const,
+            isSwapped: true,
+            notes: 'שיעור שהוחלף',
             isOneOff: false
           });
           
           return realLesson;
         };
 
-        // Materialize both lessons if needed
-        myLesson = materializeIfTemplate(myLesson);
-        targetLesson = materializeIfTemplate(targetLesson);
+        // For template lessons, we need to handle the swap differently
+        const myIsTemplate = myLesson.isFromTemplate;
+        const targetIsTemplate = targetLesson.isFromTemplate;
 
         const targetStudent = students.find(s => s.id === targetLesson.studentId);
 
@@ -280,27 +296,50 @@ const StudentSwapPanel = forwardRef<StudentSwapPanelRef, StudentSwapPanelProps>(
           return; // EXIT - no SwapRequest created, no message sent
         }
 
-        // Only reach here if BOTH codes are correct
-        const swapStatus: 'approved' = 'approved';
-
-        // Create swap request in storage.ts format
-        const swapRequestData: Omit<SwapRequest, 'id' | 'lastModified'> = {
-          requesterId: student.id,
-          targetId: targetStudent.id,
-          date: myLesson.date,
-          time: myLesson.startTime,
-          targetDate: targetLesson.date,
-          targetTime: targetLesson.startTime,
-          reason: `החלפה אוטומטית עם שני קודים`,
-          status: swapStatus,
-          createdAt: new Date().toISOString(),
-        };
-
-        // Save to storage
-        const savedRequest = addSwapRequest(swapRequestData);
-
-        // Perform the lesson swap immediately
-        performLessonSwap(savedRequest);
+        // Perform the swap based on whether lessons are from template
+        if (myIsTemplate || targetIsTemplate) {
+          // At least one is a template - handle by creating proper lessons
+          
+          // For my slot: create cancelled marker (my original) + real lesson with target's studentId
+          if (myIsTemplate) {
+            materializeForSwap(myLesson, targetStudent.id);
+          } else {
+            // My lesson is real - just update studentId
+            updateLesson(myLesson.id, { 
+              studentId: targetStudent.id, 
+              isSwapped: true,
+              notes: 'שיעור שהוחלף'
+            });
+          }
+          
+          // For target slot: create cancelled marker (target's original) + real lesson with my studentId
+          if (targetIsTemplate) {
+            materializeForSwap(targetLesson, student.id);
+          } else {
+            // Target lesson is real - just update studentId
+            updateLesson(targetLesson.id, { 
+              studentId: student.id, 
+              isSwapped: true,
+              notes: 'שיעור שהוחלף'
+            });
+          }
+        } else {
+          // Both are real lessons - use the standard swap
+          const swapStatus: 'approved' = 'approved';
+          const swapRequestData: Omit<SwapRequest, 'id' | 'lastModified'> = {
+            requesterId: student.id,
+            targetId: targetStudent.id,
+            date: myLesson.date,
+            time: myLesson.startTime,
+            targetDate: targetLesson.date,
+            targetTime: targetLesson.startTime,
+            reason: `החלפה אוטומטית עם שני קודים`,
+            status: swapStatus,
+            createdAt: new Date().toISOString(),
+          };
+          const savedRequest = addSwapRequest(swapRequestData);
+          performLessonSwap(savedRequest);
+        }
 
         // Format lesson details for success message
         const myLessonDetails = `${format(new Date(myLesson.date), 'dd/MM/yyyy', { locale: he })} בשעה ${myLesson.startTime}`;

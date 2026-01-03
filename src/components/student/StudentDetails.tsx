@@ -18,7 +18,6 @@ const StudentDetails = ({ student }: StudentDetailsProps) => {
   const completedLessons = isPerLesson ? getCompletedLessonsCount(student.id) : 0;
   const paidLessons = student.paidLessonsCount || 0;
   const balanceLessons = completedLessons - paidLessons;
-  const balanceAmount = balanceLessons * (student.lessonPrice || 0);
   
   // For annual students - Calculate payment status based on payments
   const payments = getPayments().filter(p => p.studentId === student.id);
@@ -143,7 +142,7 @@ const StudentDetails = ({ student }: StudentDetailsProps) => {
             <h3 className="text-lg font-semibold mb-4">התקדמות בלימודים</h3>
             
             {isPerLesson ? (
-              // Per-lesson payment display
+              // Per-lesson payment display - simplified without debt display
               <>
                 <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
                   <Coins className="h-5 w-5 text-primary" />
@@ -165,11 +164,6 @@ const StudentDetails = ({ student }: StudentDetailsProps) => {
                         <div className="text-xs text-muted-foreground">יתרה</div>
                       </div>
                     </div>
-                    {balanceLessons > 0 && (
-                      <div className="mt-2 text-sm text-destructive font-medium">
-                        סכום לתשלום: ₪{balanceAmount}
-                      </div>
-                    )}
                   </div>
                 </div>
                 

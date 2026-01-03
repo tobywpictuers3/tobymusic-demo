@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/safe-ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/safe-ui/dialog';
 import { Label } from '@/components/safe-ui/label';
-import { CreditCard, ChevronRight, ChevronLeft, Undo2, Download, Coins, Plus } from 'lucide-react';
-import { getStudents, getPayments, savePayments, updateStudent, getPerformances, getOneTimePayments, saveOneTimePayments, getTithePaid, saveTithePaid, getCompletedLessonsCount, updatePaidLessonsCount } from '@/lib/storage';
-import { Payment, Student, OneTimePayment, Performance } from '@/lib/types';
+import { CreditCard, ChevronRight, ChevronLeft, Download, Coins, Plus, Pencil, Trash2, Calendar } from 'lucide-react';
+import { getStudents, getPayments, savePayments, updateStudent, getPerformances, getOneTimePayments, saveOneTimePayments, updateOneTimePayment, deleteOneTimePayment, getTithePaid, saveTithePaid, getCompletedLessonsCount, recordPerLessonPayment, getPerLessonPayments, getStudentPerLessonPayments } from '@/lib/storage';
+import { Payment, Student, OneTimePayment, Performance, PerLessonPayment } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/safe-ui/badge';
 import { format } from 'date-fns';
@@ -406,6 +406,14 @@ const PaymentManagement = () => {
       }
     });
     
+    // תשלומים עבור שיעורים חד-פעמיים
+    const perLessonPayments = getPerLessonPayments();
+    perLessonPayments
+      .filter(p => p.month === monthKey)
+      .forEach(p => {
+        total += p.amount;
+      });
+    
     return total;
   };
 
@@ -492,24 +500,89 @@ const PaymentManagement = () => {
   // Per-lesson payment dialog state
   const [showPerLessonPaymentDialog, setShowPerLessonPaymentDialog] = useState(false);
   const [selectedPerLessonStudent, setSelectedPerLessonStudent] = useState<Student | null>(null);
-  const [perLessonPaymentCount, setPerLessonPaymentCount] = useState(1);
+  const [perLessonPaymentAmount, setPerLessonPaymentAmount] = useState('');
+  const [perLessonPaymentDate, setPerLessonPaymentDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [perLessonPaymentNotes, setPerLessonPaymentNotes] = useState('');
+
+  // One-time payment edit state
+  const [editingOneTimePayment, setEditingOneTimePayment] = useState<OneTimePayment | null>(null);
+  const [showEditOneTimeDialog, setShowEditOneTimeDialog] = useState(false);
 
   const handleRecordPerLessonPayment = () => {
     if (!selectedPerLessonStudent) return;
     
-    const currentPaid = selectedPerLessonStudent.paidLessonsCount || 0;
-    const newPaidCount = currentPaid + perLessonPaymentCount;
+    const amount = parseFloat(perLessonPaymentAmount) || 0;
+    if (amount <= 0) {
+      toast({
+        title: 'שגיאה',
+        description: 'יש להזין סכום תשלום',
+        variant: 'destructive'
+      });
+      return;
+    }
     
-    updatePaidLessonsCount(selectedPerLessonStudent.id, newPaidCount);
+    const result = recordPerLessonPayment(
+      selectedPerLessonStudent.id,
+      amount,
+      perLessonPaymentDate,
+      perLessonPaymentNotes || undefined
+    );
+    
+    if (!result) {
+      toast({
+        title: 'שגיאה',
+        description: 'שגיאה ברישום התשלום',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     loadData();
     setShowPerLessonPaymentDialog(false);
     setSelectedPerLessonStudent(null);
-    setPerLessonPaymentCount(1);
+    setPerLessonPaymentAmount('');
+    setPerLessonPaymentDate(new Date().toISOString().split('T')[0]);
+    setPerLessonPaymentNotes('');
     
     toast({
       title: 'הצלחה',
-      description: `נרשם תשלום עבור ${perLessonPaymentCount} שיעורים`
+      description: `נרשם תשלום ₪${amount} (${result.lessonsCovered} שיעורים, יתרה: ₪${result.newBalance})`
     });
+  };
+
+  const handleEditOneTimePayment = () => {
+    if (!editingOneTimePayment) return;
+    
+    updateOneTimePayment(editingOneTimePayment.id, {
+      description: editingOneTimePayment.description,
+      amount: editingOneTimePayment.amount,
+      paidDate: editingOneTimePayment.paidDate,
+    });
+    
+    loadData();
+    setShowEditOneTimeDialog(false);
+    setEditingOneTimePayment(null);
+    toast({ description: 'התשלום עודכן בהצלחה' });
+  };
+
+  const handleDeleteOneTimePayment = async (id: string) => {
+    await deleteOneTimePayment(id);
+    loadData();
+    toast({ description: 'התשלום נמחק' });
+  };
+
+  // Calculate per-lesson payments for a month
+  const calculatePerLessonPaymentsForMonth = (monthNum: string) => {
+    const year = parseInt(monthNum) >= 9 ? selectedYear : selectedYear + 1;
+    const monthKey = `${year}-${monthNum.padStart(2, '0')}`;
+    
+    const perLessonPayments = getPerLessonPayments();
+    return perLessonPayments.filter(p => p.month === monthKey);
+  };
+
+  const calculatePerLessonTotalForMonth = (monthNum: string) => {
+    const payments = calculatePerLessonPaymentsForMonth(monthNum);
+    return payments.reduce((sum, p) => sum + p.amount, 0);
   };
 
   return (
@@ -805,6 +878,22 @@ const PaymentManagement = () => {
                     <TableCell colSpan={3}></TableCell>
                   </TableRow>
                   
+                  {/* שורת שיעורים חד-פעמיים */}
+                  <TableRow className="bg-muted/30">
+                    <TableCell className="sticky right-0 bg-muted/30 z-10 font-bold border-l-2 border-border text-foreground text-xs min-w-[85px] w-[85px] max-w-[85px]">
+                      שיעורים חד-פעמיים
+                    </TableCell>
+                    <TableCell className="sticky right-[85px] bg-muted/30 z-10 min-w-[60px] w-[60px] max-w-[60px]">-</TableCell>
+                    {academicMonths.map(month => (
+                      <TableCell key={month.key} className="text-center font-semibold text-foreground min-w-[45px] w-[45px] max-w-[45px]">
+                        {calculatePerLessonTotalForMonth(month.key) > 0 
+                          ? `₪${calculatePerLessonTotalForMonth(month.key)}` 
+                          : '-'}
+                      </TableCell>
+                    ))}
+                    <TableCell colSpan={3}></TableCell>
+                  </TableRow>
+                  
                   {/* שורת סיכום */}
                   <TableRow className="bg-primary/20 font-bold">
                     <TableCell className="sticky right-0 bg-primary/20 z-10 border-l-2 border-accent font-bold text-primary text-xs min-w-[85px] w-[85px] max-w-[85px]">
@@ -880,12 +969,12 @@ const PaymentManagement = () => {
                       </CardContent>
                     </Card>
                   
-                  {/* פירוט תשלומים חד פעמיים */}
+                  {/* פירוט תשלומים חד פעמיים - עם אפשרות עריכה */}
                   {calculateOneTimePaymentsForMonth(selectedMonth) > 0 && (
                     <Card className="bg-[hsl(0,65%,35%)] border-[hsl(0,65%,35%)]">
                       <CardContent className="pt-6">
                         <h4 className="font-bold mb-2 text-[hsl(45,95%,55%)]">תשלומים נוספים (אחר)</h4>
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                           {oneTimePayments
                             .filter(otp => {
                               const year = parseInt(selectedMonth) >= 9 ? selectedYear : selectedYear + 1;
@@ -893,8 +982,21 @@ const PaymentManagement = () => {
                               return otp.month === monthKey;
                             })
                             .map(otp => (
-                              <div key={otp.id} className="flex justify-between items-center text-sm">
-                                <span className="text-[hsl(45,95%,55%)]">{otp.description}</span>
+                              <div key={otp.id} className="flex justify-between items-center text-sm group">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[hsl(45,95%,55%)]">{otp.description}</span>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => {
+                                      setEditingOneTimePayment(otp);
+                                      setShowEditOneTimeDialog(true);
+                                    }}
+                                  >
+                                    <Pencil className="h-3 w-3 text-[hsl(45,95%,55%)]" />
+                                  </Button>
+                                </div>
                                 <span className="font-semibold text-[hsl(45,95%,55%)]">₪{parseFloat(otp.amount.toFixed(1))}</span>
                               </div>
                             ))
@@ -904,6 +1006,42 @@ const PaymentManagement = () => {
                           <span className="font-bold text-[hsl(45,95%,55%)]">סה"כ</span>
                           <span className="font-bold text-[hsl(45,95%,55%)]">
                             ₪{parseFloat(calculateOneTimePaymentsForMonth(selectedMonth).toFixed(1))}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* פירוט הכנסות משיעורים חד-פעמיים */}
+                  {calculatePerLessonTotalForMonth(selectedMonth) > 0 && (
+                    <Card className="bg-[hsl(0,65%,35%)] border-[hsl(0,65%,35%)]">
+                      <CardContent className="pt-6">
+                        <h4 className="font-bold mb-2 text-[hsl(45,95%,55%)] flex items-center gap-2">
+                          <Coins className="h-4 w-4" />
+                          הכנסות משיעורים חד-פעמיים
+                        </h4>
+                        <div className="space-y-2">
+                          {calculatePerLessonPaymentsForMonth(selectedMonth).map(plp => {
+                            const student = students.find(s => s.id === plp.studentId);
+                            return (
+                              <div key={plp.id} className="flex justify-between items-center text-sm">
+                                <div>
+                                  <span className="text-[hsl(45,95%,55%)]">
+                                    {student ? `${student.firstName} ${student.lastName}` : 'תלמידה'}
+                                  </span>
+                                  <span className="text-[hsl(45,95%,55%)]/70 text-xs mr-2">
+                                    ({plp.paymentDate?.split('-').reverse().join('/')})
+                                  </span>
+                                </div>
+                                <span className="font-semibold text-[hsl(45,95%,55%)]">₪{plp.amount}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-[hsl(45,95%,55%)]/50">
+                          <span className="font-bold text-[hsl(45,95%,55%)]">סה"כ</span>
+                          <span className="font-bold text-[hsl(45,95%,55%)]">
+                            ₪{calculatePerLessonTotalForMonth(selectedMonth)}
                           </span>
                         </div>
                       </CardContent>
@@ -1058,20 +1196,22 @@ const PaymentManagement = () => {
                           {balanceAmount > 0 ? `₪${balanceAmount}` : '-'}
                         </TableCell>
                         <TableCell>
-                          {balanceLessons > 0 && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedPerLessonStudent(student);
-                                setPerLessonPaymentCount(balanceLessons);
-                                setShowPerLessonPaymentDialog(true);
-                              }}
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              רשום תשלום
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedPerLessonStudent(student);
+                              // Pre-fill amount based on balance
+                              const suggestedAmount = balanceLessons * (student.lessonPrice || 0);
+                              setPerLessonPaymentAmount(suggestedAmount > 0 ? suggestedAmount.toString() : '');
+                              setPerLessonPaymentDate(new Date().toISOString().split('T')[0]);
+                              setPerLessonPaymentNotes('');
+                              setShowPerLessonPaymentDialog(true);
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            רשום תשלום
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -1135,54 +1275,145 @@ const PaymentManagement = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Per-Lesson Payment Dialog */}
+      {/* Per-Lesson Payment Dialog - Amount based with date */}
       <Dialog open={showPerLessonPaymentDialog} onOpenChange={setShowPerLessonPaymentDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>רישום תשלום - שיעורים חד-פעמיים</DialogTitle>
           </DialogHeader>
-          {selectedPerLessonStudent && (
-            <div className="space-y-4">
-              <div className="p-4 bg-secondary/30 rounded-lg">
-                <p className="font-bold text-lg">{selectedPerLessonStudent.firstName} {selectedPerLessonStudent.lastName}</p>
-                <p className="text-sm text-muted-foreground">מחיר לשיעור: ₪{selectedPerLessonStudent.lessonPrice || 0}</p>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">שיעורים שניתנו:</span>
-                    <span className="font-bold mr-1">{getCompletedLessonsCount(selectedPerLessonStudent.id)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">שולם:</span>
-                    <span className="font-bold mr-1">{selectedPerLessonStudent.paidLessonsCount || 0}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">יתרה:</span>
-                    <span className="font-bold text-destructive mr-1">
-                      {getCompletedLessonsCount(selectedPerLessonStudent.id) - (selectedPerLessonStudent.paidLessonsCount || 0)}
-                    </span>
+          {selectedPerLessonStudent && (() => {
+            const lessonPrice = selectedPerLessonStudent.lessonPrice || 0;
+            const currentBalance = selectedPerLessonStudent.perLessonBalance || 0;
+            const amount = parseFloat(perLessonPaymentAmount) || 0;
+            const totalAvailable = amount + currentBalance;
+            const lessonsCovered = lessonPrice > 0 ? Math.floor(totalAvailable / lessonPrice) : 0;
+            const newBalance = lessonPrice > 0 ? totalAvailable - (lessonsCovered * lessonPrice) : 0;
+            
+            return (
+              <div className="space-y-4">
+                <div className="p-4 bg-secondary/30 rounded-lg">
+                  <p className="font-bold text-lg">{selectedPerLessonStudent.firstName} {selectedPerLessonStudent.lastName}</p>
+                  <p className="text-sm text-muted-foreground">מחיר לשיעור: ₪{lessonPrice}</p>
+                  {currentBalance > 0 && (
+                    <p className="text-sm text-green-600">יתרה קיימת: ₪{currentBalance}</p>
+                  )}
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">שיעורים שניתנו:</span>
+                      <span className="font-bold mr-1">{getCompletedLessonsCount(selectedPerLessonStudent.id)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">שולם:</span>
+                      <span className="font-bold mr-1">{selectedPerLessonStudent.paidLessonsCount || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">חוב:</span>
+                      <span className="font-bold text-destructive mr-1">
+                        {Math.max(0, getCompletedLessonsCount(selectedPerLessonStudent.id) - (selectedPerLessonStudent.paidLessonsCount || 0))}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="payment-date">תאריך תשלום</Label>
+                  <Input
+                    id="payment-date"
+                    type="date"
+                    value={perLessonPaymentDate}
+                    onChange={(e) => setPerLessonPaymentDate(e.target.value)}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="payment-amount">סכום ששולם</Label>
+                  <Input
+                    id="payment-amount"
+                    type="number"
+                    min={0}
+                    value={perLessonPaymentAmount}
+                    onChange={(e) => setPerLessonPaymentAmount(e.target.value)}
+                    placeholder="הזן סכום"
+                  />
+                  {amount > 0 && lessonPrice > 0 && (
+                    <div className="p-2 bg-muted rounded text-sm">
+                      <p>מכסה: <strong>{lessonsCovered} שיעורים</strong></p>
+                      {newBalance > 0 && (
+                        <p className="text-green-600">יתרה לזכות: ₪{newBalance.toFixed(2)}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payment-notes">הערות (אופציונלי)</Label>
+                  <Input
+                    id="payment-notes"
+                    value={perLessonPaymentNotes}
+                    onChange={(e) => setPerLessonPaymentNotes(e.target.value)}
+                    placeholder="הערות..."
+                  />
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button onClick={handleRecordPerLessonPayment} className="flex-1">
+                    רשום תשלום
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowPerLessonPaymentDialog(false)}>ביטול</Button>
+                </div>
               </div>
-              
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit One-Time Payment Dialog */}
+      <Dialog open={showEditOneTimeDialog} onOpenChange={setShowEditOneTimeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>עריכת תשלום חד פעמי</DialogTitle>
+          </DialogHeader>
+          {editingOneTimePayment && (
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="lesson-count">מספר שיעורים לרישום תשלום</Label>
+                <Label htmlFor="edit-description">תיאור</Label>
                 <Input
-                  id="lesson-count"
-                  type="number"
-                  min={1}
-                  value={perLessonPaymentCount}
-                  onChange={(e) => setPerLessonPaymentCount(parseInt(e.target.value) || 1)}
+                  id="edit-description"
+                  value={editingOneTimePayment.description}
+                  onChange={(e) => setEditingOneTimePayment({ ...editingOneTimePayment, description: e.target.value })}
                 />
-                <p className="text-sm text-muted-foreground">
-                  סה"כ: ₪{perLessonPaymentCount * (selectedPerLessonStudent.lessonPrice || 0)}
-                </p>
               </div>
-              
+              <div className="space-y-2">
+                <Label htmlFor="edit-amount">סכום</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  value={editingOneTimePayment.amount}
+                  onChange={(e) => setEditingOneTimePayment({ ...editingOneTimePayment, amount: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-date">תאריך</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editingOneTimePayment.paidDate?.split('T')[0] || ''}
+                  onChange={(e) => setEditingOneTimePayment({ ...editingOneTimePayment, paidDate: e.target.value })}
+                />
+              </div>
               <div className="flex gap-2">
-                <Button onClick={handleRecordPerLessonPayment} className="flex-1">
-                  רשום תשלום
+                <Button onClick={handleEditOneTimePayment} className="flex-1">שמור</Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={async () => {
+                    await handleDeleteOneTimePayment(editingOneTimePayment.id);
+                    setShowEditOneTimeDialog(false);
+                    setEditingOneTimePayment(null);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" onClick={() => setShowPerLessonPaymentDialog(false)}>ביטול</Button>
+                <Button variant="outline" onClick={() => setShowEditOneTimeDialog(false)}>ביטול</Button>
               </div>
             </div>
           )}
