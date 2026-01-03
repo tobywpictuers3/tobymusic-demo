@@ -1,4 +1,4 @@
-import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase } from './types';
+import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, PerLessonPayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase } from './types';
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 import { isDevMode, setDevMode } from './devMode';
@@ -463,7 +463,7 @@ export const updateSwapRequestStatus = (requestId: string, status: 'approved' | 
 export const performLessonSwap = (swapRequest: SwapRequest) => {
   const lessons = getLessons();
   
-  // Find EXISTING lessons only (not templates)
+  // Find EXISTING lessons only (not templates) - search by date/time/studentId
   const originalLessonIndex = lessons.findIndex(l => 
     l.studentId === swapRequest.requesterId && 
     l.date === swapRequest.date && 
@@ -488,7 +488,7 @@ export const performLessonSwap = (swapRequest: SwapRequest) => {
     return;
   }
   
-  // Perform bidirectional swap
+  // Perform bidirectional swap - exchange studentId between the two lessons
   const temp = lessons[originalLessonIndex].studentId;
   lessons[originalLessonIndex].studentId = lessons[targetLessonIndex].studentId;
   lessons[targetLessonIndex].studentId = temp;
@@ -836,6 +836,126 @@ export const saveOneTimePayments = (payments: OneTimePayment[]): void => {
     inMemoryStorage['oneTimePayments'] = payments;
     hybridSync.onDataChange();
   }
+};
+
+export const updateOneTimePayment = (id: string, updates: Partial<OneTimePayment>): OneTimePayment | undefined => {
+  const payments = getOneTimePayments();
+  const index = payments.findIndex(p => p.id === id);
+  if (index === -1) return undefined;
+  
+  payments[index] = { ...payments[index], ...updates };
+  saveOneTimePayments(payments);
+  return payments[index];
+};
+
+export const deleteOneTimePayment = async (id: string): Promise<boolean> => {
+  const payments = getOneTimePayments();
+  const updated = payments.filter(p => p.id !== id);
+  if (updated.length === payments.length) return false;
+  
+  if (isDevMode()) {
+    devData['oneTimePayments'] = updated;
+  } else {
+    inMemoryStorage['oneTimePayments'] = updated;
+    await hybridSync.onDestructiveChange();
+  }
+  return true;
+};
+
+// Per-Lesson Payments
+export const getPerLessonPayments = (): PerLessonPayment[] => {
+  if (isDevMode()) return devData['perLessonPayments'] || [];
+  return inMemoryStorage['perLessonPayments'] || [];
+};
+
+export const addPerLessonPayment = (payment: Omit<PerLessonPayment, 'id'>): PerLessonPayment => {
+  const payments = getPerLessonPayments();
+  const newPayment: PerLessonPayment = {
+    ...payment,
+    id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+  };
+  payments.push(newPayment);
+  
+  if (isDevMode()) {
+    devData['perLessonPayments'] = payments;
+  } else {
+    inMemoryStorage['perLessonPayments'] = payments;
+    hybridSync.onDataChange();
+  }
+  return newPayment;
+};
+
+export const updatePerLessonPayment = (id: string, updates: Partial<PerLessonPayment>): PerLessonPayment | undefined => {
+  const payments = getPerLessonPayments();
+  const index = payments.findIndex(p => p.id === id);
+  if (index === -1) return undefined;
+  
+  payments[index] = { ...payments[index], ...updates };
+  
+  if (isDevMode()) {
+    devData['perLessonPayments'] = payments;
+  } else {
+    inMemoryStorage['perLessonPayments'] = payments;
+    hybridSync.onDataChange();
+  }
+  return payments[index];
+};
+
+export const deletePerLessonPayment = async (id: string): Promise<boolean> => {
+  const payments = getPerLessonPayments();
+  const updated = payments.filter(p => p.id !== id);
+  if (updated.length === payments.length) return false;
+  
+  if (isDevMode()) {
+    devData['perLessonPayments'] = updated;
+  } else {
+    inMemoryStorage['perLessonPayments'] = updated;
+    await hybridSync.onDestructiveChange();
+  }
+  return true;
+};
+
+export const getStudentPerLessonPayments = (studentId: string): PerLessonPayment[] => {
+  return getPerLessonPayments().filter(p => p.studentId === studentId);
+};
+
+// Record a per-lesson payment with balance tracking
+export const recordPerLessonPayment = (
+  studentId: string, 
+  amount: number, 
+  paymentDate: string, 
+  notes?: string
+): { payment: PerLessonPayment; newBalance: number; lessonsCovered: number } | null => {
+  const student = getStudents().find(s => s.id === studentId);
+  if (!student || !student.lessonPrice) return null;
+  
+  const lessonPrice = student.lessonPrice;
+  const completedLessons = getCompletedLessonsCount(studentId);
+  const currentPaidLessons = student.paidLessonsCount || 0;
+  const currentBalance = student.perLessonBalance || 0;
+  
+  // Calculate how many lessons this payment covers
+  const totalAvailable = amount + currentBalance;
+  const lessonsCovered = Math.floor(totalAvailable / lessonPrice);
+  const newBalance = totalAvailable - (lessonsCovered * lessonPrice);
+  
+  // Create payment record
+  const payment = addPerLessonPayment({
+    studentId,
+    amount,
+    lessonsCount: lessonsCovered,
+    paymentDate,
+    month: paymentDate.substring(0, 7), // YYYY-MM
+    notes,
+  });
+  
+  // Update student
+  updateStudent(studentId, {
+    paidLessonsCount: currentPaidLessons + lessonsCovered,
+    perLessonBalance: newBalance,
+  });
+  
+  return { payment, newBalance, lessonsCovered };
 };
 
 // Holidays
