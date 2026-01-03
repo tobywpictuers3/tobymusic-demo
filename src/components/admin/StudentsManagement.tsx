@@ -9,7 +9,7 @@ import { Label } from '@/components/safe-ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/safe-ui/select';
 import { Badge } from '@/components/safe-ui/badge';
 import { Grid, List, UserPlus, Edit, Trash2, Users, History, Coins } from 'lucide-react';
-import { getStudents, addStudent, updateStudent, deleteStudentCascade, getCompletedLessonsCount } from '@/lib/storage';
+import { getStudents, addStudent, updateStudent, deleteStudentCascade, getCompletedLessonsCount, convertAnnualToPerLesson, getPayments } from '@/lib/storage';
 import { deleteMessagesForStudentCascade } from '@/lib/messages';
 import { Student } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
@@ -125,6 +125,32 @@ const StudentsManagement = () => {
     const monthlyAmount = effectiveAmount / studentForm.paymentMonths;
     
     if (editingStudent) {
+      // Check if switching from annual to per_lesson
+      const wasAnnual = !editingStudent.paymentType || editingStudent.paymentType === 'annual';
+      const isNowPerLesson = studentForm.paymentType === 'per_lesson';
+      
+      if (wasAnnual && isNowPerLesson) {
+        // Check if there are existing payments to migrate
+        const existingPayments = getPayments().filter(
+          p => p.studentId === editingStudent.id && p.status === 'paid' && p.amount > 0
+        );
+        
+        if (existingPayments.length > 0) {
+          // Convert and migrate payments
+          const result = convertAnnualToPerLesson(editingStudent.id, studentForm.lessonPrice);
+          if (result) {
+            toast({
+              title: 'הצלחה',
+              description: `התלמידה עברה למסלול חד-פעמי. ${result.convertedPayments.length} תשלומים הועברו (סה"כ ₪${result.totalAmount})`
+            });
+            refreshStudents();
+            setShowDialog(false);
+            resetForm();
+            return;
+          }
+        }
+      }
+      
       updateStudent(editingStudent.id, {
         firstName: studentForm.firstName,
         lastName: studentForm.lastName,
@@ -241,8 +267,6 @@ const StudentsManagement = () => {
               {students.map((student) => {
                 const isPerLesson = student.paymentType === 'per_lesson';
                 const completedLessons = isPerLesson ? getCompletedLessonsCount(student.id) : 0;
-                const paidLessons = student.paidLessonsCount || 0;
-                const balanceLessons = completedLessons - paidLessons;
                 
                 return (
                 <Card key={student.id} className="hover:shadow-lg transition-shadow">
@@ -264,10 +288,7 @@ const StudentsManagement = () => {
                         <p>📞 {student.phone}</p>
                         {isPerLesson && (
                           <div className="mt-2 p-2 bg-secondary/30 rounded text-xs">
-                            <p>📚 שיעורים: {completedLessons} | 💰 שולם: {paidLessons}</p>
-                            {balanceLessons > 0 && (
-                              <p className="text-destructive font-medium">⏳ יתרה: {balanceLessons} (₪{balanceLessons * (student.lessonPrice || 0)})</p>
-                            )}
+                            <p>📚 שיעורים: {completedLessons} | 💰 ₪{student.lessonPrice}/שיעור</p>
                           </div>
                         )}
                       </div>

@@ -958,6 +958,62 @@ export const recordPerLessonPayment = (
   return { payment, newBalance, lessonsCovered };
 };
 
+// Convert annual student to per-lesson and migrate existing payments
+export const convertAnnualToPerLesson = (
+  studentId: string,
+  lessonPrice: number
+): { convertedPayments: PerLessonPayment[]; totalAmount: number } | null => {
+  const student = getStudents().find(s => s.id === studentId);
+  if (!student) return null;
+  
+  // Get all annual payments for this student
+  const allPayments = getPayments();
+  const studentPayments = allPayments.filter(p => p.studentId === studentId && p.status === 'paid' && p.amount > 0);
+  
+  if (studentPayments.length === 0) {
+    return { convertedPayments: [], totalAmount: 0 };
+  }
+  
+  let totalAmount = 0;
+  const convertedPayments: PerLessonPayment[] = [];
+  
+  // Convert each annual payment to a per-lesson payment
+  for (const payment of studentPayments) {
+    const paymentDate = payment.paidDate || `${payment.month}-01`;
+    const amount = payment.amount;
+    totalAmount += amount;
+    
+    const newPayment = addPerLessonPayment({
+      studentId,
+      amount,
+      lessonsCount: Math.floor(amount / lessonPrice),
+      paymentDate,
+      month: payment.month,
+      notes: 'הועבר ממסלול שנתי',
+    });
+    
+    convertedPayments.push(newPayment);
+  }
+  
+  // Calculate how many lessons these payments cover
+  const totalLessonsCovered = Math.floor(totalAmount / lessonPrice);
+  const remainingBalance = totalAmount - (totalLessonsCovered * lessonPrice);
+  
+  // Update student with per-lesson fields
+  updateStudent(studentId, {
+    paymentType: 'per_lesson',
+    lessonPrice,
+    paidLessonsCount: totalLessonsCovered,
+    perLessonBalance: remainingBalance,
+  });
+  
+  // Remove the annual payments
+  const updatedPayments = allPayments.filter(p => p.studentId !== studentId);
+  savePayments(updatedPayments);
+  
+  return { convertedPayments, totalAmount }
+};
+
 // Holidays
 export const getHolidays = (): Holiday[] => {
   if (isDevMode()) return devData['holidays'] || [];

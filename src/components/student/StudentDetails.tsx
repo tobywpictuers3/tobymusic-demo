@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { User, Phone, Mail, Calendar, CreditCard, Coins } from 'lucide-react';
 import { Student } from '@/lib/types';
-import { calculateLessonNumber, getPayments, getCompletedLessonsCount } from '@/lib/storage';
+import { calculateLessonNumber, getPayments, getCompletedLessonsCount, getStudentPerLessonPayments } from '@/lib/storage';
 
 interface StudentDetailsProps {
   student: Student;
@@ -14,10 +14,14 @@ const StudentDetails = ({ student }: StudentDetailsProps) => {
   
   const isPerLesson = student.paymentType === 'per_lesson';
   
-  // For per-lesson students
+  // For per-lesson students - calculate balance based on amounts
   const completedLessons = isPerLesson ? getCompletedLessonsCount(student.id) : 0;
-  const paidLessons = student.paidLessonsCount || 0;
-  const balanceLessons = completedLessons - paidLessons;
+  const lessonPrice = student.lessonPrice || 0;
+  const totalOwed = completedLessons * lessonPrice; // Total amount owed for lessons given
+  const perLessonPayments = isPerLesson ? getStudentPerLessonPayments(student.id) : [];
+  const totalPaid = perLessonPayments.reduce((sum, p) => sum + p.amount, 0);
+  const balanceAmount = totalOwed - totalPaid; // Positive = owes money, negative = credit
+  const currentCredit = student.perLessonBalance || 0;
   
   // For annual students - Calculate payment status based on payments
   const payments = getPayments().filter(p => p.studentId === student.id);
@@ -142,36 +146,56 @@ const StudentDetails = ({ student }: StudentDetailsProps) => {
             <h3 className="text-lg font-semibold mb-4">התקדמות בלימודים</h3>
             
             {isPerLesson ? (
-              // Per-lesson payment display - simplified without debt display
+              // Per-lesson payment display with amounts
               <>
                 <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
                   <Coins className="h-5 w-5 text-primary" />
                   <div className="flex-1">
-                    <div className="font-medium">מעקב שיעורים</div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                    <div className="font-medium">מעקב תשלומים</div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                       <div className="text-center p-2 bg-background rounded">
                         <div className="text-2xl font-bold">{completedLessons}</div>
                         <div className="text-xs text-muted-foreground">שיעורים שניתנו</div>
+                        <div className="text-xs text-muted-foreground">(₪{totalOwed})</div>
                       </div>
                       <div className="text-center p-2 bg-background rounded">
-                        <div className="text-2xl font-bold text-green-600">{paidLessons}</div>
-                        <div className="text-xs text-muted-foreground">שולם</div>
+                        <div className="text-2xl font-bold text-green-600">₪{totalPaid}</div>
+                        <div className="text-xs text-muted-foreground">סה"כ שולם</div>
                       </div>
-                      <div className="text-center p-2 bg-background rounded">
-                        <div className={`text-2xl font-bold ${balanceLessons > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                          {balanceLessons > 0 ? balanceLessons : '✓'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">יתרה</div>
+                    </div>
+                    <div className="mt-2 p-2 bg-background rounded text-center">
+                      <div className={`text-xl font-bold ${balanceAmount > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                        {balanceAmount > 0 ? `חוב: ₪${balanceAmount}` : balanceAmount < 0 ? `זכות: ₪${Math.abs(balanceAmount)}` : '✓ מאוזן'}
                       </div>
+                      {currentCredit > 0 && (
+                        <div className="text-xs text-green-600">+ יתרה לשיעור הבא: ₪{currentCredit}</div>
+                      )}
                     </div>
                   </div>
                 </div>
+                
+                {/* Payment History */}
+                {perLessonPayments.length > 0 && (
+                  <div className="p-3 bg-secondary/30 rounded-lg">
+                    <div className="font-medium mb-2">היסטוריית תשלומים</div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {perLessonPayments.slice().reverse().map((payment) => (
+                        <div key={payment.id} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {new Date(payment.paymentDate).toLocaleDateString('he-IL')}
+                          </span>
+                          <span className="font-medium text-green-600">₪{payment.amount}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
                   <CreditCard className="h-5 w-5 text-primary" />
                   <div>
                     <div className="font-medium">מחיר לשיעור</div>
-                    <div className="text-muted-foreground">₪{student.lessonPrice || 0}</div>
+                    <div className="text-muted-foreground">₪{lessonPrice}</div>
                   </div>
                 </div>
               </>
