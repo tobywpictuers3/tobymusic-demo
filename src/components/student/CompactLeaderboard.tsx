@@ -133,23 +133,23 @@ const CompactLeaderboard = () => {
               key={cat.key}
               className={`p-3 rounded-lg bg-gradient-to-br ${cat.color} border ${cat.borderColor}`}
             >
-              <div className={`flex items-center gap-1.5 mb-2 ${cat.textColor}`}>
+              <div className={`flex items-center gap-2 mb-3 ${cat.textColor}`}>
                 {cat.icon}
-                <span className="text-xs font-semibold">{cat.title}</span>
+                <span className="text-sm font-semibold">{cat.title}</span>
               </div>
               
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {cat.entries.length > 0 ? (
                   cat.entries.map((entry, idx) => (
                     <div
                       key={`${entry.studentId}-${cat.key}`}
-                      className="flex items-center justify-between text-xs"
+                      className="flex items-center justify-between text-sm"
                     >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-lg flex-shrink-0">{getMedalEmoji(idx)}</span>
-                        <span className="text-yellow-100/90 truncate">{entry.studentName}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xl flex-shrink-0">{getMedalEmoji(idx)}</span>
+                        <span className="text-yellow-100/90 truncate text-sm font-medium">{entry.studentName}</span>
                       </div>
-                      <Badge className="bg-black/40 text-yellow-200 text-[10px] px-1.5 py-0.5 flex-shrink-0">
+                      <Badge className="bg-black/40 text-yellow-200 text-sm px-2 py-1 flex-shrink-0">
                         {cat.format(cat.getValue(entry))}
                       </Badge>
                     </div>

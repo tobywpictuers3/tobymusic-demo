@@ -103,24 +103,24 @@ const MonthlyAchievements = ({ studentId }: MonthlyAchievementsProps) => {
               key={data.month}
               className="p-3 rounded-lg border border-border bg-gradient-to-br from-background to-muted/30"
             >
-              <div className="font-semibold text-sm mb-2 text-primary">
+              <div className="font-semibold text-base mb-3 text-primary">
                 {formatMonth(data.month)}
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="p-2 bg-background/80 rounded">
-                  <Clock className="h-3 w-3 mx-auto mb-1 text-purple-500" />
-                  <div className="text-sm font-bold text-purple-600">{data.totalMinutes}</div>
-                  <div className="text-[10px] text-muted-foreground">סה"כ דק'</div>
+                  <Clock className="h-4 w-4 mx-auto mb-1 text-purple-500" />
+                  <div className="text-lg font-bold text-purple-600">{data.totalMinutes}</div>
+                  <div className="text-xs text-muted-foreground">סה"כ דק'</div>
                 </div>
                 <div className="p-2 bg-background/80 rounded">
-                  <Trophy className="h-3 w-3 mx-auto mb-1 text-green-500" />
-                  <div className="text-sm font-bold text-green-600">{data.maxDailyMinutes}</div>
-                  <div className="text-[10px] text-muted-foreground">שיא יומי</div>
+                  <Trophy className="h-4 w-4 mx-auto mb-1 text-green-500" />
+                  <div className="text-lg font-bold text-green-600">{data.maxDailyMinutes}</div>
+                  <div className="text-xs text-muted-foreground">שיא יומי</div>
                 </div>
                 <div className="p-2 bg-background/80 rounded">
-                  <Flame className="h-3 w-3 mx-auto mb-1 text-orange-500" />
-                  <div className="text-sm font-bold text-orange-600">{data.maxStreak}</div>
-                  <div className="text-[10px] text-muted-foreground">רצף מקס'</div>
+                  <Flame className="h-4 w-4 mx-auto mb-1 text-orange-500" />
+                  <div className="text-lg font-bold text-orange-600">{data.maxStreak}</div>
+                  <div className="text-xs text-muted-foreground">רצף מקס'</div>
                 </div>
               </div>
             </div>
