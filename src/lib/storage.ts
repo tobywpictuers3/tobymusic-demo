@@ -254,7 +254,7 @@ export const updateLesson = (id: string, updatedFields: Partial<Lesson>): Lesson
   return lessons[lessonIndex];
 };
 
-export const deleteLesson = (id: string): boolean => {
+export const deleteLesson = async (id: string): Promise<boolean> => {
   const lessons = getLessons();
   const updatedLessons = lessons.filter(lesson => lesson.id !== id);
   if (updatedLessons.length === lessons.length) {
@@ -264,7 +264,8 @@ export const deleteLesson = (id: string): boolean => {
     devData['lessons'] = updatedLessons;
   } else {
     inMemoryStorage['lessons'] = updatedLessons;
-    hybridSync.onDataChange();
+    // Use onDestructiveChange for deletes to prevent merge from restoring
+    await hybridSync.onDestructiveChange();
   }
   return true;
 };
@@ -1422,12 +1423,14 @@ export const getTithePaid = (): Record<string, boolean> => {
   return inMemoryStorage['tithePaid'] || {};
 };
 
-export const saveTithePaid = (tithePaid: Record<string, boolean>): void => {
+export const saveTithePaid = async (tithePaid: Record<string, boolean>): Promise<{ success: boolean; synced: boolean }> => {
   if (isDevMode()) {
     devData['tithePaid'] = tithePaid;
+    return { success: true, synced: false };
   } else {
     inMemoryStorage['tithePaid'] = tithePaid;
-    hybridSync.onDataChange();
+    const result = await hybridSync.onDataChange();
+    return result;
   }
 };
 

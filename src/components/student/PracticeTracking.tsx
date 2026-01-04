@@ -325,16 +325,25 @@ const PracticeTracking = ({ studentId }: PracticeTrackingProps) => {
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
-      deletePracticeSession(sessionId);
-      await hybridSync.onDataChange();
+      // deletePracticeSession already uses onDestructiveChange internally
+      // DO NOT call onDataChange after delete - it can restore deleted records via merge
+      const deleted = await deletePracticeSession(sessionId);
       
-      setRefreshKey(k => k + 1);
-      
-      toast({
-        title: '✅ נמחק בהצלחה',
-        description: 'האימון נמחק מהמערכת',
-        duration: 3000,
-      });
+      if (deleted) {
+        setRefreshKey(k => k + 1);
+        
+        toast({
+          title: '✅ נמחק בהצלחה',
+          description: 'האימון נמחק ונשמר בדרופבוקס',
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: '⚠️ האימון לא נמצא',
+          description: 'ייתכן שכבר נמחק',
+          duration: 3000,
+        });
+      }
       
       setSessionToDelete(null);
     } catch (error) {

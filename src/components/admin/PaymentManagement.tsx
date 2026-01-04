@@ -44,13 +44,27 @@ const PaymentManagement = () => {
   const scrollBarInnerRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
-  const handleTitheToggle = (monthKey: string, isPaid: boolean) => {
+  const handleTitheToggle = async (monthKey: string, isPaid: boolean) => {
     const updated = { ...tithePaid, [monthKey]: isPaid };
     setTithePaid(updated);
-    saveTithePaid(updated);
-    toast({ 
-      description: isPaid ? 'מעשר סומן כהופרש ✓' : 'מעשר סומן כלא הופרש ⚠' 
-    });
+    
+    const result = await saveTithePaid(updated);
+    
+    if (result.synced) {
+      toast({ 
+        description: isPaid ? '✅ מעשר סומן כהופרש ונשמר בדרופבוקס' : '✅ מעשר סומן כלא הופרש ונשמר בדרופבוקס' 
+      });
+    } else if (result.success) {
+      toast({ 
+        description: isPaid ? '💾 מעשר סומן כהופרש (יסונכרן בקרוב)' : '💾 מעשר סומן כלא הופרש (יסונכרן בקרוב)' 
+      });
+    } else {
+      toast({ 
+        title: 'שגיאה',
+        description: 'לא הצלחנו לשמור את השינוי',
+        variant: 'destructive'
+      });
+    }
   };
 
   const academicMonths = [

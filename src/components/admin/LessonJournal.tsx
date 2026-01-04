@@ -296,14 +296,26 @@ const LessonJournal = () => {
         notes: 'שיעור מהמערכת שנמחק'
       };
       addLesson(deletedLesson);
+      loadData();
+      toast({ description: 'השיעור נמחק לצמיתות' });
     } else {
       const lessonData = lessons.find(l => l.id === lesson.id);
       setUndoStack([...undoStack, { action: 'delete', data: lessonData }]);
-      deleteLesson(lesson.id);
+      
+      // Use deleteLesson which now uses onDestructiveChange internally
+      const deleted = await deleteLesson(lesson.id);
+      
+      if (deleted) {
+        loadData();
+        toast({ description: 'השיעור נמחק ונשמר בדרופבוקס' });
+      } else {
+        toast({ 
+          title: 'שגיאה',
+          description: 'לא הצלחנו למחוק את השיעור',
+          variant: 'destructive'
+        });
+      }
     }
-    
-    loadData();
-    toast({ description: 'השיעור נמחק לצמיתות' });
   };
 
   const handleUndo = () => {
