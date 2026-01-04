@@ -1,43 +1,81 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, TrendingUp } from 'lucide-react';
-import { getStudentMonthlyAchievements, getStudentStatistics, getStudentPracticeSessions } from '@/lib/storage';
+import { Calendar, Trophy, Flame, Clock } from 'lucide-react';
+import { getStudentPracticeSessions } from '@/lib/storage';
 import { useEffect, useState } from 'react';
-import { MonthlyAchievement } from '@/lib/types';
-import { recalcAllForStudent } from '@/lib/practiceEngine';
+import { PracticeSession } from '@/lib/types';
 
 interface MonthlyAchievementsProps {
   studentId: string;
 }
 
+interface MonthData {
+  month: string;
+  totalMinutes: number;
+  maxDailyMinutes: number;
+  maxStreak: number;
+}
+
 const MonthlyAchievements = ({ studentId }: MonthlyAchievementsProps) => {
-  const [achievements, setAchievements] = useState<MonthlyAchievement[]>([]);
-  const [monthlyTotals, setMonthlyTotals] = useState<Record<string, number>>({});
+  const [monthlyData, setMonthlyData] = useState<MonthData[]>([]);
 
   useEffect(() => {
-    const cached = getStudentStatistics(studentId);
+    const sessions = getStudentPracticeSessions(studentId);
     
-    if (cached?.monthly) {
-      // Convert cached monthly to display format
-      const totals: Record<string, number> = {};
-      Object.entries(cached.monthly).forEach(([month, data]: [string, any]) => {
-        totals[month] = data.total;
-      });
-      setMonthlyTotals(totals);
-    } else {
-      // Calculate from practice sessions directly
-      const sessions = getStudentPracticeSessions(studentId);
-      const totals: Record<string, number> = {};
-      sessions.forEach((s: any) => {
-        const month = s.date.slice(0, 7);
-        totals[month] = (totals[month] || 0) + s.durationMinutes;
-      });
-      setMonthlyTotals(totals);
-    }
+    // Group sessions by month
+    const byMonth: Record<string, PracticeSession[]> = {};
+    sessions.forEach(s => {
+      const month = s.date.slice(0, 7);
+      if (!byMonth[month]) byMonth[month] = [];
+      byMonth[month].push(s);
+    });
 
-    // Load saved achievements from storage
-    const data = getStudentMonthlyAchievements(studentId);
-    setAchievements(data.sort((a, b) => b.month.localeCompare(a.month)));
+    // Calculate stats for each month
+    const data: MonthData[] = Object.entries(byMonth).map(([month, monthSessions]) => {
+      // Total minutes
+      const totalMinutes = monthSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+      
+      // Group by day for daily stats
+      const byDay: Record<string, number> = {};
+      monthSessions.forEach(s => {
+        byDay[s.date] = (byDay[s.date] || 0) + s.durationMinutes;
+      });
+      
+      // Max daily minutes
+      const maxDailyMinutes = Math.max(...Object.values(byDay), 0);
+      
+      // Max streak within month
+      const sortedDates = Object.keys(byDay).sort();
+      let maxStreak = 0;
+      let currentStreak = 0;
+      let prevDate: Date | null = null;
+      
+      for (const dateStr of sortedDates) {
+        const date = new Date(dateStr);
+        if (prevDate) {
+          const diffDays = Math.round((date.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays === 1) {
+            currentStreak++;
+          } else {
+            currentStreak = 1;
+          }
+        } else {
+          currentStreak = 1;
+        }
+        maxStreak = Math.max(maxStreak, currentStreak);
+        prevDate = date;
+      }
+      
+      return { month, totalMinutes, maxDailyMinutes, maxStreak };
+    });
+
+    // Sort by month descending, exclude current month
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    setMonthlyData(
+      data
+        .filter(d => d.month < currentMonth)
+        .sort((a, b) => b.month.localeCompare(a.month))
+    );
   }, [studentId]);
 
   const formatMonth = (month: string) => {
@@ -46,65 +84,48 @@ const MonthlyAchievements = ({ studentId }: MonthlyAchievementsProps) => {
     return date.toLocaleDateString('he-IL', { year: 'numeric', month: 'long' });
   };
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  if (monthlyData.length === 0) {
+    return null;
+  }
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <Calendar className="h-5 w-5" />
           הישגי חודשים קודמים
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {achievements.length > 0 ? (
-          <div className="space-y-4">
-            {achievements.map((achievement) => (
-              <div
-                key={achievement.id}
-                className={`p-4 rounded-lg border ${
-                  achievement.month === currentMonth
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border bg-card'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {formatMonth(achievement.month)}
-                    {achievement.month === currentMonth && (
-                      <Badge variant="default" className="text-xs">פעיל</Badge>
-                    )}
-                  </h3>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {monthlyData.map((data) => (
+            <div
+              key={data.month}
+              className="p-3 rounded-lg border border-border bg-gradient-to-br from-background to-muted/30"
+            >
+              <div className="font-semibold text-sm mb-2 text-primary">
+                {formatMonth(data.month)}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2 bg-background/80 rounded">
+                  <Clock className="h-3 w-3 mx-auto mb-1 text-purple-500" />
+                  <div className="text-sm font-bold text-purple-600">{data.totalMinutes}</div>
+                  <div className="text-[10px] text-muted-foreground">סה"כ דק'</div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="text-center p-3 bg-background/50 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">סכום כולל</div>
-                    <div className="text-lg font-bold text-purple-600">
-                      {monthlyTotals[achievement.month] || 0} דק'
-                    </div>
-                  </div>
-                  <div className="text-center p-3 bg-background/50 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">מקסימום יומי</div>
-                    <div className="text-lg font-bold text-green-600">
-                      {achievement.maxDailyMinutes} דק'
-                    </div>
-                  </div>
-                  <div className="text-center p-3 bg-background/50 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">רצף מקסימלי</div>
-                    <div className="text-lg font-bold text-orange-600">
-                      {achievement.maxStreak} ימים
-                    </div>
-                  </div>
+                <div className="p-2 bg-background/80 rounded">
+                  <Trophy className="h-3 w-3 mx-auto mb-1 text-green-500" />
+                  <div className="text-sm font-bold text-green-600">{data.maxDailyMinutes}</div>
+                  <div className="text-[10px] text-muted-foreground">שיא יומי</div>
+                </div>
+                <div className="p-2 bg-background/80 rounded">
+                  <Flame className="h-3 w-3 mx-auto mb-1 text-orange-500" />
+                  <div className="text-sm font-bold text-orange-600">{data.maxStreak}</div>
+                  <div className="text-[10px] text-muted-foreground">רצף מקס'</div>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-center text-muted-foreground py-8">
-            עדיין אין הישגים שנרשמו. המשיכי להתאמן!
-          </p>
-        )}
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
