@@ -1,4 +1,4 @@
-import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, PerLessonPayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase } from './types';
+import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, PerLessonPayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase, YearlyLeaderboardEntry } from './types';
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 import { isDevMode, setDevMode } from './devMode';
@@ -1284,6 +1284,252 @@ export const getCurrentQuarterLeaderboard = (): LeaderboardEntry[] => {
     })
     .filter((entry): entry is LeaderboardEntry => entry !== null)
     .sort((a, b) => b.dailyAverage - a.dailyAverage);
+};
+
+// ============= YEARLY LEADERBOARD (5 CATEGORIES + MEDAL KPI) =============
+
+/**
+ * Get the current academic year range (Sep 1 to Sep 1)
+ */
+const getAcademicYearRange = (): { start: Date; end: Date } => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-11
+  
+  // Academic year starts Sep 1
+  // If we're in Sep-Dec, academic year is currentYear to currentYear+1
+  // If we're in Jan-Aug, academic year is currentYear-1 to currentYear
+  let startYear: number;
+  if (currentMonth >= 8) { // Sep (8) or later
+    startYear = currentYear;
+  } else {
+    startYear = currentYear - 1;
+  }
+  
+  const start = new Date(startYear, 8, 1, 0, 0, 0, 0); // Sep 1, 00:00
+  const end = new Date(startYear + 1, 8, 1, 0, 0, 0, 0); // Next Sep 1, 00:00 (exclusive)
+  
+  return { start, end };
+};
+
+/**
+ * Get current calendar week range (Saturday 00:00 to Saturday 00:00)
+ */
+const getCurrentWeekRange = (): { start: Date; end: Date } => {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  
+  // Calculate days since last Saturday
+  // If today is Saturday (6), daysSinceSat = 0
+  // If today is Sunday (0), daysSinceSat = 1
+  // etc.
+  const daysSinceSat = (dayOfWeek + 1) % 7;
+  
+  const start = new Date(now);
+  start.setDate(now.getDate() - daysSinceSat);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+  
+  return { start, end };
+};
+
+/**
+ * Get rolling 7 days window (D-7 to D-1)
+ * Today is NOT included
+ */
+const getRolling7DaysRange = (): { start: Date; end: Date } => {
+  const now = new Date();
+  
+  // End = yesterday 23:59:59
+  const end = new Date(now);
+  end.setDate(now.getDate() - 1);
+  end.setHours(23, 59, 59, 999);
+  
+  // Start = 7 days before today at 00:00
+  const start = new Date(now);
+  start.setDate(now.getDate() - 7);
+  start.setHours(0, 0, 0, 0);
+  
+  return { start, end };
+};
+
+/**
+ * Calculate max daily minutes from sessions
+ */
+const calcMaxDailyMinutes = (sessions: PracticeSession[]): number => {
+  if (sessions.length === 0) return 0;
+  
+  const dailyTotals: Record<string, number> = {};
+  sessions.forEach(s => {
+    dailyTotals[s.date] = (dailyTotals[s.date] || 0) + s.durationMinutes;
+  });
+  
+  return Math.max(0, ...Object.values(dailyTotals));
+};
+
+/**
+ * Calculate longest streak of consecutive days with practice
+ */
+const calcMaxStreak = (sessions: PracticeSession[]): number => {
+  if (sessions.length === 0) return 0;
+  
+  // Get unique dates with at least 1 minute
+  const datesWithPractice = new Set<string>();
+  sessions.forEach(s => {
+    if (s.durationMinutes >= 1) {
+      datesWithPractice.add(s.date);
+    }
+  });
+  
+  if (datesWithPractice.size === 0) return 0;
+  
+  // Sort dates
+  const sortedDates = Array.from(datesWithPractice).sort();
+  
+  let maxStreak = 1;
+  let currentStreak = 1;
+  
+  for (let i = 1; i < sortedDates.length; i++) {
+    const prev = new Date(sortedDates[i - 1]);
+    const curr = new Date(sortedDates[i]);
+    
+    // Check if consecutive days
+    const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) {
+      currentStreak++;
+      maxStreak = Math.max(maxStreak, currentStreak);
+    } else {
+      currentStreak = 1;
+    }
+  }
+  
+  return maxStreak;
+};
+
+/**
+ * Calculate highest average between lessons
+ * Average = total minutes in segment / calendar days in segment
+ */
+const calcMaxAvgBetweenLessons = (studentId: string, sessions: PracticeSession[], academicYearStart: Date, academicYearEnd: Date): number => {
+  const lessons = getLessons()
+    .filter(l => l.studentId === studentId && l.status === 'completed')
+    .filter(l => {
+      const lessonDate = new Date(l.date);
+      return lessonDate >= academicYearStart && lessonDate < academicYearEnd;
+    })
+    .sort((a, b) => {
+      // Sort by date, then by startTime
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.startTime.localeCompare(b.startTime);
+    });
+  
+  if (lessons.length < 2) return 0;
+  
+  let maxAvg = 0;
+  
+  for (let i = 1; i < lessons.length; i++) {
+    const prevLesson = lessons[i - 1];
+    const currLesson = lessons[i];
+    
+    // Segment: from prevLesson start time to currLesson start time
+    const segmentStart = new Date(`${prevLesson.date}T${prevLesson.startTime}:00`);
+    const segmentEnd = new Date(`${currLesson.date}T${currLesson.startTime}:00`);
+    
+    // Calculate calendar days in segment
+    const daysDiff = Math.max(1, Math.ceil((segmentEnd.getTime() - segmentStart.getTime()) / (1000 * 60 * 60 * 24)));
+    
+    // Sum practice minutes in this segment
+    const segmentSessions = sessions.filter(s => {
+      const sessionDate = new Date(s.date);
+      return sessionDate >= segmentStart && sessionDate < segmentEnd;
+    });
+    
+    const totalMinutes = segmentSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+    const avg = totalMinutes / daysDiff;
+    
+    maxAvg = Math.max(maxAvg, avg);
+  }
+  
+  return maxAvg;
+};
+
+/**
+ * Calculate rolling 7 days total
+ */
+const calcRolling7DaysTotal = (sessions: PracticeSession[]): number => {
+  const { start, end } = getRolling7DaysRange();
+  
+  return sessions
+    .filter(s => {
+      const sessionDate = new Date(s.date);
+      return sessionDate >= start && sessionDate <= end;
+    })
+    .reduce((sum, s) => sum + s.durationMinutes, 0);
+};
+
+/**
+ * Calculate current week max daily minutes
+ */
+const calcWeeklyMaxDaily = (sessions: PracticeSession[]): number => {
+  const { start, end } = getCurrentWeekRange();
+  
+  const weeklySessions = sessions.filter(s => {
+    const sessionDate = new Date(s.date);
+    return sessionDate >= start && sessionDate < end;
+  });
+  
+  return calcMaxDailyMinutes(weeklySessions);
+};
+
+/**
+ * Get yearly leaderboard with 5 categories + medal KPI
+ */
+export const getYearlyLeaderboard = (): YearlyLeaderboardEntry[] => {
+  const students = getStudents();
+  const allSessions = getPracticeSessions();
+  const { start: yearStart, end: yearEnd } = getAcademicYearRange();
+  
+  return students.map(student => {
+    // Filter sessions for this student within academic year
+    const studentSessions = allSessions.filter(s => {
+      if (s.studentId !== student.id) return false;
+      const sessionDate = new Date(s.date);
+      return sessionDate >= yearStart && sessionDate < yearEnd;
+    });
+    
+    // Category 1: Max daily total - yearly
+    const maxDailyMinutesYearly = calcMaxDailyMinutes(studentSessions);
+    
+    // Category 2: Longest streak - yearly
+    const maxStreakYearly = calcMaxStreak(studentSessions);
+    
+    // Category 3: Highest weekly average between lessons - yearly
+    const maxAvgBetweenLessons = calcMaxAvgBetweenLessons(student.id, studentSessions, yearStart, yearEnd);
+    
+    // Category 4: Max daily total - current calendar week
+    const maxDailyMinutesWeekly = calcWeeklyMaxDaily(allSessions.filter(s => s.studentId === student.id));
+    
+    // Category 5: Rolling 7 days total (D-7 to D-1)
+    const rolling7DaysTotal = calcRolling7DaysTotal(allSessions.filter(s => s.studentId === student.id));
+    
+    // KPI: Current medal score (copper equivalent)
+    const currentMedalScore = calculateEarnedCopper(student.id);
+    
+    return {
+      studentId: student.id,
+      studentName: `${student.firstName} ${student.lastName}`,
+      maxDailyMinutesYearly,
+      maxStreakYearly,
+      maxAvgBetweenLessons,
+      maxDailyMinutesWeekly,
+      rolling7DaysTotal,
+      currentMedalScore,
+    };
+  });
 };
 
 // Medal Records
