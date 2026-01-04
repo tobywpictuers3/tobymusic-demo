@@ -205,9 +205,28 @@ export interface MonthlyAchievement {
 export interface LeaderboardEntry {
   studentId: string;
   studentName: string;
+  // Legacy fields (kept for backward compatibility)
   dailyAverage: number;
   maxDailyMinutes: number;
   maxStreak: number;
+}
+
+// NEW: Yearly leaderboard with 5 categories + medal KPI
+export interface YearlyLeaderboardEntry {
+  studentId: string;
+  studentName: string;
+  // Category 1: Max daily total - yearly
+  maxDailyMinutesYearly: number;
+  // Category 2: Longest streak - yearly
+  maxStreakYearly: number;
+  // Category 3: Highest weekly average between lessons - yearly
+  maxAvgBetweenLessons: number;
+  // Category 4: Max daily total - current calendar week (Sat-Sat)
+  maxDailyMinutesWeekly: number;
+  // Category 5: Rolling 7 days (D-7 to D-1)
+  rolling7DaysTotal: number;
+  // KPI: Current medal score (copper equivalent)
+  currentMedalScore: number;
 }
 
 export interface Attachment {
