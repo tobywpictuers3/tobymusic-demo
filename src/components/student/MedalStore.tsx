@@ -303,21 +303,6 @@ const MedalStore = ({ studentId }: MedalStoreProps) => {
                         </span>
                       </div>
 
-                      {/* Requirements indicators */}
-                      {item.requirements && (
-                        <div className="flex flex-wrap gap-1 text-xs">
-                          {item.requirements.minStreakDays && (
-                            <Badge variant="outline" className="text-xs">
-                              🔥 {item.requirements.minStreakDays} ימים
-                            </Badge>
-                          )}
-                          {item.requirements.minMinutesInLastNDays && (
-                            <Badge variant="outline" className="text-xs">
-                              ⏱️ {item.requirements.minMinutesInLastNDays} דק'
-                            </Badge>
-                          )}
-                        </div>
-                      )}
 
                       {/* Purchase Button */}
                       {!purchased && (

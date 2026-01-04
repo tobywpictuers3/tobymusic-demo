@@ -34,15 +34,12 @@ const AdminStoreManagement = () => {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   
-  // Form state
+  // Form state - simplified: only name, description, price, stock, image
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     priceCredits: 10,
     stock: 1,
-    minStreakDays: 0,
-    minMinutesInLastNDays: 0,
-    windowDays: 7,
     imageUrl: '',
     imagePath: ''
   });
@@ -98,6 +95,7 @@ const AdminStoreManagement = () => {
       return;
     }
 
+    // Simplified: no requirements, only price and stock
     const newItem: Omit<StoreItem, 'id' | 'createdAt' | 'lastModified'> = {
       name: formData.name.trim(),
       description: formData.description.trim() || undefined,
@@ -105,14 +103,7 @@ const AdminStoreManagement = () => {
       stock: formData.stock,
       imageUrl: formData.imageUrl || undefined,
       imagePath: formData.imagePath || undefined,
-      isActive: true,
-      requirements: (formData.minStreakDays > 0 || formData.minMinutesInLastNDays > 0) 
-        ? {
-            minStreakDays: formData.minStreakDays || undefined,
-            minMinutesInLastNDays: formData.minMinutesInLastNDays || undefined,
-            windowDays: formData.windowDays
-          }
-        : undefined
+      isActive: true
     };
 
     upsertStoreItem(newItem as StoreItem);
@@ -124,9 +115,6 @@ const AdminStoreManagement = () => {
       description: '',
       priceCredits: 10,
       stock: 1,
-      minStreakDays: 0,
-      minMinutesInLastNDays: 0,
-      windowDays: 7,
       imageUrl: '',
       imagePath: ''
     });
@@ -214,47 +202,15 @@ const AdminStoreManagement = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label>מלאי</Label>
-                  <Input 
-                    type="number"
-                    min={0}
-                    value={formData.stock}
-                    onChange={(e) => setFormData(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
-                  />
-                </div>
-                <div>
-                  <Label>דרישת רצף (ימים)</Label>
-                  <Input 
-                    type="number"
-                    min={0}
-                    value={formData.minStreakDays}
-                    onChange={(e) => setFormData(prev => ({ ...prev, minStreakDays: parseInt(e.target.value) || 0 }))}
-                  />
-                </div>
-                <div>
-                  <Label>דרישת דקות אימון</Label>
-                  <Input 
-                    type="number"
-                    min={0}
-                    value={formData.minMinutesInLastNDays}
-                    onChange={(e) => setFormData(prev => ({ ...prev, minMinutesInLastNDays: parseInt(e.target.value) || 0 }))}
-                  />
-                </div>
+              <div className="w-32">
+                <Label>מלאי</Label>
+                <Input 
+                  type="number"
+                  min={0}
+                  value={formData.stock}
+                  onChange={(e) => setFormData(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
+                />
               </div>
-
-              {(formData.minStreakDays > 0 || formData.minMinutesInLastNDays > 0) && (
-                <div className="w-32">
-                  <Label>חלון ימים</Label>
-                  <Input 
-                    type="number"
-                    min={1}
-                    value={formData.windowDays}
-                    onChange={(e) => setFormData(prev => ({ ...prev, windowDays: parseInt(e.target.value) || 7 }))}
-                  />
-                </div>
-              )}
 
               <div className="flex items-center gap-4">
                 <div className="flex-1">
@@ -308,14 +264,13 @@ const AdminStoreManagement = () => {
                 <TableHead className="text-right">תיאור</TableHead>
                 <TableHead className="text-right">מחיר</TableHead>
                 <TableHead className="text-right">מלאי</TableHead>
-                <TableHead className="text-right">דרישות</TableHead>
                 <TableHead className="text-right w-16">פעולות</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     אין מוצרים בחנות. הוסיפי מוצר חדש!
                   </TableCell>
                 </TableRow>
@@ -336,20 +291,6 @@ const AdminStoreManagement = () => {
                       <Badge variant={item.stock > 0 ? 'outline' : 'destructive'}>
                         {item.stock}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {item.requirements ? (
-                        <div className="space-y-1">
-                          {item.requirements.minStreakDays && (
-                            <div>🔥 {item.requirements.minStreakDays} ימים</div>
-                          )}
-                          {item.requirements.minMinutesInLastNDays && (
-                            <div>⏱️ {item.requirements.minMinutesInLastNDays} דק'</div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
                     </TableCell>
                     <TableCell>
                       <Button
