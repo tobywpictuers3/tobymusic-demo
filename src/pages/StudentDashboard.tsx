@@ -10,7 +10,7 @@ import { Student, Lesson } from '@/lib/types';
 import { getAllLessonsIncludingTemplates } from '@/lib/lessonUtils';
 import { useAccessMode } from '@/contexts/AccessModeContext';
 import { clearClientCaches } from '@/lib/cacheManager';
-
+import EditableStudentDetails from '@/components/student/EditableStudentDetails';
 import GeneralWeeklySchedule from '@/components/student/GeneralWeeklySchedule';
 import ContactsList from '@/components/student/ContactsList';
 import StudentFiles from '@/components/student/StudentFiles';
