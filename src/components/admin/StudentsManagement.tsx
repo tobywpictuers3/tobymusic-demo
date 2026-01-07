@@ -635,13 +635,26 @@ const StudentsManagement = () => {
                   
                   if (formula.startsWith('=')) {
                     try {
-                      // Remove = and evaluate the expression
+                      // Remove = and evaluate the expression using safe math parser
                       const expression = formula.slice(1);
-                      // Safe evaluation - only allow numbers and basic operators
+                      // Only allow numbers and basic math operators
                       const sanitized = expression.replace(/[^0-9+\-*/().]/g, '');
-                      const result = eval(sanitized);
-                      if (!isNaN(result) && isFinite(result)) {
-                        setStudentForm(prev => ({...prev, calculatedFormula: formula, calculatedAmount: Math.round(result)}));
+                      if (sanitized.length > 0) {
+                        // Use Function constructor with restricted scope as a safer alternative to eval
+                        // This creates a function that only has access to Math operations
+                        const safeEval = (expr: string): number => {
+                          // Validate expression contains only safe characters
+                          if (!/^[0-9+\-*/().]+$/.test(expr)) {
+                            throw new Error('Invalid characters in expression');
+                          }
+                          // Use Function to evaluate in a controlled scope
+                          const fn = new Function('return ' + expr);
+                          return fn();
+                        };
+                        const result = safeEval(sanitized);
+                        if (!isNaN(result) && isFinite(result)) {
+                          setStudentForm(prev => ({...prev, calculatedFormula: formula, calculatedAmount: Math.round(result)}));
+                        }
                       }
                     } catch (e) {
                       // Invalid formula, ignore

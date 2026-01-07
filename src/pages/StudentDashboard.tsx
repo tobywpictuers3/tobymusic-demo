@@ -26,7 +26,7 @@ import MedalCollection from "@/components/student/MedalCollection";
 import MedalStore from "@/components/student/MedalStore";
 import BackButton from "@/components/ui/back-button";
 import { SaveButton } from "@/components/ui/save-button";
-import UnreadMessagesBadge from "@/components/ui/unread-messages-badge";
+import { UnreadMessagesBadge } from "@/components/ui/unread-messages-badge";
 import StudentSwapPanel, { StudentSwapPanelRef } from "@/components/student/lessonSwap/StudentSwapPanel";
 
 import Metronome from "./Metronome";
@@ -111,14 +111,12 @@ const StudentDashboard = () => {
     navigate("/", { replace: true });
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      // אם יש אצלך שמירה אמיתית — השאירי את הקריאה הקיימת שלך.
-      // פה זה Placeholder כדי לא לשנות לך לוגיקה עסקית.
-      toast({ title: "נשמר" });
-    } finally {
-      setSaving(false);
+  const handleStudentUpdate = () => {
+    // Refresh student data
+    const students = getStudents();
+    const found = students.find((s) => s?.id === student.id);
+    if (found) {
+      setStudent(found);
     }
   };
 
@@ -138,8 +136,8 @@ const StudentDashboard = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <UnreadMessagesBadge studentId={student.id} />
-          <SaveButton onClick={handleSave} isLoading={saving} />
+          <UnreadMessagesBadge userId={student.id} />
+          <SaveButton />
           <Button variant="outline" onClick={handleLogout} className="gap-2">
             <LogOut className="w-4 h-4" />
             התנתקות
@@ -147,10 +145,10 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      <BroadcastMessageBanner />
-      <StarredMessagesBanner />
+      <BroadcastMessageBanner studentId={student.id} />
+      <StarredMessagesBanner studentId={student.id} />
 
-      <PaymentAlert student={student} />
+      <PaymentAlert studentId={student.id} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-10 gap-2 h-auto">
@@ -185,11 +183,11 @@ const StudentDashboard = () => {
         </TabsList>
 
         <TabsContent value="schedule" className="space-y-6">
-          <GeneralWeeklySchedule student={student} lessons={lessons} />
+          <GeneralWeeklySchedule studentId={student.id} lessons={lessons} />
         </TabsContent>
 
         <TabsContent value="practice" className="space-y-6">
-          <PracticeTracking student={student} />
+          <PracticeTracking studentId={student.id} />
         </TabsContent>
 
         <TabsContent value="metronome" className="space-y-6">
@@ -204,11 +202,11 @@ const StudentDashboard = () => {
         </TabsContent>
 
         <TabsContent value="medals" className="space-y-6">
-          <MedalCollection student={student} />
+          <MedalCollection studentId={student.id} />
         </TabsContent>
 
         <TabsContent value="store" className="space-y-6">
-          <MedalStore student={student} />
+          <MedalStore studentId={student.id} />
         </TabsContent>
 
         <TabsContent value="history" className="space-y-6">
@@ -216,19 +214,19 @@ const StudentDashboard = () => {
         </TabsContent>
 
         <TabsContent value="messages" className="space-y-6">
-          <GmailStyleMessages student={student} />
+          <GmailStyleMessages studentId={student.id} studentName={`${student.firstName} ${student.lastName}`} />
         </TabsContent>
 
         <TabsContent value="details" className="space-y-6">
-          <EditableStudentDetails student={student} />
+          <EditableStudentDetails student={student} onUpdate={handleStudentUpdate} />
         </TabsContent>
 
         <TabsContent value="contacts" className="space-y-6">
-          <ContactsList student={student} />
+          <ContactsList />
         </TabsContent>
 
         <TabsContent value="files" className="space-y-6">
-          <StudentFiles student={student} />
+          <StudentFiles studentId={student.id} />
         </TabsContent>
       </Tabs>
 
