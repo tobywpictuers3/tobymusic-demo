@@ -36,7 +36,7 @@ export class TunerEngine {
 
   private rafId: number | null = null;
 
-  private buf: Float32Array = new Float32Array(2048);
+  private buf: Float32Array<ArrayBufferLike> = new Float32Array(2048);
 
   private a4Hz = 440;
   private minHz = 50;
@@ -133,7 +133,7 @@ export class TunerEngine {
       return;
     }
 
-    this.analyser.getFloatTimeDomainData(this.buf);
+    this.analyser.getFloatTimeDomainData(this.buf as Float32Array<ArrayBuffer>);
 
     const { hz, clarity } = estimatePitchAutoCorr(this.buf, this.audioCtx!.sampleRate, this.minHz, this.maxHz);
 
@@ -153,7 +153,7 @@ export class TunerEngine {
  * returns hz + clarity (0..1)
  */
 function estimatePitchAutoCorr(
-  input: Float32Array,
+  input: Float32Array<ArrayBufferLike>,
   sampleRate: number,
   minHz: number,
   maxHz: number
@@ -222,7 +222,7 @@ function estimatePitchAutoCorr(
   return { hz, clarity };
 }
 
-function autoCorrAtLag(input: Float32Array, mean: number, lag: number) {
+function autoCorrAtLag(input: Float32Array<ArrayBufferLike>, mean: number, lag: number) {
   if (lag < 1) return 0;
   const size = input.length;
   let corr = 0;

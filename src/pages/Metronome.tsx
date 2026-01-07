@@ -63,7 +63,7 @@ function centsOffFromPitch(freq: number, noteNumber: number) {
  * Autocorrelation pitch detection (simple + stable enough for tuner UI).
  * Returns frequency in Hz, or -1 if no reliable pitch.
  */
-function autoCorrelateFloat32(buf: Float32Array, sampleRate: number) {
+function autoCorrelateFloat32(buf: Float32Array<ArrayBufferLike>, sampleRate: number) {
   // RMS gate (silence filter)
   let rms = 0;
   for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
@@ -139,7 +139,7 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
-  const bufRef = useRef<Float32Array | null>(null);
+  const bufRef = useRef<Float32Array<ArrayBufferLike> | null>(null);
 
   const stopMic = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -201,7 +201,7 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
         const buf = bufRef.current;
         if (!a || !ctx || !buf) return;
 
-        a.getFloatTimeDomainData(buf);
+        a.getFloatTimeDomainData(buf as Float32Array<ArrayBuffer>);
         const f = autoCorrelateFloat32(buf, ctx.sampleRate);
 
         if (f > 0) {
