@@ -2,6 +2,7 @@ import { Message } from './types';
 import { isDevMode, getDevStore, getStudents, loadLocalMessages, saveLocalMessages } from './storage';
 import { hybridSync } from './hybridSync';
 import { workerApi } from './workerApi';
+import { sanitizeHtml } from './sanitize';
 
 // Get storage location
 const getStorage = () => {
@@ -548,7 +549,7 @@ const workerMessageToAppMessage = (workerMsg: any): Message => {
     recipientIds,
     subject: workerMsg.subject || '(ללא נושא)',
     content: workerMsg.body?.text || '',
-    contentHtml: workerMsg.body?.html,
+    contentHtml: workerMsg.body?.html ? sanitizeHtml(workerMsg.body.html) : undefined,
     createdAt: workerMsg.timestamps?.createdAt || now,
     type: 'general',
     messageType: recipientIds.includes('all') ? 'broadcast' : recipientIds.length > 1 ? 'group' : 'direct-student',

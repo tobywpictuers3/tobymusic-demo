@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { Card, CardContent } from "@/components/safe-ui/card";
 import { Button } from "@/components/safe-ui/button";
 import { Badge } from "@/components/safe-ui/badge";
@@ -841,7 +842,7 @@ function MessageView({
 
       <div className="text-sm leading-relaxed">
         {message.contentHtml ? (
-          <div dangerouslySetInnerHTML={{ __html: message.contentHtml }} />
+          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.contentHtml) }} />
         ) : (
           <div className="whitespace-pre-wrap">{message.content}</div>
         )}
