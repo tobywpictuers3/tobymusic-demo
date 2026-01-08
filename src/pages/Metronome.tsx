@@ -465,42 +465,65 @@ export default function Metronome() {
       className="min-h-screen w-full p-6"
       style={{ background: "linear-gradient(135deg, #1a0c0e 0%, #2a0f12 55%, #140607 100%)" }}
     >
-      <div className="mx-auto w-full max-w-5xl">
-        {/* Header - תיקון לפי הסימון שלך */}
-        <div className="mb-4 flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold" style={{ color: COLORS.gold }}>
-            מטרונום טיונר
-          </h1>
-          <div className="text-sm" style={{ color: "rgba(255,255,255,0.70)" }}>
-            מטרונום + טיונר (מיקרופון) — באותו עמוד
-          </div>
-        </div>
+ <div className="mx-auto w-full max-w-5xl">
+  {/* Header */}
+  <div className="mb-6 flex flex-col gap-1">
+    <h1
+      className="text-2xl font-semibold"
+      style={{ color: COLORS.gold }}
+    >
+      מטרונום טיונר
+    </h1>
+  </div>
 
-        {/* Sub Tabs */}
-        <div className="mb-6 flex gap-2">
-          <button
-            onClick={() => setTab("metronome")}
-            className="rounded-lg px-4 py-2 text-sm font-semibold"
-            style={{
-              background: tab === "metronome" ? COLORS.gold : "rgba(255,255,255,0.10)",
-              color: tab === "metronome" ? COLORS.ink : "rgba(255,255,255,0.85)",
-              border: `1px solid ${tab === "metronome" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"}`,
-            }}
-          >
-            מטרונום
-          </button>
-          <button
-            onClick={() => setTab("tuner")}
-            className="rounded-lg px-4 py-2 text-sm font-semibold"
-            style={{
-              background: tab === "tuner" ? COLORS.gold : "rgba(255,255,255,0.10)",
-              color: tab === "tuner" ? COLORS.ink : "rgba(255,255,255,0.85)",
-              border: `1px solid ${tab === "tuner" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"}`,
-            }}
-          >
-            טיונר
-          </button>
-        </div>
+  {/* Sub Tabs */}
+  <div className="mb-6 flex gap-2">
+    <button
+      onClick={() => setTab("metronome")}
+      className="rounded-lg px-4 py-2 text-sm font-semibold transition"
+      style={{
+        background:
+          tab === "metronome"
+            ? COLORS.gold
+            : "rgba(255,255,255,0.10)",
+        color:
+          tab === "metronome"
+            ? COLORS.ink
+            : "rgba(255,255,255,0.85)",
+        border: `1px solid ${
+          tab === "metronome"
+            ? "rgba(0,0,0,0.25)"
+            : "rgba(255,255,255,0.18)"
+        }`,
+      }}
+    >
+      מטרונום
+    </button>
+
+    <button
+      onClick={() => setTab("tuner")}
+      className="rounded-lg px-4 py-2 text-sm font-semibold transition"
+      style={{
+        background:
+          tab === "tuner"
+            ? COLORS.gold
+            : "rgba(255,255,255,0.10)",
+        color:
+          tab === "tuner"
+            ? COLORS.ink
+            : "rgba(255,255,255,0.85)",
+        border: `1px solid ${
+          tab === "tuner"
+            ? "rgba(0,0,0,0.25)"
+            : "rgba(255,255,255,0.18)"
+        }`,
+      }}
+    >
+      טיונר
+    </button>
+  </div>
+</div>
+
 
         {tab === "tuner" ? (
           <TunerPanel COLORS={COLORS} />
@@ -684,7 +707,7 @@ export default function Metronome() {
 
                 <div className="flex items-center gap-2">
                   <div className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
-                    נקודה
+                    פעמה
                   </div>
                   <div
                     className="h-4 w-4 rounded-full"
