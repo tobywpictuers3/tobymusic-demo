@@ -1074,58 +1074,115 @@ export const getStudentPracticeSessions = (studentId: string): PracticeSession[]
   );
 };
 
-export const addPracticeSession = (session: Omit<PracticeSession, 'id' | 'createdAt'>): PracticeSession => {
+export const addPracticeSession = (
+  session: Omit<PracticeSession, 'id' | 'createdAt'>
+): PracticeSession => {
   const sessions = getPracticeSessions();
   const now = new Date().toISOString();
+
   const newSession: PracticeSession = {
     ...session,
     id: generateId(),
     createdAt: now,
-    lastModified: now, // Add timestamp for optimistic locking
+    lastModified: now,
   };
+
   sessions.push(newSession);
+
+  // ✅ Recalc monthly achievements from source-of-truth sessions
+  recalcMonthlyAchievementFromSessions(newSession.studentId, newSession.date.slice(0, 7));
+
   if (isDevMode()) {
     devData['practiceSessions'] = sessions;
+    devData['monthlyAchievements'] = getMonthlyAchievements();
   } else {
     inMemoryStorage['practiceSessions'] = sessions;
+    inMemoryStorage['monthlyAchievements'] = getMonthlyAchievements();
     hybridSync.onDataChange();
   }
+
   return newSession;
 };
 
-export const updatePracticeSession = (id: string, updatedFields: Partial<PracticeSession>): PracticeSession | undefined => {
+
+export const updatePracticeSession = (
+  id: string,
+  updatedFields: Partial<PracticeSession>
+): PracticeSession | undefined => {
   const sessions = getPracticeSessions();
   const index = sessions.findIndex(s => s.id === id);
   if (index === -1) return undefined;
-  
-  sessions[index] = { 
-    ...sessions[index], 
+
+  const before = sessions[index];
+  const beforeMonth = before.date.slice(0, 7);
+
+  const now = new Date().toISOString();
+
+  sessions[index] = {
+    ...before,
     ...updatedFields,
-    lastModified: new Date().toISOString() // Update timestamp
+    lastModified: now,
   };
+
+  const after = sessions[index];
+  const afterMonth = after.date.slice(0, 7);
+
+  // ✅ Recalc affected month(s)
+  recalcMonthlyAchievementFromSessions(after.studentId, afterMonth);
+  if (beforeMonth !== afterMonth) {
+    recalcMonthlyAchievementFromSessions(before.studentId, beforeMonth);
+  }
+
   if (isDevMode()) {
     devData['practiceSessions'] = sessions;
+    devData['monthlyAchievements'] = getMonthlyAchievements();
   } else {
     inMemoryStorage['practiceSessions'] = sessions;
+    inMemoryStorage['monthlyAchievements'] = getMonthlyAchievements();
     hybridSync.onDataChange();
   }
+
   return sessions[index];
 };
 
+
 export const deletePracticeSession = async (id: string): Promise<boolean> => {
   const sessions = getPracticeSessions();
+  const sessionToDelete = sessions.find(s => s.id === id);
+
   const updatedSessions = sessions.filter(s => s.id !== id);
-  if (updatedSessions.length === sessions.length) {
-    return false;
-  }
+  if (updatedSessions.length === sessions.length) return false;
+
   if (isDevMode()) {
     devData['practiceSessions'] = updatedSessions;
+
+    if (sessionToDelete) {
+      recalcMonthlyAchievementFromSessions(
+        sessionToDelete.studentId,
+        sessionToDelete.date.slice(0, 7)
+      );
+    }
+
+    devData['monthlyAchievements'] = getMonthlyAchievements();
   } else {
     inMemoryStorage['practiceSessions'] = updatedSessions;
+
+    if (sessionToDelete) {
+      recalcMonthlyAchievementFromSessions(
+        sessionToDelete.studentId,
+        sessionToDelete.date.slice(0, 7)
+      );
+    }
+
+    inMemoryStorage['monthlyAchievements'] = getMonthlyAchievements();
+
+    // ✅ important for deletes
     await hybridSync.onDestructiveChange();
   }
+
   return true;
 };
+
 
 // Monthly Achievements
 export const getMonthlyAchievements = (): MonthlyAchievement[] => {
