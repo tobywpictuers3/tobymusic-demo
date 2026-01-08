@@ -56,24 +56,23 @@ function noteName(noteNumber: number) {
 
 function centsOffFromPitch(freq: number, noteNumber: number) {
   const ref = frequencyFromNoteNumber(noteNumber);
-  return Math.floor((1200 * Math.log2(freq / ref)) * 10) / 10; // 0.1 cents resolution
+  return Math.floor((1200 * Math.log2(freq / ref)) * 10) / 10; // 0.1 cents
 }
 
 /**
- * Autocorrelation pitch detection (simple + stable enough for tuner UI).
+ * Autocorrelation pitch detection.
  * Returns frequency in Hz, or -1 if no reliable pitch.
  */
-function autoCorrelateFloat32(buf: Float32Array<ArrayBufferLike>, sampleRate: number) {
-  // RMS gate (silence filter)
+function autoCorrelateFloat32(buf: Float32Array, sampleRate: number) {
   let rms = 0;
   for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / buf.length);
   if (rms < 0.01) return -1;
 
-  // Trim edges where signal is too low
   let r1 = 0;
   let r2 = buf.length - 1;
   const threshold = 0.2;
+
   for (let i = 0; i < buf.length / 2; i++) {
     if (Math.abs(buf[i]) < threshold) {
       r1 = i;
@@ -112,7 +111,6 @@ function autoCorrelateFloat32(buf: Float32Array<ArrayBufferLike>, sampleRate: nu
 
   if (maxpos <= 0) return -1;
 
-  // Parabolic interpolation around maxpos
   const x1 = c[maxpos - 1] ?? 0;
   const x2 = c[maxpos];
   const x3 = c[maxpos + 1] ?? 0;
@@ -122,7 +120,6 @@ function autoCorrelateFloat32(buf: Float32Array<ArrayBufferLike>, sampleRate: nu
   if (a) t0 = t0 - b / (2 * a);
 
   const freq = sampleRate / t0;
-  // sanity
   if (freq < 40 || freq > 2000) return -1;
   return freq;
 }
@@ -139,7 +136,7 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
-  const bufRef = useRef<Float32Array<ArrayBufferLike> | null>(null);
+  const bufRef = useRef<Float32Array | null>(null);
 
   const stopMic = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -182,7 +179,7 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
       const audioCtx = new AudioCtx();
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048; // good balance
+      analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = 0.4;
 
       source.connect(analyser);
@@ -201,7 +198,7 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
         const buf = bufRef.current;
         if (!a || !ctx || !buf) return;
 
-        a.getFloatTimeDomainData(buf as Float32Array<ArrayBuffer>);
+        a.getFloatTimeDomainData(buf);
         const f = autoCorrelateFloat32(buf, ctx.sampleRate);
 
         if (f > 0) {
@@ -213,7 +210,6 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
           setNote(nname);
           setCents(c);
 
-          // confidence heuristic
           setConfidence(Math.abs(c) <= 35 ? "ok" : "low");
         } else {
           setFreq(null);
@@ -226,7 +222,7 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
       };
 
       rafRef.current = requestAnimationFrame(tick);
-    } catch (e: any) {
+    } catch {
       setStatus("נחסם / אין הרשאה למיקרופון");
       setMicOn(false);
     }
@@ -237,15 +233,17 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const centsAbs = cents == null ? null : Math.min(50, Math.abs(cents));
   const inTune = cents != null && Math.abs(cents) <= 5;
 
   return (
-    <div className="rounded-xl border p-5" style={{ borderColor: "rgba(215,180,106,0.25)", background: "rgba(0,0,0,0.25)" }}>
+    <div
+      className="rounded-xl border p-5"
+      style={{ borderColor: "rgba(215,180,106,0.25)", background: "rgba(0,0,0,0.25)" }}
+    >
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <div className="text-lg font-medium" style={{ color: "rgba(255,255,255,0.90)" }}>
-            טיונר (מיקרופון)
+            טיונר
           </div>
           <div className="text-xs" style={{ color: "rgba(255,255,255,0.60)" }}>
             {status}
@@ -298,7 +296,6 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
             {cents == null ? "—" : `${cents > 0 ? "+" : ""}${cents.toFixed(1)}`}
           </div>
 
-          {/* meter */}
           <div className="mt-3 h-3 w-full overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.10)" }}>
             <div
               className="h-full"
@@ -309,6 +306,7 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
               }}
             />
           </div>
+
           <div className="relative mt-1 h-4">
             <div
               style={{
@@ -331,9 +329,7 @@ function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: s
                 background: inTune ? COLORS.gold2 : COLORS.gold,
                 boxShadow: inTune ? "0 0 14px rgba(241,209,138,0.45)" : "0 0 12px rgba(215,180,106,0.35)",
                 left:
-                  centsAbs == null
-                    ? "50%"
-                    : `calc(50% + ${Math.max(-50, Math.min(50, cents))} * 0.7%)`, // small mapping
+                  cents == null ? "50%" : `calc(50% + ${Math.max(-50, Math.min(50, cents))} * 0.7%)`,
                 transform: "translateX(-50%)",
                 transition: "left 80ms linear",
               }}
@@ -362,17 +358,14 @@ export default function Metronome() {
 
   const [tab, setTab] = useState<"metronome" | "tuner">("metronome");
 
-  // Beat UI
   const [beatInBar, setBeatInBar] = useState<number>(1);
   const [subIndex, setSubIndex] = useState<number>(0);
   const [flash, setFlash] = useState<{ on: boolean; strong: boolean }>({ on: false, strong: false });
 
-  // For pendulum animation
   const lastMainTickAtRef = useRef<number>(performance.now());
   const rafRef = useRef<number | null>(null);
   const [pendulumAngle, setPendulumAngle] = useState<number>(0);
 
-  // Colors (approx. your logo vibe: wine/gold)
   const COLORS = {
     wine: "#5b1f24",
     gold: "#d7b46a",
@@ -380,7 +373,6 @@ export default function Metronome() {
     ink: "#1a1a1a",
   };
 
-  // ---------- Engine wiring ----------
   useEffect(() => {
     engine.setOnState((r) => setRunning(r));
 
@@ -388,7 +380,6 @@ export default function Metronome() {
       setBeatInBar(e.beatInBar);
       setSubIndex(e.subIndex);
 
-      // Flash dot on main beat only (clear and readable)
       if (e.isMainBeat) {
         lastMainTickAtRef.current = performance.now();
         setFlash({ on: true, strong: e.isDownbeat || e.isAccent });
@@ -404,7 +395,6 @@ export default function Metronome() {
     };
   }, [engine]);
 
-  // ---------- Pendulum animation loop ----------
   useEffect(() => {
     const loop = () => {
       const bpm = settings.bpm;
@@ -431,7 +421,6 @@ export default function Metronome() {
     };
   }, [running, settings.bpm]);
 
-  // ---------- Apply settings to engine ----------
   const applySettings = (next: Partial<MetronomeSettings>) => {
     const merged: MetronomeSettings = { ...settings, ...next };
     setSettings(merged);
@@ -452,7 +441,6 @@ export default function Metronome() {
     await engine.start();
   };
 
-  // ---------- UI helpers ----------
   const beatDots = useMemo(() => {
     return Array.from({ length: settings.beatsPerBar }, (_, i) => {
       const n = i + 1;
@@ -478,17 +466,17 @@ export default function Metronome() {
       style={{ background: "linear-gradient(135deg, #1a0c0e 0%, #2a0f12 55%, #140607 100%)" }}
     >
       <div className="mx-auto w-full max-w-5xl">
-        {/* Header */}
-        <div className="mb-4 flex flex-col gap-2">
+        {/* Header - תיקון לפי הסימון שלך */}
+        <div className="mb-4 flex flex-col gap-1">
           <h1 className="text-2xl font-semibold" style={{ color: COLORS.gold }}>
             מטרונום טיונר
           </h1>
           <div className="text-sm" style={{ color: "rgba(255,255,255,0.70)" }}>
-            עמוד פנימי — מטרונום + טיונר (מיקרופון)
+            מטרונום + טיונר (מיקרופון) — באותו עמוד
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Sub Tabs */}
         <div className="mb-6 flex gap-2">
           <button
             onClick={() => setTab("metronome")}
@@ -570,7 +558,6 @@ export default function Metronome() {
                 />
               </div>
 
-              {/* Beats per bar + Accent every */}
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
@@ -617,7 +604,6 @@ export default function Metronome() {
                 </div>
               </div>
 
-              {/* Subdivision */}
               <div className="mb-4">
                 <label className="mb-1 block text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
                   חלוקה פנימית (מקצבים)
@@ -639,14 +625,13 @@ export default function Metronome() {
                   ))}
                 </select>
                 <div className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-                  * הנקודה המהבהבת מסונכרנת לפעימה הראשית (main beat) כדי שיהיה קל לראות.
+                  * הנקודה המהבהבת מסונכרנת לפעימה הראשית (main beat).
                 </div>
               </div>
 
-              {/* Sound */}
               <div className="mb-4">
                 <label className="mb-1 block text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  סאונד (10+)
+                  סאונד
                 </label>
                 <select
                   value={settings.sound}
@@ -666,7 +651,6 @@ export default function Metronome() {
                 </select>
               </div>
 
-              {/* Volume */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
@@ -698,7 +682,6 @@ export default function Metronome() {
                   תצוגה
                 </div>
 
-                {/* Flashing dot */}
                 <div className="flex items-center gap-2">
                   <div className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
                     נקודה
@@ -718,7 +701,6 @@ export default function Metronome() {
                 </div>
               </div>
 
-              {/* Beat dots */}
               <div className="mb-4 flex items-center gap-2">
                 {beatDots}
                 <div className="ml-2 text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
@@ -732,7 +714,6 @@ export default function Metronome() {
                 </div>
               </div>
 
-              {/* Mechanical metronome */}
               <div
                 className="relative mx-auto mt-2 flex h-64 w-full max-w-sm items-end justify-center overflow-hidden rounded-xl"
                 style={{
@@ -741,7 +722,6 @@ export default function Metronome() {
                   border: "1px solid rgba(255,255,255,0.10)",
                 }}
               >
-                {/* body */}
                 <div
                   className="absolute bottom-0 h-56 w-56 rounded-2xl"
                   style={{
@@ -750,7 +730,6 @@ export default function Metronome() {
                     boxShadow: "0 18px 60px rgba(0,0,0,0.55)",
                   }}
                 />
-                {/* dial */}
                 <div
                   className="absolute bottom-6 h-12 w-40 rounded-lg"
                   style={{
@@ -758,11 +737,11 @@ export default function Metronome() {
                     border: "1px solid rgba(215,180,106,0.25)",
                   }}
                 />
+                {/* תיקון טקסט לפי הסימון שלך */}
                 <div className="absolute bottom-8 text-xs" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  Toby Metronome
+                  מטרונום טיונר
                 </div>
 
-                {/* pivot */}
                 <div
                   className="absolute"
                   style={{
@@ -777,7 +756,6 @@ export default function Metronome() {
                   }}
                 />
 
-                {/* arm */}
                 <div
                   className="absolute origin-top"
                   style={{
@@ -791,7 +769,6 @@ export default function Metronome() {
                     borderRadius: 999,
                   }}
                 >
-                  {/* weight */}
                   <div
                     style={{
                       position: "absolute",
@@ -806,7 +783,6 @@ export default function Metronome() {
                       boxShadow: "0 10px 22px rgba(0,0,0,0.45)",
                     }}
                   />
-                  {/* tip */}
                   <div
                     style={{
                       position: "absolute",
@@ -824,7 +800,6 @@ export default function Metronome() {
                   />
                 </div>
 
-                {/* baseline markers */}
                 <div
                   className="absolute bottom-[170px] left-0 right-0 flex items-center justify-between px-10 text-[10px]"
                   style={{ color: "rgba(255,255,255,0.35)" }}
@@ -835,7 +810,7 @@ export default function Metronome() {
               </div>
 
               <div className="mt-4 text-xs leading-5" style={{ color: "rgba(255,255,255,0.6)" }}>
-                טיפ: אם את במובייל והסאונד לא נשמע — ודאי שלחצת על “התחל” (מחייב פעולה של משתמש כדי להפעיל AudioContext).
+                טיפ: במובייל חובה ללחוץ “התחל” כדי שה־AudioContext יופעל.
               </div>
             </div>
           </div>
