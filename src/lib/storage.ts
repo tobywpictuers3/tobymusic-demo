@@ -1,5 +1,7 @@
-import { Student, Lesson, Payment, SwapRequest, FileEntry, SchoolClass, Message, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalPurchase, YearlyLeaderboardEntry } from './types';
+import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleItem, StoreItem, StorePurchase, YearlyLeaderboardEntry, Message, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalPurchase } from './types';
 import { hybridSync } from './hybridSync';
+import { logger } from './logger';
+import { isDevMode, setDevMode } from './devMode';
 import { calculateEarnedCopper, formatPriceCompact } from './storeCurrency';
 
 // In-memory storage for production mode
@@ -11,18 +13,13 @@ const generateId = (): string => Math.random().toString(36).substr(2, 9);
 // Dev mode data storage
 const devData: Record<string, any[]> = {};
 
-// Check if in dev mode
-export const isDevMode = (): boolean => {
-  return window.location.hostname === 'localhost' || window.location.hostname.includes('dev');
-};
-
 // Set initial data from worker
 export const initializeStorage = (data: Record<string, any[]>) => {
   Object.keys(data).forEach(key => {
     inMemoryStorage[key] = data[key] || [];
   });
-  
-  console.log('[Storage] Initialized with:', Object.keys(data).map(k => `${k}: ${data[k]?.length || 0}`).join(', '));
+
+  logger.info('[Storage] Initialized with:', Object.keys(data).map(k => `${k}: ${data[k]?.length || 0}`).join(', '));
 };
 
 // Generic getter
@@ -32,16 +29,55 @@ const getData = <T>(key: string): T[] => {
 };
 
 // Generic setter
-const setData = <T>(key: string, data: T[]): void => {
+const setData = <T>(key: string, data: T[], shouldSync: boolean = true): void => {
   if (isDevMode()) {
     devData[key] = data;
   } else {
     inMemoryStorage[key] = data;
-    hybridSync.onDataChange();
+    if (shouldSync) hybridSync.onDataChange();
   }
 };
 
-// Students
+// ==================== EXPORT / IMPORT ALL (hybridSync depends on this) ====================
+
+export const exportAllData = (): Record<string, any[]> => {
+  const keys = Object.keys(inMemoryStorage);
+  const out: Record<string, any[]> = {};
+  keys.forEach(k => {
+    out[k] = inMemoryStorage[k] || [];
+  });
+  return out;
+};
+
+export const setAllData = (data: Record<string, any[]>): void => {
+  Object.keys(data).forEach(key => {
+    inMemoryStorage[key] = data[key] || [];
+  });
+};
+
+// ==================== DEV HELPERS ====================
+
+export const setDevData = (data: Record<string, any[]>): void => {
+  Object.keys(data).forEach(key => {
+    devData[key] = data[key] || [];
+  });
+};
+
+export const getDevData = (): Record<string, any[]> => {
+  return devData;
+};
+
+export const clearAllData = async (): Promise<void> => {
+  Object.keys(inMemoryStorage).forEach(key => {
+    inMemoryStorage[key] = [];
+  });
+  if (!isDevMode()) {
+    await hybridSync.onDestructiveChange();
+  }
+};
+
+// ==================== STUDENTS ====================
+
 export const getStudents = (): Student[] => getData<Student>('students');
 
 export const getStudent = (id: string): Student | undefined => {
@@ -58,6 +94,7 @@ export const addStudent = (student: Omit<Student, 'id' | 'createdAt'>): Student 
     lastModified: now,
   };
   students.push(newStudent);
+
   if (isDevMode()) {
     devData['students'] = students;
   } else {
@@ -71,11 +108,13 @@ export const updateStudent = (id: string, updatedFields: Partial<Student>): Stud
   const students = getStudents();
   const index = students.findIndex(s => s.id === id);
   if (index === -1) return undefined;
-  students[index] = { 
-    ...students[index], 
+
+  students[index] = {
+    ...students[index],
     ...updatedFields,
     lastModified: new Date().toISOString()
   };
+
   if (isDevMode()) {
     devData['students'] = students;
   } else {
@@ -88,9 +127,8 @@ export const updateStudent = (id: string, updatedFields: Partial<Student>): Stud
 export const deleteStudent = async (id: string): Promise<boolean> => {
   const students = getStudents();
   const updatedStudents = students.filter(s => s.id !== id);
-  if (updatedStudents.length === students.length) {
-    return false;
-  }
+  if (updatedStudents.length === students.length) return false;
+
   if (isDevMode()) {
     devData['students'] = updatedStudents;
   } else {
@@ -100,7 +138,8 @@ export const deleteStudent = async (id: string): Promise<boolean> => {
   return true;
 };
 
-// Lessons
+// ==================== LESSONS ====================
+
 export const getLessons = (): Lesson[] => getData<Lesson>('lessons');
 
 export const getLesson = (id: string): Lesson | undefined => {
@@ -117,6 +156,7 @@ export const addLesson = (lesson: Omit<Lesson, 'id' | 'createdAt'>): Lesson => {
     lastModified: now,
   };
   lessons.push(newLesson);
+
   if (isDevMode()) {
     devData['lessons'] = lessons;
   } else {
@@ -130,11 +170,13 @@ export const updateLesson = (id: string, updatedFields: Partial<Lesson>): Lesson
   const lessons = getLessons();
   const index = lessons.findIndex(l => l.id === id);
   if (index === -1) return undefined;
-  lessons[index] = { 
-    ...lessons[index], 
+
+  lessons[index] = {
+    ...lessons[index],
     ...updatedFields,
     lastModified: new Date().toISOString()
   };
+
   if (isDevMode()) {
     devData['lessons'] = lessons;
   } else {
@@ -147,9 +189,8 @@ export const updateLesson = (id: string, updatedFields: Partial<Lesson>): Lesson
 export const deleteLesson = async (id: string): Promise<boolean> => {
   const lessons = getLessons();
   const updatedLessons = lessons.filter(l => l.id !== id);
-  if (updatedLessons.length === lessons.length) {
-    return false;
-  }
+  if (updatedLessons.length === lessons.length) return false;
+
   if (isDevMode()) {
     devData['lessons'] = updatedLessons;
   } else {
@@ -159,7 +200,8 @@ export const deleteLesson = async (id: string): Promise<boolean> => {
   return true;
 };
 
-// Payments
+// ==================== PAYMENTS ====================
+
 export const getPayments = (): Payment[] => getData<Payment>('payments');
 
 export const getStudentPayments = (studentId: string): Payment[] => {
@@ -176,6 +218,7 @@ export const addPayment = (payment: Omit<Payment, 'id' | 'createdAt'>): Payment 
     lastModified: now,
   };
   payments.push(newPayment);
+
   if (isDevMode()) {
     devData['payments'] = payments;
   } else {
@@ -189,11 +232,13 @@ export const updatePayment = (id: string, updatedFields: Partial<Payment>): Paym
   const payments = getPayments();
   const index = payments.findIndex(p => p.id === id);
   if (index === -1) return undefined;
-  payments[index] = { 
-    ...payments[index], 
+
+  payments[index] = {
+    ...payments[index],
     ...updatedFields,
     lastModified: new Date().toISOString()
   };
+
   if (isDevMode()) {
     devData['payments'] = payments;
   } else {
@@ -206,9 +251,8 @@ export const updatePayment = (id: string, updatedFields: Partial<Payment>): Paym
 export const deletePayment = async (id: string): Promise<boolean> => {
   const payments = getPayments();
   const updatedPayments = payments.filter(p => p.id !== id);
-  if (updatedPayments.length === payments.length) {
-    return false;
-  }
+  if (updatedPayments.length === payments.length) return false;
+
   if (isDevMode()) {
     devData['payments'] = updatedPayments;
   } else {
@@ -218,7 +262,8 @@ export const deletePayment = async (id: string): Promise<boolean> => {
   return true;
 };
 
-// Swap Requests
+// ==================== SWAP REQUESTS ====================
+
 export const getSwapRequests = (): SwapRequest[] => getData<SwapRequest>('swapRequests');
 
 export const getStudentSwapRequests = (studentId: string): SwapRequest[] => {
@@ -235,6 +280,7 @@ export const addSwapRequest = (request: Omit<SwapRequest, 'id' | 'createdAt'>): 
     lastModified: now,
   };
   requests.push(newRequest);
+
   if (isDevMode()) {
     devData['swapRequests'] = requests;
   } else {
@@ -248,11 +294,13 @@ export const updateSwapRequest = (id: string, updatedFields: Partial<SwapRequest
   const requests = getSwapRequests();
   const index = requests.findIndex(r => r.id === id);
   if (index === -1) return undefined;
-  requests[index] = { 
-    ...requests[index], 
+
+  requests[index] = {
+    ...requests[index],
     ...updatedFields,
     lastModified: new Date().toISOString()
   };
+
   if (isDevMode()) {
     devData['swapRequests'] = requests;
   } else {
@@ -265,9 +313,8 @@ export const updateSwapRequest = (id: string, updatedFields: Partial<SwapRequest
 export const deleteSwapRequest = async (id: string): Promise<boolean> => {
   const requests = getSwapRequests();
   const updatedRequests = requests.filter(r => r.id !== id);
-  if (updatedRequests.length === requests.length) {
-    return false;
-  }
+  if (updatedRequests.length === requests.length) return false;
+
   if (isDevMode()) {
     devData['swapRequests'] = updatedRequests;
   } else {
@@ -277,7 +324,8 @@ export const deleteSwapRequest = async (id: string): Promise<boolean> => {
   return true;
 };
 
-// Files
+// ==================== FILES ====================
+
 export const getFiles = (): FileEntry[] => getData<FileEntry>('files');
 
 export const addFile = (file: Omit<FileEntry, 'id' | 'uploadedAt'>): FileEntry => {
@@ -290,6 +338,7 @@ export const addFile = (file: Omit<FileEntry, 'id' | 'uploadedAt'>): FileEntry =
     lastModified: now,
   };
   files.push(newFile);
+
   if (isDevMode()) {
     devData['files'] = files;
   } else {
@@ -302,9 +351,8 @@ export const addFile = (file: Omit<FileEntry, 'id' | 'uploadedAt'>): FileEntry =
 export const deleteFile = async (id: string): Promise<boolean> => {
   const files = getFiles();
   const updatedFiles = files.filter(f => f.id !== id);
-  if (updatedFiles.length === files.length) {
-    return false;
-  }
+  if (updatedFiles.length === files.length) return false;
+
   if (isDevMode()) {
     devData['files'] = updatedFiles;
   } else {
@@ -314,62 +362,8 @@ export const deleteFile = async (id: string): Promise<boolean> => {
   return true;
 };
 
-// Classes
-export const getClasses = (): SchoolClass[] => getData<SchoolClass>('classes');
+// ==================== MESSAGES ====================
 
-export const addClass = (classData: Omit<SchoolClass, 'id' | 'createdAt'>): SchoolClass => {
-  const classes = getClasses();
-  const now = new Date().toISOString();
-  const newClass: SchoolClass = {
-    ...classData,
-    id: generateId(),
-    createdAt: now,
-    lastModified: now,
-  };
-  classes.push(newClass);
-  if (isDevMode()) {
-    devData['classes'] = classes;
-  } else {
-    inMemoryStorage['classes'] = classes;
-    hybridSync.onDataChange();
-  }
-  return newClass;
-};
-
-export const updateClass = (id: string, updatedFields: Partial<SchoolClass>): SchoolClass | undefined => {
-  const classes = getClasses();
-  const index = classes.findIndex(c => c.id === id);
-  if (index === -1) return undefined;
-  classes[index] = { 
-    ...classes[index], 
-    ...updatedFields,
-    lastModified: new Date().toISOString()
-  };
-  if (isDevMode()) {
-    devData['classes'] = classes;
-  } else {
-    inMemoryStorage['classes'] = classes;
-    hybridSync.onDataChange();
-  }
-  return classes[index];
-};
-
-export const deleteClass = async (id: string): Promise<boolean> => {
-  const classes = getClasses();
-  const updatedClasses = classes.filter(c => c.id !== id);
-  if (updatedClasses.length === classes.length) {
-    return false;
-  }
-  if (isDevMode()) {
-    devData['classes'] = updatedClasses;
-  } else {
-    inMemoryStorage['classes'] = updatedClasses;
-    await hybridSync.onDestructiveChange();
-  }
-  return true;
-};
-
-// Messages
 export const getMessages = (): Message[] => getData<Message>('messages');
 
 export const addMessage = (message: Omit<Message, 'id' | 'sentAt'>): Message => {
@@ -382,6 +376,7 @@ export const addMessage = (message: Omit<Message, 'id' | 'sentAt'>): Message => 
     lastModified: now,
   };
   messages.push(newMessage);
+
   if (isDevMode()) {
     devData['messages'] = messages;
   } else {
@@ -391,7 +386,8 @@ export const addMessage = (message: Omit<Message, 'id' | 'sentAt'>): Message => 
   return newMessage;
 };
 
-// Practice Sessions
+// ==================== PRACTICE SESSIONS ====================
+
 export const getPracticeSessions = (): PracticeSession[] => {
   if (isDevMode()) return devData['practiceSessions'] || [];
   return inMemoryStorage['practiceSessions'] || [];
@@ -402,106 +398,21 @@ export const getStudentPracticeSessions = (studentId: string): PracticeSession[]
   return sessions.filter(s => s.studentId === studentId);
 };
 
-export const addPracticeSession = (session: Omit<PracticeSession, 'id' | 'createdAt'>): PracticeSession => {
-  const sessions = getPracticeSessions();
-  const now = new Date().toISOString();
-  const newSession: PracticeSession = {
-    ...session,
-    id: generateId(),
-    createdAt: now,
-    lastModified: now, // Add timestamp for optimistic locking
-  };
-  sessions.push(newSession);
-  if (isDevMode()) {
-    devData['practiceSessions'] = sessions;
-    // Recalculate monthly achievements for the session's month (derived from sessions)
-    recalcMonthlyAchievementFromSessions(newSession.studentId, newSession.date.slice(0, 7), false);
-  } else {
-    inMemoryStorage['practiceSessions'] = sessions;
-    // Recalculate monthly achievements for the session's month (derived from sessions)
-    recalcMonthlyAchievementFromSessions(newSession.studentId, newSession.date.slice(0, 7), false);
-    // Recalculate monthly achievements for the session's month (derived from sessions)
-    recalcMonthlyAchievementFromSessions(newSession.studentId, newSession.date.slice(0, 7), false);
-    hybridSync.onDataChange();
-  }
-  return newSession;
-};
-
-export const updatePracticeSession = (id: string, updatedFields: Partial<PracticeSession>): PracticeSession | undefined => {
-  const sessions = getPracticeSessions();
-  const index = sessions.findIndex(s => s.id === id);
-  if (index === -1) return undefined;
-  
-  sessions[index] = { 
-    ...sessions[index], 
-    ...updatedFields,
-    lastModified: new Date().toISOString() // Update timestamp
-  };
-  if (isDevMode()) {
-    devData['practiceSessions'] = sessions;
-    // Recalculate monthly achievements for the affected month (derived from sessions)
-    recalcMonthlyAchievementFromSessions(sessions[index].studentId, sessions[index].date.slice(0, 7), false);
-  } else {
-    inMemoryStorage['practiceSessions'] = sessions;
-    // Recalculate monthly achievements for the affected month (derived from sessions)
-    recalcMonthlyAchievementFromSessions(sessions[index].studentId, sessions[index].date.slice(0, 7), false);
-    // Recalculate monthly achievements for the affected month (derived from sessions)
-    recalcMonthlyAchievementFromSessions(sessions[index].studentId, sessions[index].date.slice(0, 7), false);
-    hybridSync.onDataChange();
-  }
-  return sessions[index];
-};
-
-export const deletePracticeSession = async (id: string): Promise<boolean> => {
-  const sessions = getPracticeSessions();
-  const sessionToDelete = sessions.find(s => s.id === id);
-  const updatedSessions = sessions.filter(s => s.id !== id);
-
-  if (updatedSessions.length === sessions.length) {
-    return false;
-  }
-
-  if (isDevMode()) {
-    devData['practiceSessions'] = updatedSessions;
-
-    // Keep monthly achievements consistent even in dev mode
-    if (sessionToDelete) {
-      recalcMonthlyAchievementFromSessions(sessionToDelete.studentId, sessionToDelete.date.slice(0, 7), false);
-    }
-  } else {
-    inMemoryStorage['practiceSessions'] = updatedSessions;
-
-    // Recalculate monthly achievements for the month that changed
-    if (sessionToDelete) {
-      recalcMonthlyAchievementFromSessions(sessionToDelete.studentId, sessionToDelete.date.slice(0, 7), false);
-    }
-
-    // Use onDestructiveChange for deletes to prevent merge from restoring
-    await hybridSync.onDestructiveChange();
-  }
-
-  return true;
-};
-
-
 // ===================== DERIVED MONTHLY ACHIEVEMENTS (RECALCULATED) =====================
 
 /**
  * Recalculate a student's monthly achievements from practice sessions (source of truth).
  * This fixes the "max only" bug where a mistaken high value could never go down after edits/deletes.
- *
- * By default this mutates storage ONLY (no sync). Caller should sync (onDataChange / onDestructiveChange)
- * in the same transaction to avoid extra network calls.
  */
 const recalcMonthlyAchievementFromSessions = (
   studentId: string,
   month: string, // YYYY-MM
   shouldSync: boolean = false
 ): void => {
-  const sessions = getPracticeSessions()
-    .filter(s => s.studentId === studentId && s.date.startsWith(month));
+  const sessions = getPracticeSessions().filter(
+    (s) => s.studentId === studentId && s.date.startsWith(month)
+  );
 
-  // Daily totals (sum of sessions per day)
   const dailyTotals: Record<string, number> = {};
   for (const s of sessions) {
     dailyTotals[s.date] = (dailyTotals[s.date] || 0) + (s.durationMinutes || 0);
@@ -510,14 +421,12 @@ const recalcMonthlyAchievementFromSessions = (
   const maxDailyMinutes =
     Object.keys(dailyTotals).length > 0 ? Math.max(...Object.values(dailyTotals)) : 0;
 
-  // Daily average across practiced days in the month
   const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
   const practicedDays = Object.keys(dailyTotals).length;
   const dailyAverage = practicedDays > 0 ? totalMinutes / practicedDays : 0;
 
-  // Longest streak inside the month (consecutive practiced dates)
   const practicedDates = Object.keys(dailyTotals)
-    .filter(d => dailyTotals[d] >= 1)
+    .filter((d) => dailyTotals[d] >= 1)
     .sort();
 
   let maxStreak = 0;
@@ -536,8 +445,11 @@ const recalcMonthlyAchievementFromSessions = (
     prevDate = cur;
   }
 
-  const achievements = getMonthlyAchievements();
-  const index = achievements.findIndex(a => a.studentId === studentId && a.month === month);
+  const achievements: MonthlyAchievement[] = isDevMode()
+    ? (devData['monthlyAchievements'] || [])
+    : (inMemoryStorage['monthlyAchievements'] || []);
+
+  const index = achievements.findIndex((a) => a.studentId === studentId && a.month === month);
   const now = new Date().toISOString();
 
   const next: MonthlyAchievement = {
@@ -568,7 +480,85 @@ const recalcMonthlyAchievementFromSessions = (
   }
 };
 
-// Monthly Achievements
+export const addPracticeSession = (session: Omit<PracticeSession, 'id' | 'createdAt'>): PracticeSession => {
+  const sessions = getPracticeSessions();
+  const now = new Date().toISOString();
+  const newSession: PracticeSession = {
+    ...session,
+    id: generateId(),
+    createdAt: now,
+    lastModified: now,
+  };
+  sessions.push(newSession);
+
+  // derived monthly achievements (can go up or down)
+  recalcMonthlyAchievementFromSessions(newSession.studentId, newSession.date.slice(0, 7), false);
+
+  if (isDevMode()) {
+    devData['practiceSessions'] = sessions;
+  } else {
+    inMemoryStorage['practiceSessions'] = sessions;
+    hybridSync.onDataChange();
+  }
+  return newSession;
+};
+
+export const updatePracticeSession = (id: string, updatedFields: Partial<PracticeSession>): PracticeSession | undefined => {
+  const sessions = getPracticeSessions();
+  const index = sessions.findIndex(s => s.id === id);
+  if (index === -1) return undefined;
+
+  const before = sessions[index];
+  const beforeMonth = before.date.slice(0, 7);
+
+  sessions[index] = {
+    ...sessions[index],
+    ...updatedFields,
+    lastModified: new Date().toISOString()
+  };
+
+  const after = sessions[index];
+  const afterMonth = after.date.slice(0, 7);
+
+  // recalc affected month(s)
+  recalcMonthlyAchievementFromSessions(after.studentId, afterMonth, false);
+  if (beforeMonth !== afterMonth) {
+    recalcMonthlyAchievementFromSessions(before.studentId, beforeMonth, false);
+  }
+
+  if (isDevMode()) {
+    devData['practiceSessions'] = sessions;
+  } else {
+    inMemoryStorage['practiceSessions'] = sessions;
+    hybridSync.onDataChange();
+  }
+  return sessions[index];
+};
+
+export const deletePracticeSession = async (id: string): Promise<boolean> => {
+  const sessions = getPracticeSessions();
+  const sessionToDelete = sessions.find(s => s.id === id);
+  const updatedSessions = sessions.filter(s => s.id !== id);
+  if (updatedSessions.length === sessions.length) return false;
+
+  if (isDevMode()) {
+    devData['practiceSessions'] = updatedSessions;
+    if (sessionToDelete) {
+      recalcMonthlyAchievementFromSessions(sessionToDelete.studentId, sessionToDelete.date.slice(0, 7), false);
+    }
+  } else {
+    inMemoryStorage['practiceSessions'] = updatedSessions;
+    if (sessionToDelete) {
+      recalcMonthlyAchievementFromSessions(sessionToDelete.studentId, sessionToDelete.date.slice(0, 7), false);
+    }
+    await hybridSync.onDestructiveChange();
+  }
+
+  return true;
+};
+
+// ==================== MONTHLY ACHIEVEMENTS ====================
+
 export const getMonthlyAchievements = (): MonthlyAchievement[] => {
   if (isDevMode()) return devData['monthlyAchievements'] || [];
   return inMemoryStorage['monthlyAchievements'] || [];
@@ -590,7 +580,7 @@ export const updateMonthlyAchievement = (
   _updates: { maxDailyAverage?: number; maxDailyMinutes?: number; maxStreak?: number }
 ): void => {
   // Monthly achievements are derived from practice sessions (source of truth).
-  // We recalculate to allow values to go DOWN after edits/deletes.
+  // Recalculate so values can also go DOWN after edits/deletes.
   const currentMonth = new Date().toISOString().slice(0, 7);
   recalcMonthlyAchievementFromSessions(studentId, currentMonth, true);
 };
@@ -599,12 +589,12 @@ export const getCurrentMonthLeaderboard = (): LeaderboardEntry[] => {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const achievements = getMonthlyAchievements().filter(a => a.month === currentMonth);
   const students = getStudents();
-  
+
   return achievements
     .map(a => {
       const student = students.find(s => s.id === a.studentId);
       if (!student) return null;
-      
+
       return {
         studentId: a.studentId,
         studentName: `${student.firstName} ${student.lastName}`,
@@ -615,7 +605,8 @@ export const getCurrentMonthLeaderboard = (): LeaderboardEntry[] => {
     .filter(Boolean) as LeaderboardEntry[];
 };
 
-// Medal Purchases
+// ==================== MEDAL PURCHASES ====================
+
 export const getMedalPurchases = (): MedalPurchase[] => getData<MedalPurchase>('medalPurchases');
 
 export const addMedalPurchase = (purchase: Omit<MedalPurchase, 'id' | 'createdAt'>): MedalPurchase => {
@@ -628,6 +619,7 @@ export const addMedalPurchase = (purchase: Omit<MedalPurchase, 'id' | 'createdAt
     lastModified: now,
   };
   purchases.push(newPurchase);
+
   if (isDevMode()) {
     devData['medalPurchases'] = purchases;
   } else {
@@ -637,23 +629,21 @@ export const addMedalPurchase = (purchase: Omit<MedalPurchase, 'id' | 'createdAt
   return newPurchase;
 };
 
-// Yearly Leaderboard
+// ==================== YEARLY LEADERBOARD ====================
+
 export const getYearlyLeaderboard = (): YearlyLeaderboardEntry[] => {
   const students = getStudents();
   const allSessions = getPracticeSessions();
 
-  // Helper: compute daily totals per student
   const sessionsByStudent = new Map<string, PracticeSession[]>();
   for (const s of allSessions) {
     if (!sessionsByStudent.has(s.studentId)) sessionsByStudent.set(s.studentId, []);
     sessionsByStudent.get(s.studentId)!.push(s);
   }
 
-  // Build leaderboard entries per student
   const entries: YearlyLeaderboardEntry[] = students.map(student => {
     const sessions = sessionsByStudent.get(student.id) || [];
 
-    // Daily totals across all dates
     const dailyTotals: Record<string, number> = {};
     for (const s of sessions) {
       dailyTotals[s.date] = (dailyTotals[s.date] || 0) + (s.durationMinutes || 0);
@@ -662,7 +652,6 @@ export const getYearlyLeaderboard = (): YearlyLeaderboardEntry[] => {
     const dailyTotalsValues = Object.values(dailyTotals);
     const maxDaily = dailyTotalsValues.length ? Math.max(...dailyTotalsValues) : 0;
 
-    // Longest streak overall (by practiced days)
     const practicedDates = Object.keys(dailyTotals)
       .filter(d => dailyTotals[d] >= 1)
       .sort();
@@ -683,11 +672,9 @@ export const getYearlyLeaderboard = (): YearlyLeaderboardEntry[] => {
       prevDate = cur;
     }
 
-    // Weekly totals: group by ISO week key (YYYY-W##)
     const weekTotals: Record<string, number> = {};
     const getWeekKey = (dateStr: string): string => {
       const d = new Date(dateStr);
-      // ISO week date weeks start on Monday
       const dayNum = (d.getDay() + 6) % 7; // 0=Mon..6=Sun
       d.setDate(d.getDate() - dayNum + 3); // Thursday
       const firstThursday = new Date(d.getFullYear(), 0, 4);
@@ -705,15 +692,10 @@ export const getYearlyLeaderboard = (): YearlyLeaderboardEntry[] => {
 
     const maxWeekly = Object.values(weekTotals).length ? Math.max(...Object.values(weekTotals)) : 0;
 
-    // Average between lessons (use intervals between sessions, reuse existing util from practiceEngine in UI)
-    // Here: compute weekly average minutes (total minutes / number of weeks practiced)
     const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
     const practicedWeeks = Object.keys(weekTotals).length;
     const weeklyAverage = practicedWeeks > 0 ? totalMinutes / practicedWeeks : 0;
 
-    // Medal score (copper) computed from sessions' medals (medalEngine stores medals derived elsewhere, but here we approximate by earned copper from minutes)
-    // Use calculateEarnedCopper with student's sessions total minutes per day?
-    // We'll calculate copper based on daily totals (consistent with medal thresholds per day)
     let medalCopper = 0;
     for (const minutes of Object.values(dailyTotals)) {
       medalCopper += calculateEarnedCopper(minutes);
