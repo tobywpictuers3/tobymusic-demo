@@ -7,12 +7,17 @@ import {
   type SubdivisionMode,
 } from "@/lib/metronom/MetronomeEngine";
 
+const COLORS = {
+  gold: "#d8b15a",
+  ink: "#1b1412",
+};
+
 const SUBDIVISIONS: { value: SubdivisionMode; label: string }[] = [
   { value: "quarter", label: "רבעים" },
   { value: "eighths", label: "שמיניות" },
-  { value: "triplets", label: "שלישונים" },
+  { value: "triplets", label: "טריולות" },
   { value: "sixteenths", label: "שש־עשריות" },
-  { value: "swing", label: "סווינג (מנוקד 3:1)" },
+  { value: "swing", label: "סווינג (3:1)" },
 ];
 
 const SOUNDS: { value: MetronomeSound; label: string }[] = [
@@ -32,789 +37,577 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function formatPct(v01: number) {
-  return `${Math.round(v01 * 100)}%`;
-}
-
-/** ---------- TUNER HELPERS ---------- */
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-
-function noteFromFrequency(freq: number) {
-  const noteNumber = 69 + 12 * Math.log2(freq / 440);
+/* ======== TUNER MATH (supports variable A4) ======== */
+function noteFromFrequency(freq: number, a4: number = 440) {
+  const noteNumber = 69 + 12 * Math.log2(freq / a4);
   return Math.round(noteNumber);
 }
 
-function frequencyFromNoteNumber(note: number) {
-  return 440 * Math.pow(2, (note - 69) / 12);
+function frequencyFromNoteNumber(note: number, a4: number = 440) {
+  return a4 * Math.pow(2, (note - 69) / 12);
 }
 
-function noteName(noteNumber: number) {
-  const name = NOTE_NAMES[(noteNumber + 1200) % 12];
+function noteNameFromNumber(noteNumber: number) {
+  const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const noteIndex = (noteNumber + 1200) % 12;
   const octave = Math.floor(noteNumber / 12) - 1;
-  return `${name}${octave}`;
+  return `${noteStrings[noteIndex]}${octave}`;
 }
 
-function centsOffFromPitch(freq: number, noteNumber: number) {
-  const ref = frequencyFromNoteNumber(noteNumber);
+function centsOffFromPitch(freq: number, noteNumber: number, a4: number = 440) {
+  const ref = frequencyFromNoteNumber(noteNumber, a4);
   return Math.floor((1200 * Math.log2(freq / ref)) * 10) / 10; // 0.1 cents
 }
 
-/**
- * Autocorrelation pitch detection.
- * Returns frequency in Hz, or -1 if no reliable pitch.
- */
-function autoCorrelateFloat32(buf: Float32Array, sampleRate: number) {
+/* ======== AUTOCORRELATION PITCH DETECTION ======== */
+function autoCorrelate(buf: Float32Array, sampleRate: number) {
+  // Based on Chris Wilson PitchDetect (with tweaks)
+  const SIZE = buf.length;
   let rms = 0;
-  for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
-  rms = Math.sqrt(rms / buf.length);
-  if (rms < 0.01) return -1;
 
-  let r1 = 0;
-  let r2 = buf.length - 1;
-  const threshold = 0.2;
-
-  for (let i = 0; i < buf.length / 2; i++) {
-    if (Math.abs(buf[i]) < threshold) {
-      r1 = i;
-      break;
-    }
+  for (let i = 0; i < SIZE; i++) {
+    const val = buf[i];
+    rms += val * val;
   }
-  for (let i = 1; i < buf.length / 2; i++) {
-    if (Math.abs(buf[buf.length - i]) < threshold) {
-      r2 = buf.length - i;
-      break;
-    }
+  rms = Math.sqrt(rms / SIZE);
+  if (rms < 0.01) return { freq: -1, confidence: 0 };
+
+  // Trim edges (silence)
+  let r1 = 0;
+  let r2 = SIZE - 1;
+  const THRESHOLD = 0.2;
+
+  for (let i = 0; i < SIZE / 2; i++) {
+    if (Math.abs(buf[i]) < THRESHOLD) continue;
+    r1 = i;
+    break;
+  }
+  for (let i = 1; i < SIZE / 2; i++) {
+    if (Math.abs(buf[SIZE - i]) < THRESHOLD) continue;
+    r2 = SIZE - i;
+    break;
   }
 
   const trimmed = buf.slice(r1, r2);
-  const size = trimmed.length;
-  if (size < 128) return -1;
+  const len = trimmed.length;
+  const c = new Array<number>(len).fill(0);
 
-  const c = new Array<number>(size).fill(0);
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j < size - i; j++) {
+  for (let i = 0; i < len; i++) {
+    for (let j = 0; j < len - i; j++) {
       c[i] = c[i] + trimmed[j] * trimmed[j + i];
     }
   }
 
   let d = 0;
-  while (d < size - 1 && c[d] > c[d + 1]) d++;
+  while (d < len && c[d] > c[d + 1]) d++;
 
   let maxval = -1;
   let maxpos = -1;
-  for (let i = d; i < size; i++) {
+  for (let i = d; i < len; i++) {
     if (c[i] > maxval) {
       maxval = c[i];
       maxpos = i;
     }
   }
 
-  if (maxpos <= 0) return -1;
+  let T0 = maxpos;
+  if (T0 <= 0) return { freq: -1, confidence: 0 };
 
-  const x1 = c[maxpos - 1] ?? 0;
-  const x2 = c[maxpos];
-  const x3 = c[maxpos + 1] ?? 0;
+  // Parabolic interpolation
+  const x1 = c[T0 - 1] ?? 0;
+  const x2 = c[T0] ?? 0;
+  const x3 = c[T0 + 1] ?? 0;
   const a = (x1 + x3 - 2 * x2) / 2;
   const b = (x3 - x1) / 2;
-  let t0 = maxpos;
-  if (a) t0 = t0 - b / (2 * a);
+  if (a) T0 = T0 - b / (2 * a);
 
-  const freq = sampleRate / t0;
-  if (freq < 40 || freq > 2000) return -1;
-  return freq;
+  const freq = sampleRate / T0;
+  const confidence = clamp(maxval / (c[0] || 1), 0, 1);
+  return { freq, confidence };
 }
 
-function TunerPanel({ COLORS }: { COLORS: { wine: string; gold: string; gold2: string; ink: string } }) {
-  const [micOn, setMicOn] = useState(false);
-  const [status, setStatus] = useState<string>("כבוי");
-  const [freq, setFreq] = useState<number | null>(null);
-  const [note, setNote] = useState<string>("—");
-  const [cents, setCents] = useState<number | null>(null);
-  const [confidence, setConfidence] = useState<"low" | "ok">("low");
+/* ===================== PAGE ===================== */
 
+export default function Metronome() {
+  const [tab, setTab] = useState<"metronome" | "tuner">("metronome");
+
+  return (
+    <div className="mx-auto w-full max-w-5xl">
+      {/* Header (נקי – בלי שורת הסבר) */}
+      <div className="mb-6 flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold" style={{ color: COLORS.gold }}>
+          מטרונום טיונר
+        </h1>
+      </div>
+
+      {/* Sub Tabs */}
+      <div className="mb-6 flex gap-2">
+        <button
+          onClick={() => setTab("metronome")}
+          className="rounded-lg px-4 py-2 text-sm font-semibold transition"
+          style={{
+            background: tab === "metronome" ? COLORS.gold : "rgba(255,255,255,0.10)",
+            color: tab === "metronome" ? COLORS.ink : "rgba(255,255,255,0.85)",
+            border: `1px solid ${
+              tab === "metronome" ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.18)"
+            }`,
+          }}
+        >
+          מטרונום
+        </button>
+
+        <button
+          onClick={() => setTab("tuner")}
+          className="rounded-lg px-4 py-2 text-sm font-semibold transition"
+          style={{
+            background: tab === "tuner" ? COLORS.gold : "rgba(255,255,255,0.10)",
+            color: tab === "tuner" ? COLORS.ink : "rgba(255,255,255,0.85)",
+            border: `1px solid ${
+              tab === "tuner" ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.18)"
+            }`,
+          }}
+        >
+          טיונר
+        </button>
+      </div>
+
+      {tab === "metronome" ? <MetronomePanel /> : <TunerPanel />}
+    </div>
+  );
+}
+
+/* ===================== METRONOME ===================== */
+
+function MetronomePanel() {
+  const engineRef = useRef<MetronomeEngine | null>(null);
+
+  const [bpm, setBpm] = useState<number>(120);
+  const [beatsPerBar, setBeatsPerBar] = useState<number>(4);
+  const [accentEvery, setAccentEvery] = useState<number>(2);
+  const [subdivision, setSubdivision] = useState<SubdivisionMode>("quarter");
+  const [sound, setSound] = useState<MetronomeSound>("classic_click");
+  const [volume, setVolume] = useState<number>(0.9);
+
+  const [running, setRunning] = useState(false);
+
+  // UI callbacks
+  const [beat, setBeat] = useState<number>(1);
+  const [dotOn, setDotOn] = useState(false);
+
+  useEffect(() => {
+    if (!engineRef.current) {
+      engineRef.current = new MetronomeEngine();
+      engineRef.current.setUICallbacks({
+        onTick: (e: MetronomeTickEvent) => {
+          setBeat(e.beatInBar);
+          setDotOn(true);
+          window.setTimeout(() => setDotOn(false), 60);
+        },
+      });
+    }
+
+    return () => {
+      try {
+        engineRef.current?.stop();
+      } catch {}
+    };
+  }, []);
+
+  const settings: MetronomeSettings = useMemo(
+    () => ({
+      bpm,
+      beatsPerBar,
+      accentEvery,
+      subdivision,
+      sound,
+      volume,
+    }),
+    [bpm, beatsPerBar, accentEvery, subdivision, sound, volume]
+  );
+
+  useEffect(() => {
+    engineRef.current?.setSettings(settings);
+  }, [settings]);
+
+  const toggle = async () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    if (!running) {
+      await engine.start();
+      setRunning(true);
+    } else {
+      engine.stop();
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/10 p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+          שליטה
+        </div>
+
+        <button
+          onClick={toggle}
+          className="rounded-xl px-4 py-2 text-sm font-semibold"
+          style={{
+            background: COLORS.gold,
+            color: COLORS.ink,
+            border: "1px solid rgba(0,0,0,0.25)",
+          }}
+        >
+          {running ? "עצור" : "התחל"}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+            BPM
+          </div>
+
+          <input
+            type="range"
+            min={20}
+            max={300}
+            value={bpm}
+            onChange={(e) => setBpm(Number(e.target.value))}
+            className="w-full"
+          />
+          <div className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.75)" }}>
+            {bpm}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+            תצוגה
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="text-sm" style={{ color: "rgba(255,255,255,0.75)" }}>
+              Beat: {beat}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                נקודה
+              </div>
+              <div
+                className="h-3 w-3 rounded-full"
+                style={{
+                  background: dotOn ? COLORS.gold : "rgba(255,255,255,0.18)",
+                  boxShadow: dotOn ? "0 0 12px rgba(216,177,90,0.65)" : "none",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Placeholder area for your existing pendulum UI if you already have it elsewhere */}
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/10 p-4">
+            <div className="text-sm" style={{ color: "rgba(255,255,255,0.65)" }}>
+              (התצוגה הוויזואלית שלך נמצאת כאן)
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+            מספר פעימות בתיבה (1–7)
+          </div>
+
+          <select
+            value={beatsPerBar}
+            onChange={(e) => setBeatsPerBar(Number(e.target.value))}
+            className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"
+          >
+            {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+            AccentEvery (0–7)
+          </div>
+
+          <select
+            value={accentEvery}
+            onChange={(e) => setAccentEvery(Number(e.target.value))}
+            className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"
+          >
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
+              <option key={n} value={n}>
+                {n === 0 ? "ללא" : `כל ${n} פעימות`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+            חלוקה
+          </div>
+
+          <select
+            value={subdivision}
+            onChange={(e) => setSubdivision(e.target.value as SubdivisionMode)}
+            className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"
+          >
+            {SUBDIVISIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+            צליל
+          </div>
+
+          <select
+            value={sound}
+            onChange={(e) => setSound(e.target.value as MetronomeSound)}
+            className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"
+          >
+            {SOUNDS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4 md:col-span-2">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+            ווליום (0–1)
+          </div>
+
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={volume}
+            onChange={(e) => setVolume(Number(e.target.value))}
+            className="w-full"
+          />
+          <div className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.75)" }}>
+            {volume.toFixed(2)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== TUNER ===================== */
+
+function TunerPanel() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
-  const bufRef = useRef<Float32Array | null>(null);
 
-  const stopMic = () => {
+  const [micOn, setMicOn] = useState(false);
+  const [freq, setFreq] = useState<number | null>(null);
+  const [note, setNote] = useState<string>("—");
+  const [cents, setCents] = useState<number>(0);
+  const [confidence, setConfidence] = useState<number>(0);
+
+  // MASTER TUNING (A4) 435–445
+  const [a4, setA4] = useState<number>(440);
+
+  const startMic = async () => {
+    if (micOn) return;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+    });
+    mediaStreamRef.current = stream;
+
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioCtxRef.current = audioCtx;
+
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyserRef.current = analyser;
+
+    source.connect(analyser);
+
+    const buf = new Float32Array(analyser.fftSize);
+
+    const tick = () => {
+      const an = analyserRef.current;
+      const ctx = audioCtxRef.current;
+      if (!an || !ctx) return;
+
+      an.getFloatTimeDomainData(buf);
+      const { freq: f, confidence: conf } = autoCorrelate(buf, ctx.sampleRate);
+
+      if (f > 0 && conf > 0.1) {
+        const nn = noteFromFrequency(f, a4);
+        const c = centsOffFromPitch(f, nn, a4);
+        setFreq(f);
+        setNote(noteNameFromNumber(nn));
+        setCents(c);
+        setConfidence(conf);
+      } else {
+        setFreq(null);
+        setNote("—");
+        setCents(0);
+        setConfidence(conf);
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    setMicOn(true);
+  };
+
+  const stopMic = async () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
 
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-      mediaStreamRef.current = null;
-    }
+    analyserRef.current = null;
 
     if (audioCtxRef.current) {
-      audioCtxRef.current.close().catch(() => undefined);
-      audioCtxRef.current = null;
+      try {
+        await audioCtxRef.current.close();
+      } catch {}
     }
+    audioCtxRef.current = null;
 
-    analyserRef.current = null;
-    bufRef.current = null;
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+    }
+    mediaStreamRef.current = null;
 
     setMicOn(false);
-    setStatus("כבוי");
-    setFreq(null);
-    setNote("—");
-    setCents(null);
-    setConfidence("low");
-  };
-
-  const startMic = async () => {
-    try {
-      setStatus("מבקש הרשאה למיקרופון...");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: false,
-        },
-        video: false,
-      });
-
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioCtx();
-      const source = audioCtx.createMediaStreamSource(stream);
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.4;
-
-      source.connect(analyser);
-
-      audioCtxRef.current = audioCtx;
-      analyserRef.current = analyser;
-      mediaStreamRef.current = stream;
-
-      bufRef.current = new Float32Array(analyser.fftSize);
-      setMicOn(true);
-      setStatus("דולק (מקשיב...)");
-
-      const tick = () => {
-        const a = analyserRef.current;
-        const ctx = audioCtxRef.current;
-        const buf = bufRef.current;
-        if (!a || !ctx || !buf) return;
-
-        a.getFloatTimeDomainData(buf);
-        const f = autoCorrelateFloat32(buf, ctx.sampleRate);
-
-        if (f > 0) {
-          const nn = noteFromFrequency(f);
-          const nname = noteName(nn);
-          const c = centsOffFromPitch(f, nn);
-
-          setFreq(f);
-          setNote(nname);
-          setCents(c);
-
-          setConfidence(Math.abs(c) <= 35 ? "ok" : "low");
-        } else {
-          setFreq(null);
-          setNote("—");
-          setCents(null);
-          setConfidence("low");
-        }
-
-        rafRef.current = requestAnimationFrame(tick);
-      };
-
-      rafRef.current = requestAnimationFrame(tick);
-    } catch {
-      setStatus("נחסם / אין הרשאה למיקרופון");
-      setMicOn(false);
-    }
   };
 
   useEffect(() => {
-    return () => stopMic();
+    return () => {
+      stopMic();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const inTune = cents != null && Math.abs(cents) <= 5;
+  const needleX = useMemo(() => {
+    // cents typically -50..+50
+    const v = clamp(cents, -50, 50);
+    const pct = (v + 50) / 100;
+    return pct * 100;
+  }, [cents]);
 
   return (
-    <div
-      className="rounded-xl border p-5"
-      style={{ borderColor: "rgba(215,180,106,0.25)", background: "rgba(0,0,0,0.25)" }}
-    >
+    <div className="rounded-2xl border border-white/10 bg-black/10 p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-lg font-medium" style={{ color: "rgba(255,255,255,0.90)" }}>
-            טיונר
-          </div>
-          <div className="text-xs" style={{ color: "rgba(255,255,255,0.60)" }}>
-            {status}
-          </div>
+        <div className="text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+          טיונר (מיקרופון)
         </div>
 
         <button
           onClick={micOn ? stopMic : startMic}
-          className="rounded-lg px-4 py-2 text-sm font-semibold"
+          className="rounded-xl px-4 py-2 text-sm font-semibold"
           style={{
             background: micOn ? "rgba(255,255,255,0.12)" : COLORS.gold,
             color: micOn ? "rgba(255,255,255,0.9)" : COLORS.ink,
-            border: `1px solid ${micOn ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.2)"}`,
+            border: "1px solid rgba(255,255,255,0.18)",
           }}
         >
           {micOn ? "כבה מיקרופון" : "הפעל מיקרופון"}
         </button>
       </div>
 
+      {/* A4 Master Tuning */}
+      <div className="mt-4 flex flex-col gap-2">
+        <div className="flex items-center justify-between text-sm" style={{ color: "rgba(255,255,255,0.85)" }}>
+          <span>כיוון מאסטר (A4)</span>
+          <span className="font-semibold">{a4}Hz</span>
+        </div>
+
+        <input
+          type="range"
+          min={435}
+          max={445}
+          step={1}
+          value={a4}
+          onChange={(e) => setA4(Number(e.target.value))}
+          className="w-full"
+        />
+
+        <div className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+          טווח כיוון: 435–445Hz (ברירת מחדל 440Hz)
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-lg border p-4" style={{ borderColor: "rgba(255,255,255,0.12)", background: "rgba(0,0,0,0.25)" }}>
-          <div className="text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
             תו
           </div>
-          <div className="mt-1 text-3xl font-semibold" style={{ color: inTune ? COLORS.gold2 : COLORS.gold }}>
+          <div className="text-3xl font-bold" style={{ color: COLORS.gold }}>
             {note}
           </div>
-          <div className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-            {confidence === "ok" ? "קליטה טובה" : "קליטה חלשה / לא יציב"}
+          <div className="mt-2 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+            {micOn ? (confidence > 0.1 ? "קולט" : "שקט/לא יציב") : "מיקרופון כבוי"}
           </div>
         </div>
 
-        <div className="rounded-lg border p-4" style={{ borderColor: "rgba(255,255,255,0.12)", background: "rgba(0,0,0,0.25)" }}>
-          <div className="text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
             תדר (Hz)
           </div>
-          <div className="mt-1 text-2xl font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>
-            {freq ? freq.toFixed(1) : "—"}
+          <div className="text-2xl font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>
+            {freq ? freq.toFixed(2) : "—"}
           </div>
-          <div className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-            טווח מומלץ: 40–2000Hz
+          <div className="mt-2 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+            מומלץ טווח עבודה: ~40Hz–2000Hz
           </div>
         </div>
 
-        <div className="rounded-lg border p-4" style={{ borderColor: "rgba(255,255,255,0.12)", background: "rgba(0,0,0,0.25)" }}>
-          <div className="text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+          <div className="mb-2 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
             סטייה (cents)
           </div>
-          <div className="mt-1 text-2xl font-semibold" style={{ color: inTune ? COLORS.gold2 : "rgba(255,255,255,0.9)" }}>
-            {cents == null ? "—" : `${cents > 0 ? "+" : ""}${cents.toFixed(1)}`}
+
+          <div className="mb-2 text-2xl font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>
+            {freq ? `${cents > 0 ? "+" : ""}${cents.toFixed(1)}` : "—"}
           </div>
 
-          <div className="mt-3 h-3 w-full overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.10)" }}>
+          <div className="relative mt-3 h-2 w-full rounded-full bg-white/10">
+            <div className="absolute left-1/2 top-[-6px] h-6 w-[2px] bg-white/30" />
             <div
-              className="h-full"
+              className="absolute top-[-7px] h-6 w-3 rounded-full"
               style={{
-                width: "100%",
-                background:
-                  "linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(215,180,106,0.35) 35%, rgba(241,209,138,0.65) 50%, rgba(215,180,106,0.35) 65%, rgba(255,255,255,0.05) 100%)",
+                left: `calc(${needleX}% - 6px)`,
+                background: COLORS.gold,
+                boxShadow: "0 0 12px rgba(216,177,90,0.55)",
               }}
             />
           </div>
 
-          <div className="relative mt-1 h-4">
-            <div
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: 2,
-                width: 2,
-                height: 12,
-                background: "rgba(255,255,255,0.25)",
-                transform: "translateX(-50%)",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                top: 1,
-                height: 14,
-                width: 10,
-                borderRadius: 8,
-                background: inTune ? COLORS.gold2 : COLORS.gold,
-                boxShadow: inTune ? "0 0 14px rgba(241,209,138,0.45)" : "0 0 12px rgba(215,180,106,0.35)",
-                left:
-                  cents == null ? "50%" : `calc(50% + ${Math.max(-50, Math.min(50, cents))} * 0.7%)`,
-                transform: "translateX(-50%)",
-                transition: "left 80ms linear",
-              }}
-              title="סטייה"
-            />
-          </div>
-
-          <div className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+          <div className="mt-2 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
             יעד: ±5 סנט (כמעט מדויק)
           </div>
         </div>
       </div>
 
-      <div className="mt-4 text-xs leading-5" style={{ color: "rgba(255,255,255,0.60)" }}>
-        טיפ: אם הטיונר “קופץ” — התקרבי למקור הצליל, כבי רעשי רקע, ותני תו יציב (ללא ויברטו חזק).
-      </div>
-    </div>
-  );
-}
-
-/** ---------- PAGE (METRONOME + TUNER) ---------- */
-export default function Metronome() {
-  const engine = useMemo(() => MetronomeEngine.getInstance(), []);
-  const [settings, setSettings] = useState<MetronomeSettings>(() => engine.getSettings());
-  const [running, setRunning] = useState<boolean>(() => engine.getRunning());
-
-  const [tab, setTab] = useState<"metronome" | "tuner">("metronome");
-
-  const [beatInBar, setBeatInBar] = useState<number>(1);
-  const [subIndex, setSubIndex] = useState<number>(0);
-  const [flash, setFlash] = useState<{ on: boolean; strong: boolean }>({ on: false, strong: false });
-
-  const lastMainTickAtRef = useRef<number>(performance.now());
-  const rafRef = useRef<number | null>(null);
-  const [pendulumAngle, setPendulumAngle] = useState<number>(0);
-
-  const COLORS = {
-    wine: "#5b1f24",
-    gold: "#d7b46a",
-    gold2: "#f1d18a",
-    ink: "#1a1a1a",
-  };
-
-  useEffect(() => {
-    engine.setOnState((r) => setRunning(r));
-
-    engine.setOnTick((e: MetronomeTickEvent) => {
-      setBeatInBar(e.beatInBar);
-      setSubIndex(e.subIndex);
-
-      if (e.isMainBeat) {
-        lastMainTickAtRef.current = performance.now();
-        setFlash({ on: true, strong: e.isDownbeat || e.isAccent });
-        window.setTimeout(() => setFlash({ on: false, strong: false }), 90);
-      }
-    });
-
-    return () => {
-      engine.setOnTick(null);
-      engine.setOnState(null);
-      engine.stop();
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [engine]);
-
-  useEffect(() => {
-    const loop = () => {
-      const bpm = settings.bpm;
-      const msPerBeat = (60_000 / bpm) || 500;
-
-      if (!running) {
-        setPendulumAngle((prev) => prev * 0.85);
-        rafRef.current = requestAnimationFrame(loop);
-        return;
-      }
-
-      const t = performance.now();
-      const dt = t - lastMainTickAtRef.current;
-      const phase = (dt / msPerBeat) * Math.PI;
-      const angle = Math.sin(phase) * 28;
-      setPendulumAngle(angle);
-
-      rafRef.current = requestAnimationFrame(loop);
-    };
-
-    rafRef.current = requestAnimationFrame(loop);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [running, settings.bpm]);
-
-  const applySettings = (next: Partial<MetronomeSettings>) => {
-    const merged: MetronomeSettings = { ...settings, ...next };
-    setSettings(merged);
-
-    engine.setBpm(merged.bpm);
-    engine.setBeatsPerBar(merged.beatsPerBar);
-    engine.setAccentEvery(merged.accentEvery);
-    engine.setSubdivision(merged.subdivision);
-    engine.setSound(merged.sound);
-    engine.setVolume(merged.volume);
-  };
-
-  const startStop = async () => {
-    if (running) {
-      engine.stop();
-      return;
-    }
-    await engine.start();
-  };
-
-  const beatDots = useMemo(() => {
-    return Array.from({ length: settings.beatsPerBar }, (_, i) => {
-      const n = i + 1;
-      const isCurrent = n === beatInBar && subIndex === 0;
-      const isDownbeat = n === 1;
-      return (
-        <div
-          key={n}
-          className="h-3 w-3 rounded-full"
-          style={{
-            background: isCurrent ? (isDownbeat ? COLORS.gold2 : COLORS.gold) : "rgba(255,255,255,0.25)",
-            boxShadow: isCurrent ? `0 0 0 3px rgba(215,180,106,0.25)` : "none",
-          }}
-          title={`Beat ${n}`}
-        />
-      );
-    });
-  }, [settings.beatsPerBar, beatInBar, subIndex]);
-
-  return (
-    <div
-      className="min-h-screen w-full p-6"
-      style={{ background: "linear-gradient(135deg, #1a0c0e 0%, #2a0f12 55%, #140607 100%)" }}
-    >
-      <div className="mx-auto w-full max-w-5xl">
-        {/* Header - תיקון לפי הסימון שלך */}
-        <div className="mb-4 flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold" style={{ color: COLORS.gold }}>
-            מטרונום טיונר
-          </h1>
-          <div className="text-sm" style={{ color: "rgba(255,255,255,0.70)" }}>
-            מטרונום + טיונר (מיקרופון) — באותו עמוד
-          </div>
-        </div>
-
-        {/* Sub Tabs */}
-        <div className="mb-6 flex gap-2">
-          <button
-            onClick={() => setTab("metronome")}
-            className="rounded-lg px-4 py-2 text-sm font-semibold"
-            style={{
-              background: tab === "metronome" ? COLORS.gold : "rgba(255,255,255,0.10)",
-              color: tab === "metronome" ? COLORS.ink : "rgba(255,255,255,0.85)",
-              border: `1px solid ${tab === "metronome" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"}`,
-            }}
-          >
-            מטרונום
-          </button>
-          <button
-            onClick={() => setTab("tuner")}
-            className="rounded-lg px-4 py-2 text-sm font-semibold"
-            style={{
-              background: tab === "tuner" ? COLORS.gold : "rgba(255,255,255,0.10)",
-              color: tab === "tuner" ? COLORS.ink : "rgba(255,255,255,0.85)",
-              border: `1px solid ${tab === "tuner" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"}`,
-            }}
-          >
-            טיונר
-          </button>
-        </div>
-
-        {tab === "tuner" ? (
-          <TunerPanel COLORS={COLORS} />
-        ) : (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Controls */}
-            <div
-              className="rounded-xl border p-5"
-              style={{ borderColor: "rgba(215,180,106,0.25)", background: "rgba(0,0,0,0.25)" }}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-lg font-medium" style={{ color: "rgba(255,255,255,0.90)" }}>
-                  שליטה
-                </div>
-                <button
-                  onClick={startStop}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold"
-                  style={{
-                    background: running ? "rgba(255,255,255,0.12)" : COLORS.gold,
-                    color: running ? "rgba(255,255,255,0.9)" : COLORS.ink,
-                    border: `1px solid ${running ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.2)"}`,
-                  }}
-                >
-                  {running ? "עצור" : "התחל"}
-                </button>
-              </div>
-
-              {/* BPM */}
-              <div className="mb-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-                    BPM
-                  </label>
-                  <input
-                    type="number"
-                    min={20}
-                    max={300}
-                    value={settings.bpm}
-                    onChange={(e) => applySettings({ bpm: clamp(Number(e.target.value || 120), 20, 300) })}
-                    className="w-24 rounded-md border px-2 py-1 text-sm"
-                    style={{
-                      background: "rgba(0,0,0,0.35)",
-                      borderColor: "rgba(255,255,255,0.15)",
-                      color: "rgba(255,255,255,0.9)",
-                    }}
-                  />
-                </div>
-                <input
-                  type="range"
-                  min={20}
-                  max={300}
-                  value={settings.bpm}
-                  onChange={(e) => applySettings({ bpm: clamp(Number(e.target.value), 20, 300) })}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-                    מספר פעימות בתיבה (1–7)
-                  </label>
-                  <select
-                    value={settings.beatsPerBar}
-                    onChange={(e) => applySettings({ beatsPerBar: clamp(Number(e.target.value), 1, 7) })}
-                    className="w-full rounded-md border px-2 py-2 text-sm"
-                    style={{
-                      background: "rgba(0,0,0,0.35)",
-                      borderColor: "rgba(255,255,255,0.15)",
-                      color: "rgba(255,255,255,0.9)",
-                    }}
-                  >
-                    {Array.from({ length: 7 }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-                    תדירות פעמה כבדה AccentEvery (0–7)
-                  </label>
-                  <select
-                    value={settings.accentEvery}
-                    onChange={(e) => applySettings({ accentEvery: clamp(Number(e.target.value), 0, 7) })}
-                    className="w-full rounded-md border px-2 py-2 text-sm"
-                    style={{
-                      background: "rgba(0,0,0,0.35)",
-                      borderColor: "rgba(255,255,255,0.15)",
-                      color: "rgba(255,255,255,0.9)",
-                    }}
-                  >
-                    {Array.from({ length: 8 }, (_, i) => i).map((n) => (
-                      <option key={n} value={n}>
-                        {n === 0 ? "0 — ללא" : n === 1 ? "1 — כל פעימה" : `${n} — כל ${n} פעימות`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="mb-1 block text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  חלוקה פנימית (מקצבים)
-                </label>
-                <select
-                  value={settings.subdivision}
-                  onChange={(e) => applySettings({ subdivision: e.target.value as SubdivisionMode })}
-                  className="w-full rounded-md border px-2 py-2 text-sm"
-                  style={{
-                    background: "rgba(0,0,0,0.35)",
-                    borderColor: "rgba(255,255,255,0.15)",
-                    color: "rgba(255,255,255,0.9)",
-                  }}
-                >
-                  {SUBDIVISIONS.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-                  * הנקודה המהבהבת מסונכרנת לפעימה הראשית (main beat).
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="mb-1 block text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  סאונד
-                </label>
-                <select
-                  value={settings.sound}
-                  onChange={(e) => applySettings({ sound: e.target.value as MetronomeSound })}
-                  className="w-full rounded-md border px-2 py-2 text-sm"
-                  style={{
-                    background: "rgba(0,0,0,0.35)",
-                    borderColor: "rgba(255,255,255,0.15)",
-                    color: "rgba(255,255,255,0.9)",
-                  }}
-                >
-                  {SOUNDS.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-                    עוצמה
-                  </label>
-                  <div className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
-                    {formatPct(settings.volume)}
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={settings.volume}
-                  onChange={(e) => applySettings({ volume: clamp(Number(e.target.value), 0, 1) })}
-                  className="w-full"
-                />
-              </div>
-            </div>
-
-            {/* Visual */}
-            <div
-              className="rounded-xl border p-5"
-              style={{ borderColor: "rgba(215,180,106,0.25)", background: "rgba(0,0,0,0.25)" }}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-lg font-medium" style={{ color: "rgba(255,255,255,0.90)" }}>
-                  תצוגה
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
-                    נקודה
-                  </div>
-                  <div
-                    className="h-4 w-4 rounded-full"
-                    style={{
-                      background: flash.on ? (flash.strong ? COLORS.gold2 : COLORS.gold) : "rgba(255,255,255,0.18)",
-                      boxShadow: flash.on
-                        ? `0 0 12px ${flash.strong ? "rgba(241,209,138,0.55)" : "rgba(215,180,106,0.45)"}`
-                        : "none",
-                      transition: "transform 80ms ease, box-shadow 80ms ease",
-                      transform: flash.on ? "scale(1.15)" : "scale(1)",
-                    }}
-                    title="Blink"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-4 flex items-center gap-2">
-                {beatDots}
-                <div className="ml-2 text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
-                  Beat: <span style={{ color: COLORS.gold }}>{beatInBar}</span>
-                  {settings.subdivision !== "quarter" && (
-                    <>
-                      {" "}
-                      | Sub: <span style={{ color: COLORS.gold }}>{subIndex}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div
-                className="relative mx-auto mt-2 flex h-64 w-full max-w-sm items-end justify-center overflow-hidden rounded-xl"
-                style={{
-                  background:
-                    "radial-gradient(120% 140% at 50% 0%, rgba(215,180,106,0.14) 0%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.35) 100%)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                }}
-              >
-                <div
-                  className="absolute bottom-0 h-56 w-56 rounded-2xl"
-                  style={{
-                    background: `linear-gradient(180deg, rgba(91,31,36,0.92) 0%, rgba(38,10,12,0.95) 100%)`,
-                    border: "1px solid rgba(215,180,106,0.25)",
-                    boxShadow: "0 18px 60px rgba(0,0,0,0.55)",
-                  }}
-                />
-                <div
-                  className="absolute bottom-6 h-12 w-40 rounded-lg"
-                  style={{
-                    background: "rgba(0,0,0,0.35)",
-                    border: "1px solid rgba(215,180,106,0.25)",
-                  }}
-                />
-                {/* תיקון טקסט לפי הסימון שלך */}
-                <div className="absolute bottom-8 text-xs" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  מטרונום טיונר
-                </div>
-
-                <div
-                  className="absolute"
-                  style={{
-                    bottom: 170,
-                    left: "50%",
-                    width: 10,
-                    height: 10,
-                    borderRadius: 999,
-                    transform: "translateX(-50%)",
-                    background: COLORS.gold,
-                    boxShadow: "0 0 12px rgba(215,180,106,0.35)",
-                  }}
-                />
-
-                <div
-                  className="absolute origin-top"
-                  style={{
-                    bottom: 170,
-                    left: "50%",
-                    width: 6,
-                    height: 140,
-                    transform: `translateX(-50%) rotate(${pendulumAngle}deg)`,
-                    transition: running ? "transform 16ms linear" : "transform 120ms ease",
-                    background: `linear-gradient(180deg, ${COLORS.gold2} 0%, ${COLORS.gold} 100%)`,
-                    borderRadius: 999,
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 40,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      width: 26,
-                      height: 18,
-                      borderRadius: 8,
-                      background: "rgba(0,0,0,0.35)",
-                      border: "1px solid rgba(215,180,106,0.35)",
-                      boxShadow: "0 10px 22px rgba(0,0,0,0.45)",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: -10,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      width: 16,
-                      height: 16,
-                      borderRadius: 999,
-                      background: flash.on ? COLORS.gold2 : COLORS.gold,
-                      boxShadow: flash.on ? "0 0 16px rgba(241,209,138,0.55)" : "0 0 10px rgba(215,180,106,0.35)",
-                      transition: "background 80ms ease, box-shadow 80ms ease",
-                    }}
-                    title="Pendulum tip"
-                  />
-                </div>
-
-                <div
-                  className="absolute bottom-[170px] left-0 right-0 flex items-center justify-between px-10 text-[10px]"
-                  style={{ color: "rgba(255,255,255,0.35)" }}
-                >
-                  <span>◀︎</span>
-                  <span>▶︎</span>
-                </div>
-              </div>
-
-              <div className="mt-4 text-xs leading-5" style={{ color: "rgba(255,255,255,0.6)" }}>
-                טיפ: במובייל חובה ללחוץ “התחל” כדי שה־AudioContext יופעל.
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="mt-4 text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+        טיפ: אם הטיונר “קופץ” — התקרבי למקור הצליל, כבי רעשי רקע, ונגני תו יציב (ללא ויברטו חזק).
       </div>
     </div>
   );
