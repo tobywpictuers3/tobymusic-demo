@@ -16,7 +16,6 @@ import GeneralWeeklySchedule from "@/components/student/GeneralWeeklySchedule";
 import ContactsList from "@/components/student/ContactsList";
 import StudentFiles from "@/components/student/StudentFiles";
 import PaymentAlert from "@/components/student/PaymentAlert";
-import PaymentSummary from "@/components/student/PaymentSummary";
 import LessonHistory from "@/components/student/LessonHistory";
 import PracticeTracking from "@/components/student/PracticeTracking";
 import GmailStyleMessages from "@/components/student/GmailStyleMessages";
@@ -29,6 +28,8 @@ import { SaveButton } from "@/components/ui/save-button";
 import { UnreadMessagesBadge } from "@/components/ui/unread-messages-badge";
 import StudentSwapPanel, { StudentSwapPanelRef } from "@/components/student/lessonSwap/StudentSwapPanel";
 
+import SyncStatusBadge from "@/components/ui/SyncStatusBadge";
+
 import Metronome from "./Metronome";
 
 const StudentDashboard = () => {
@@ -39,28 +40,23 @@ const StudentDashboard = () => {
   const [student, setStudent] = useState<Student | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [activeTab, setActiveTab] = useState("schedule");
-  const [saving, setSaving] = useState(false);
 
   const studentSwapPanelRef = useState<StudentSwapPanelRef | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
-        // אם זה אזור "public" (לצפייה מוגבלת) – ודאי שיש לוגיקה אצלך שתומכת בזה
         if (studentId === "public") {
-          // במקרה שאין פה תלמיד אמיתי, ננווט החוצה כדי לא לקרוס
           navigate("/", { replace: true });
           return;
         }
 
         const current = getCurrentUser();
         if (!current) {
-          // אם אין משתמש – נשלח למסך כניסה/בית
           navigate("/", { replace: true });
           return;
         }
 
-        // מציאת תלמיד לפי פרמטר
         const students = getStudents();
         const found = students.find((s) => s?.id === studentId);
 
@@ -92,7 +88,6 @@ const StudentDashboard = () => {
     load();
   }, [studentId, navigate]);
 
-  // ✅ חשוב: אם student עדיין לא נטען – לא מרנדרים UI שמשתמש ב-student.id
   if (!student) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -112,12 +107,9 @@ const StudentDashboard = () => {
   };
 
   const handleStudentUpdate = () => {
-    // Refresh student data
     const students = getStudents();
     const found = students.find((s) => s?.id === student.id);
-    if (found) {
-      setStudent(found);
-    }
+    if (found) setStudent(found);
   };
 
   return (
@@ -129,15 +121,18 @@ const StudentDashboard = () => {
             <div className="text-xl md:text-2xl font-bold">
               אזור אישי — {student.firstName} {student.lastName}
             </div>
-            <div className="text-sm text-muted-foreground">
-              ID: {student.id}
-            </div>
+            <div className="text-sm text-muted-foreground">ID: {student.id}</div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 flex-wrap justify-end">
           <UnreadMessagesBadge userId={student.id} />
+
+          {/* ✅ Sync status visible to students */}
+          <SyncStatusBadge />
+
           <SaveButton />
+
           <Button variant="outline" onClick={handleLogout} className="gap-2">
             <LogOut className="w-4 h-4" />
             התנתקות
@@ -214,7 +209,10 @@ const StudentDashboard = () => {
         </TabsContent>
 
         <TabsContent value="messages" className="space-y-6">
-          <GmailStyleMessages studentId={student.id} studentName={`${student.firstName} ${student.lastName}`} />
+          <GmailStyleMessages
+            studentId={student.id}
+            studentName={`${student.firstName} ${student.lastName}`}
+          />
         </TabsContent>
 
         <TabsContent value="details" className="space-y-6">
@@ -229,9 +227,6 @@ const StudentDashboard = () => {
           <StudentFiles studentId={student.id} />
         </TabsContent>
       </Tabs>
-
-      {/* אם יש לך את StudentSwapPanel בפועל – תשאירי אותו כמו אצלך.
-          כאן אני לא "ממציא" שימוש כדי לא לשבור לוגיקה קיימת. */}
     </div>
   );
 };
