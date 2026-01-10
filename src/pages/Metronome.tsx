@@ -16,12 +16,18 @@ function extractBeatInBar(e: any): number | null {
 }
 function subdivCount(mode: SubdivisionMode): number {
   switch (mode) {
-    case "quarter": return 1;
-    case "eighths": return 2;
-    case "triplets": return 3;
-    case "sixteenths": return 4;
-    case "swing": return 2;
-    default: return 1;
+    case "quarter":
+      return 1;
+    case "eighths":
+      return 2;
+    case "triplets":
+      return 3;
+    case "sixteenths":
+      return 4;
+    case "swing":
+      return 2;
+    default:
+      return 1;
   }
 }
 
@@ -60,25 +66,16 @@ function PendulumVisual(props: {
 }) {
   const { running, bpm, beatsPerBar, beatInBar, subdivision, hit } = props;
 
-  // virtual stage
+  // stage
   const W = 520;
   const H = 260;
 
   const pivotX = W / 2;
   const pivotY = 26;
 
-  const wallPad = 26;
-  const wallThickness = 10;
-
-  // IMPORTANT: wall face X is where collision happens
-  const leftWallFaceX = wallPad + wallThickness;                 // inner face
-  const rightWallFaceX = W - (wallPad + wallThickness);          // inner face
-
+  // geometry: no walls, just extremes
   const rodLen = 185;
-  const dx = pivotX - leftWallFaceX; // equals rightWallFaceX - pivotX
-
-  const ratio = clamp(dx / rodLen, 0, 0.999);
-  const maxAngle = Math.asin(ratio); // ensures bob touches wall face exactly
+  const maxAngle = 0.95; // pleasant wide swing (radians)
 
   const beatMs = 60000 / clamp(bpm, 20, 400);
 
@@ -89,10 +86,11 @@ function PendulumVisual(props: {
   const angleRef = useRef<number>(maxAngle);
   const [angle, setAngle] = useState<number>(maxAngle);
 
-  // canvas trail (only this beat)
+  // trail per beat
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
+  // burst only on main beat
   const [burst, setBurst] = useState<{
     x: number;
     y: number;
@@ -100,7 +98,9 @@ function PendulumVisual(props: {
     id: number;
   } | null>(null);
 
-  const [subPulse, setSubPulse] = useState<{ id: number } | null>(null);
+  // subdivision blink on weight (must retrigger)
+  const [subBlinkId, setSubBlinkId] = useState<number>(0);
+  const subBlinkTimerRef = useRef<number | null>(null);
 
   function bobPos(a: number) {
     return {
@@ -118,7 +118,7 @@ function PendulumVisual(props: {
     lastPointRef.current = null;
   }
 
-  // tick events
+  // respond to tick events
   useEffect(() => {
     if (hit.kind === "main") {
       startSideRef.current = hit.side;
@@ -128,27 +128,31 @@ function PendulumVisual(props: {
       angleRef.current = snap;
       setAngle(snap);
 
-      // reset trail exactly on each beat
+      // trail resets exactly on each beat
       clearTrail();
 
-      // burst must be ON THE WALL FACE at the bob Y
+      // big burst exactly where the weight is at impact
       const p = bobPos(snap);
-      const wallX = hit.side === 1 ? rightWallFaceX : leftWallFaceX;
 
       setBurst({
-        x: wallX,
+        x: p.x,
         y: p.y,
         isDownbeat: hit.isDownbeat,
         id: hit.id,
       });
     } else {
-      // subdivision: pulse the weight only (no burst)
-      setSubPulse({ id: hit.id });
+      // subdivision: blink weight only (no burst, no trail reset)
+      setSubBlinkId((prev) => prev + 1);
+      if (subBlinkTimerRef.current) window.clearTimeout(subBlinkTimerRef.current);
+      subBlinkTimerRef.current = window.setTimeout(() => {
+        // allow class to drop so next blink re-triggers cleanly
+        // (this is important for rapid subdivisions)
+      }, 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hit]);
 
-  // animation + trail drawing
+  // animation + trail
   useEffect(() => {
     if (!running) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -158,11 +162,11 @@ function PendulumVisual(props: {
 
     const loop = () => {
       const now = performance.now();
-      const p = clamp((now - t0Ref.current) / beatMs, 0, 1);
+      const p01 = clamp((now - t0Ref.current) / beatMs, 0, 1);
 
-      // smooth travel wall->wall
+      // smooth travel extreme->extreme
       const side = startSideRef.current;
-      const a = side * Math.cos(Math.PI * p) * maxAngle;
+      const a = side * Math.cos(Math.PI * p01) * maxAngle;
 
       angleRef.current = a;
       setAngle(a);
@@ -247,54 +251,29 @@ function PendulumVisual(props: {
       <div className="rounded-2xl border border-white/10 bg-black/20 p-6">
         <div className="relative h-[260px] rounded-2xl border border-white/10 bg-black/10 overflow-hidden">
           {/* Trail */}
-          <canvas
-            ref={canvasRef}
-            width={W}
-            height={H}
-            className="absolute inset-0 w-full h-full"
-          />
+          <canvas ref={canvasRef} width={W} height={H} className="absolute inset-0 w-full h-full" />
 
-          {/* SVG overlay (rod + weight + walls + burst) */}
-          <svg
-            className="absolute inset-0 w-full h-full"
-            viewBox={`0 0 ${W} ${H}`}
-            preserveAspectRatio="none"
-          >
+          {/* SVG overlay */}
+          <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
             <defs>
               <radialGradient id="weightGrad" cx="30%" cy="30%" r="70%">
                 <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
                 <stop offset="55%" stopColor="rgba(244,189,86,0.98)" />
                 <stop offset="100%" stopColor="rgba(244,189,86,0.65)" />
               </radialGradient>
+
               <radialGradient id="burstGradRed" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stopColor="rgba(255,45,75,0.95)" />
-                <stop offset="60%" stopColor="rgba(255,45,75,0.20)" />
+                <stop offset="55%" stopColor="rgba(255,45,75,0.25)" />
                 <stop offset="100%" stopColor="rgba(255,45,75,0.0)" />
               </radialGradient>
+
               <radialGradient id="burstGradGold" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stopColor="rgba(244,189,86,0.95)" />
-                <stop offset="60%" stopColor="rgba(244,189,86,0.20)" />
+                <stop offset="55%" stopColor="rgba(244,189,86,0.25)" />
                 <stop offset="100%" stopColor="rgba(244,189,86,0.0)" />
               </radialGradient>
             </defs>
-
-            {/* walls (NO constant glow) */}
-            <rect
-              x={wallPad}
-              y={22}
-              width={wallThickness}
-              height={H - 44}
-              rx={5}
-              fill="rgba(255,255,255,0.10)"
-            />
-            <rect
-              x={W - wallPad - wallThickness}
-              y={22}
-              width={wallThickness}
-              height={H - 44}
-              rx={5}
-              fill="rgba(255,255,255,0.10)"
-            />
 
             {/* pivot */}
             <circle cx={pivotX} cy={pivotY} r={5} fill="rgba(255,255,255,0.22)" />
@@ -310,46 +289,46 @@ function PendulumVisual(props: {
               strokeLinecap="round"
             />
 
-            {/* weight (main object) */}
-            <g>
-              {/* weight body */}
+            {/* weight group (KEYED) so blink animation retriggers reliably */}
+            <g key={`${showSub ? subBlinkId : "no-sub"}`}>
               <circle
                 cx={p.x}
                 cy={p.y}
                 r={13}
                 fill="url(#weightGrad)"
-                className={showSub && subPulse ? "tobyWeightPulse" : ""}
+                className={showSub ? "tobyWeightBlink" : ""}
               />
-              {/* small cap highlight */}
               <circle
                 cx={p.x - 4}
                 cy={p.y - 5}
                 r={4}
                 fill="rgba(255,255,255,0.18)"
-                className={showSub && subPulse ? "tobyWeightPulse" : ""}
+                className={showSub ? "tobyWeightBlink" : ""}
               />
             </g>
 
-            {/* burst at wall contact ONLY on main beat */}
+            {/* BIG burst only on main beat */}
             {burst && (
               <g key={burst.id}>
                 <circle
                   cx={burst.x}
                   cy={burst.y}
-                  r={70}
+                  r={95}
                   fill={burst.isDownbeat ? "url(#burstGradRed)" : "url(#burstGradGold)"}
                   style={{ animation: "tobyBurst 220ms ease-out" }}
                 />
-                {/* extra glow */}
                 <circle
                   cx={burst.x}
                   cy={burst.y}
-                  r={34}
+                  r={48}
                   fill="transparent"
                   stroke={burstCore}
-                  strokeOpacity={0.55}
+                  strokeOpacity={0.6}
                   strokeWidth={2}
-                  style={{ filter: `drop-shadow(0 0 18px ${burstGlow})`, animation: "tobyBurst 220ms ease-out" }}
+                  style={{
+                    filter: `drop-shadow(0 0 24px ${burstGlow})`,
+                    animation: "tobyBurst 220ms ease-out",
+                  }}
                 />
               </g>
             )}
@@ -358,16 +337,17 @@ function PendulumVisual(props: {
           <style>{`
             @keyframes tobyBurst {
               0% { transform: scale(0.55); opacity: 0; }
-              20% { opacity: 1; }
-              100% { transform: scale(1.25); opacity: 0; }
+              18% { opacity: 1; }
+              100% { transform: scale(1.18); opacity: 0; }
             }
-            .tobyWeightPulse {
-              animation: tobyPulse 140ms ease-out;
-              filter: drop-shadow(0 0 14px rgba(244,189,86,0.60));
+            /* blink for subdivisions (weight only, no burst) */
+            .tobyWeightBlink {
+              animation: tobyBlink 120ms ease-out;
+              filter: drop-shadow(0 0 18px rgba(244,189,86,0.65));
             }
-            @keyframes tobyPulse {
+            @keyframes tobyBlink {
               0% { transform: scale(0.96); opacity: 0.75; }
-              40% { transform: scale(1.06); opacity: 1; }
+              40% { transform: scale(1.08); opacity: 1; }
               100% { transform: scale(1.00); opacity: 1; }
             }
           `}</style>
@@ -514,7 +494,6 @@ export default function Metronome() {
       releaseMs: 150,
       minNoteMs: 90,
 
-      // IMPORTANT: duration measurement target
       durationTarget: "A4_A5",
       durationTargetCents: 150,
     });
@@ -559,10 +538,7 @@ export default function Metronome() {
     return "";
   })();
 
-  const showMicRetry =
-    tState.status === "permission_denied" ||
-    tState.status === "error" ||
-    tState.status === "idle";
+  const showMicRetry = tState.status === "permission_denied" || tState.status === "error" || tState.status === "idle";
 
   return (
     <div className="space-y-6">
@@ -594,8 +570,12 @@ export default function Metronome() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Button onClick={startMetronome} disabled={mRunning}>התחל</Button>
-                        <Button variant="secondary" onClick={stopMetronome} disabled={!mRunning}>עצור</Button>
+                        <Button onClick={startMetronome} disabled={mRunning}>
+                          התחל
+                        </Button>
+                        <Button variant="secondary" onClick={stopMetronome} disabled={!mRunning}>
+                          עצור
+                        </Button>
                       </div>
                     </div>
 
@@ -622,8 +602,10 @@ export default function Metronome() {
                           value={mSettings.beatsPerBar}
                           onChange={(e) => setBeatsPerBar(Number(e.target.value))}
                         >
-                          {[1,2,3,4,5,6,7].map((n) => (
-                            <option key={n} value={n}>{n}</option>
+                          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -648,7 +630,9 @@ export default function Metronome() {
                           onChange={(e) => setSubdivision(e.target.value as SubdivisionMode)}
                         >
                           {Object.keys(SUB_LABELS).map((k) => (
-                            <option key={k} value={k}>{SUB_LABELS[k as SubdivisionMode]}</option>
+                            <option key={k} value={k}>
+                              {SUB_LABELS[k as SubdivisionMode]}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -661,7 +645,9 @@ export default function Metronome() {
                           onChange={(e) => setSound(e.target.value as MetronomeSound)}
                         >
                           {Object.keys(SOUND_LABELS).map((k) => (
-                            <option key={k} value={k}>{SOUND_LABELS[k as MetronomeSound]}</option>
+                            <option key={k} value={k}>
+                              {SOUND_LABELS[k as MetronomeSound]}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -715,14 +701,7 @@ export default function Metronome() {
                       <div className="text-white/70 text-sm text-right">כיוון מאסטר (A4)</div>
                       <div className="text-white tabular-nums">{a4}Hz</div>
                     </div>
-                    <input
-                      type="range"
-                      min={430}
-                      max={450}
-                      value={a4}
-                      onChange={(e) => setA4(Number(e.target.value))}
-                      className="w-full"
-                    />
+                    <input type="range" min={430} max={450} value={a4} onChange={(e) => setA4(Number(e.target.value))} className="w-full" />
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
@@ -749,18 +728,12 @@ export default function Metronome() {
 
                     <div className="rounded-lg bg-black/25 border border-white/10 p-3 text-right">
                       <div className="text-sm text-white/70">תדירות</div>
-                      <div className="text-3xl text-white font-semibold">
-                        {tunerRunning ? `${tState.hz.toFixed(1)} Hz` : "--"}
-                      </div>
+                      <div className="text-3xl text-white font-semibold">{tunerRunning ? `${tState.hz.toFixed(1)} Hz` : "--"}</div>
                     </div>
 
                     <div className="rounded-lg bg-black/25 border border-white/10 p-3 text-right">
                       <div className="text-sm text-white/70">סטייה (cents)</div>
-                      <div
-                        className={`text-3xl font-semibold ${
-                          tunerRunning ? (inTol ? "text-emerald-400" : "text-red-400") : "text-white"
-                        }`}
-                      >
+                      <div className={`text-3xl font-semibold ${tunerRunning ? (inTol ? "text-emerald-400" : "text-red-400") : "text-white"}`}>
                         {tunerRunning ? (tState.cents > 0 ? `+${tState.cents}` : `${tState.cents}`) : "--"}
                       </div>
                     </div>
@@ -768,11 +741,14 @@ export default function Metronome() {
 
                   <div className="rounded-lg border border-white/10 bg-black/20 p-4 space-y-2">
                     <div className="flex justify-between text-xs text-white/60">
-                      <span>-50</span><span>-25</span><span>0</span><span>+25</span><span>+50</span>
+                      <span>-50</span>
+                      <span>-25</span>
+                      <span>0</span>
+                      <span>+25</span>
+                      <span>+50</span>
                     </div>
 
                     <div className="relative h-4 rounded bg-white/10 overflow-hidden">
-                      {/* green tolerance band that GLOWS when inTol */}
                       <div
                         className="absolute top-0 h-4"
                         style={{
@@ -785,9 +761,7 @@ export default function Metronome() {
                       />
                       <div className="absolute top-0 h-4 w-[2px] bg-white/70 left-1/2 -translate-x-1/2" />
                       <div
-                        className={`absolute top-[-6px] h-7 w-[3px] rounded ${
-                          tunerRunning ? (inTol ? "bg-emerald-400" : "bg-red-400") : "bg-white/50"
-                        }`}
+                        className={`absolute top-[-6px] h-7 w-[3px] rounded ${tunerRunning ? (inTol ? "bg-emerald-400" : "bg-red-400") : "bg-white/50"}`}
                         style={{
                           left: `${markerLeft}%`,
                           transform: "translateX(-50%)",
@@ -837,17 +811,13 @@ export default function Metronome() {
                         <div key={n.id} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/20 px-3 py-2">
                           <div className="text-white/70 text-sm">#{durations.length - idx}</div>
                           <div className="text-white font-semibold tabular-nums">{n.durationSec.toFixed(2)} שנ׳</div>
-                          <div className="text-white/60 text-sm tabular-nums">
-                            {typeof n.lastHz === "number" ? `${Math.round(n.lastHz)} Hz` : ""}
-                          </div>
+                          <div className="text-white/60 text-sm tabular-nums">{typeof n.lastHz === "number" ? `${Math.round(n.lastHz)} Hz` : ""}</div>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div className="text-right text-xs text-white/50">
-                    המיקרופון נסגר אוטומטית כשעוברים ללשונית אחרת.
-                  </div>
+                  <div className="text-right text-xs text-white/50">המיקרופון נסגר אוטומטית כשעוברים ללשונית אחרת.</div>
                 </CardContent>
               </Card>
             </TabsContent>
