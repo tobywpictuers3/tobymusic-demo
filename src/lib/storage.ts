@@ -527,14 +527,16 @@ export const getFiles = (): FileEntry[] => {
   return inMemoryStorage['files'] || [];
 };
 
-export const addFile = (file: Omit<FileEntry, 'id'>): FileEntry => {
+export const addFile = (file: Omit<FileEntry, 'id' | 'uploadDate'> & { uploadDate?: string }): FileEntry => {
   const files = getFiles();
   const newFile: FileEntry = {
     ...file,
     id: generateId(),
+    uploadDate: file.uploadDate || new Date().toISOString(),
     lastModified: new Date().toISOString(),
   };
   files.push(newFile);
+
   if (isDevMode()) {
     devData['files'] = files;
   } else {
@@ -548,30 +550,29 @@ export const updateFile = (id: string, updatedFields: Partial<FileEntry>): FileE
   const files = getFiles();
   const fileIndex = files.findIndex(file => file.id === id);
 
-  if (fileIndex === -1) {
-    return undefined; // File not found
-  }
+  if (fileIndex === -1) return undefined;
 
-  files[fileIndex] = { 
-    ...files[fileIndex], 
+  files[fileIndex] = {
+    ...files[fileIndex],
     ...updatedFields,
-    lastModified: new Date().toISOString()
+    lastModified: new Date().toISOString(),
   };
+
   if (isDevMode()) {
     devData['files'] = files;
   } else {
     inMemoryStorage['files'] = files;
     hybridSync.onDataChange();
   }
+
   return files[fileIndex];
 };
 
 export const deleteFile = async (id: string): Promise<boolean> => {
   const files = getFiles();
   const updatedFiles = files.filter(file => file.id !== id);
-  if (updatedFiles.length === files.length) {
-    return false; // No file was deleted
-  }
+  if (updatedFiles.length === files.length) return false;
+
   if (isDevMode()) {
     devData['files'] = updatedFiles;
   } else {
