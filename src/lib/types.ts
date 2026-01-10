@@ -1,4 +1,3 @@
-
 // Data Models for Music Students Management System - Updated
 
 export interface Student {
@@ -111,13 +110,39 @@ export interface SwapRequest {
   lastModified?: string; // Optimistic locking timestamp
 }
 
+/**
+ * NEW (for StudentFiles): file kind + handwrite template
+ */
+export type StudentFileKind = 'upload' | 'handwrite' | 'link';
+export type HandwriteTemplate = 'blank' | 'lines' | 'staff';
+
 export interface FileEntry {
   id: string;
   studentId: string;
+
+  // Display
   name: string;
   description?: string; // optional description/explanation for the file
+
+  // Where to open the file (worker serve_attachment or external URL)
   webViewLink: string;
+
+  // When created/uploaded
   uploadDate: string;
+
+  // NEW: what kind of file this is
+  kind?: StudentFileKind;
+
+  // NEW: Dropbox path (for delete/replace) for uploaded/handwrite files
+  dropboxPath?: string;
+
+  // NEW: file info (optional)
+  mimeType?: string;
+  size?: number;
+
+  // NEW: for handwrite pages
+  template?: HandwriteTemplate;
+
   lastModified?: string; // Optimistic locking timestamp
 }
 
@@ -296,4 +321,3 @@ export interface StorePurchase {
   priceCreditsAtPurchase: number;
   lastModified?: string;
 }
-
