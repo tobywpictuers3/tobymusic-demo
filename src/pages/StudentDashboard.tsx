@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { LogOut, Calendar, User, Phone, FileText } from "lucide-react";
@@ -26,14 +25,9 @@ import MedalStore from "@/components/student/MedalStore";
 import BackButton from "@/components/ui/back-button";
 import { SaveButton } from "@/components/ui/save-button";
 import { UnreadMessagesBadge } from "@/components/ui/unread-messages-badge";
-import StudentSwapPanel, { StudentSwapPanelRef } from "@/components/student/lessonSwap/StudentSwapPanel";
-
 import SyncStatusBadge from "@/components/ui/SyncStatusBadge";
 
 import Metronome from "./Metronome";
-
-// ✅ NEW: bring the tuner (with note-length list) into this tab
-import TunerCard from "@/components/student/TunerCard";
 
 const StudentDashboard = () => {
   const { studentId } = useParams();
@@ -43,9 +37,6 @@ const StudentDashboard = () => {
   const [student, setStudent] = useState<Student | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [activeTab, setActiveTab] = useState("schedule");
-
-  // (kept as-is; not used in this snippet)
-  const studentSwapPanelRef = useState<StudentSwapPanelRef | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -131,10 +122,7 @@ const StudentDashboard = () => {
 
         <div className="flex items-center gap-3 flex-wrap justify-end">
           <UnreadMessagesBadge userId={student.id} />
-
-          {/* ✅ Sync status visible to students */}
           <SyncStatusBadge />
-
           <SaveButton />
 
           <Button variant="outline" onClick={handleLogout} className="gap-2">
@@ -146,7 +134,6 @@ const StudentDashboard = () => {
 
       <BroadcastMessageBanner studentId={student.id} />
       <StarredMessagesBanner studentId={student.id} />
-
       <PaymentAlert studentId={student.id} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -157,7 +144,9 @@ const StudentDashboard = () => {
           </TabsTrigger>
 
           <TabsTrigger value="practice">מעקב אימונים</TabsTrigger>
-          <TabsTrigger value="metronome">מטרונום טיונר</TabsTrigger>
+
+          {/* ✅ לשונית אם */}
+          <TabsTrigger value="aids">עזרים</TabsTrigger>
 
           <TabsTrigger value="medals">המדליות שלי</TabsTrigger>
           <TabsTrigger value="store">חנות</TabsTrigger>
@@ -189,23 +178,9 @@ const StudentDashboard = () => {
           <PracticeTracking studentId={student.id} />
         </TabsContent>
 
-        {/* ✅ HERE: same tab contains BOTH Metronome and Tuner+Note Length */}
-        <TabsContent value="metronome" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>המטרונום של טובי</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Metronome />
-              </CardContent>
-            </Card>
-
-            <div>
-              {/* TunerCard already includes the note-length list */}
-              <TunerCard />
-            </div>
-          </div>
+        {/* ✅ עזרים: בפנים יהיו 3 לשוניות משנה בתוך Metronome.tsx */}
+        <TabsContent value="aids" className="space-y-6">
+          <Metronome />
         </TabsContent>
 
         <TabsContent value="medals" className="space-y-6">
