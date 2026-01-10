@@ -102,11 +102,8 @@ async function canvasToPdfBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     push(contentPart);
   };
 
-  // 1 Catalog
   writeObj(1, "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
-  // 2 Pages
   writeObj(2, "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
-  // 3 Page
   writeObj(
     3,
     "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " +
@@ -116,7 +113,6 @@ async function canvasToPdfBlob(canvas: HTMLCanvasElement): Promise<Blob> {
       "] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n"
   );
 
-  // 4 Image
   objOffsets[4] = len();
   push(
     `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imgWpx} /Height ${imgHpx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpgBytes.length} >>\nstream\n`
@@ -124,51 +120,23 @@ async function canvasToPdfBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   push(jpgBytes);
   push("\nendstream\nendobj\n");
 
-  // 5 Content stream
   const content =
     `q\n${drawW.toFixed(2)} 0 0 ${drawH.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm\n/Im0 Do\nQ\n`;
   const contentBytes = enc.encode(content);
   objOffsets[5] = len();
   push(`5 0 obj\n<< /Length ${contentBytes.length} >>\nstream\n${content}endstream\nendobj\n`);
 
-  // xref
   const xrefStart = len();
-  const objCount = 6; // 0..5
+  const objCount = 6;
   let xref = `xref\n0 ${objCount}\n0000000000 65535 f \n`;
   for (let i = 1; i < objCount; i++) {
     const off = objOffsets[i] || 0;
     xref += `${String(off).padStart(10, "0")} 00000 n \n`;
   }
   push(xref);
-
-  // trailer
   push(`trailer\n<< /Size ${objCount} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`);
 
   return new Blob(parts, { type: "application/pdf" });
-}
-
-async function renderPdfFirstPageToCanvas(pdfBlob: Blob, targetW: number, targetH: number): Promise<HTMLCanvasElement> {
-  // Requires pdfjs-dist in project
-  const pdfjs = await import("pdfjs-dist");
-  const workerSrc = await import("pdfjs-dist/build/pdf.worker?url").catch(() => null);
-  // @ts-ignore
-  if (workerSrc?.default) pdfjs.GlobalWorkerOptions.workerSrc = workerSrc.default;
-
-  const arrayBuffer = await pdfBlob.arrayBuffer();
-  // @ts-ignore
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-  const page = await pdf.getPage(1);
-
-  const viewport = page.getViewport({ scale: 1.0 });
-  const scale = Math.min(targetW / viewport.width, targetH / viewport.height);
-
-  const vp = page.getViewport({ scale });
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.floor(vp.width);
-  canvas.height = Math.floor(vp.height);
-  const ctx = canvas.getContext("2d")!;
-  await page.render({ canvasContext: ctx, viewport: vp }).promise;
-  return canvas;
 }
 
 function safeBaseName(name: string) {
@@ -220,7 +188,7 @@ export default function DocumentEditor(props: {
   const redoStack = useRef<ImageData[]>([]);
 
   const [loadingBase, setLoadingBase] = useState<boolean>(false);
-  const [pdfjsMissing, setPdfjsMissing] = useState<boolean>(false);
+  const [pdfNotSupported, setPdfNotSupported] = useState<boolean>(false);
 
   const snapshotInk = () => {
     const ink = inkRef.current;
@@ -275,62 +243,45 @@ export default function DocumentEditor(props: {
     const drawEditSource = async () => {
       if (!props.source) return;
       setLoadingBase(true);
-      setPdfjsMissing(false);
+      setPdfNotSupported(false);
 
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, w, h);
 
       try {
-        if (props.source.kind === "image") {
-          const url = URL.createObjectURL(props.source.blob);
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error("IMAGE_LOAD_FAILED"));
-            img.src = url;
-          });
+        if (props.source.kind === "pdf") {
+          // No pdfjs-dist installed => disable PDF editing for now
+          setPdfNotSupported(true);
+          return;
+        }
 
-          const imgAspect = img.width / img.height;
-          const canvasAspect = w / h;
+        // image
+        const url = URL.createObjectURL(props.source.blob);
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("IMAGE_LOAD_FAILED"));
+          img.src = url;
+        });
 
-          let drawW = w;
-          let drawH = h;
-          if (imgAspect > canvasAspect) {
-            drawW = w;
-            drawH = w / imgAspect;
-          } else {
-            drawH = h;
-            drawW = h * imgAspect;
-          }
-          const x = (w - drawW) / 2;
-          const y = (h - drawH) / 2;
-          ctx.drawImage(img, x, y, drawW, drawH);
-          URL.revokeObjectURL(url);
+        const imgAspect = img.width / img.height;
+        const canvasAspect = w / h;
+
+        let drawW = w;
+        let drawH = h;
+        if (imgAspect > canvasAspect) {
+          drawW = w;
+          drawH = w / imgAspect;
         } else {
-          const pdfCanvas = await renderPdfFirstPageToCanvas(props.source.blob, w, h);
-          const imgAspect = pdfCanvas.width / pdfCanvas.height;
-          const canvasAspect = w / h;
-
-          let drawW = w;
-          let drawH = h;
-          if (imgAspect > canvasAspect) {
-            drawW = w;
-            drawH = w / imgAspect;
-          } else {
-            drawH = h;
-            drawW = h * imgAspect;
-          }
-          const x = (w - drawW) / 2;
-          const y = (h - drawH) / 2;
-          ctx.drawImage(pdfCanvas, x, y, drawW, drawH);
+          drawH = h;
+          drawW = h * imgAspect;
         }
-      } catch (e: any) {
-        const msg = String(e?.message || e);
-        if (msg.includes("Cannot find module") || msg.includes("pdfjs-dist")) {
-          setPdfjsMissing(true);
-        }
+        const x = (w - drawW) / 2;
+        const y = (h - drawH) / 2;
+        ctx.drawImage(img, x, y, drawW, drawH);
+        URL.revokeObjectURL(url);
       } finally {
         setLoadingBase(false);
       }
@@ -379,7 +330,7 @@ export default function DocumentEditor(props: {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileNameBase, tool, penSize, zoom]);
+  }, [fileNameBase]);
 
   const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -517,6 +468,7 @@ export default function DocumentEditor(props: {
     background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
     cursor: "pointer",
     fontSize: 13,
+    color: "white",
   });
 
   return (
@@ -525,7 +477,7 @@ export default function DocumentEditor(props: {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
             <div style={{ display: "grid", gap: 4 }}>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>שם הקובץ</div>
+              <div style={{ fontSize: 12, opacity: 0.85, color: "white" }}>שם הקובץ</div>
               <input
                 value={fileNameBase}
                 onChange={(e) => setFileNameBase(e.target.value)}
@@ -543,7 +495,7 @@ export default function DocumentEditor(props: {
 
             {props.mode === "new" ? (
               <div style={{ display: "grid", gap: 4 }}>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>סוג דף</div>
+                <div style={{ fontSize: 12, opacity: 0.85, color: "white" }}>סוג דף</div>
                 <select
                   value={template}
                   onChange={(e) => setTemplate(e.target.value as EditorTemplate)}
@@ -577,7 +529,7 @@ export default function DocumentEditor(props: {
               </button>
 
               <div style={{ display: "grid", gap: 4, minWidth: 160 }}>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>עובי</div>
+                <div style={{ fontSize: 12, opacity: 0.85, color: "white" }}>עובי</div>
                 <input type="range" min={2} max={18} value={penSize} onChange={(e) => setPenSize(Number(e.target.value))} />
               </div>
 
@@ -595,7 +547,7 @@ export default function DocumentEditor(props: {
                 <button type="button" onClick={zoomOut} style={toolButtonStyle(false)}>
                   −
                 </button>
-                <div style={{ width: 70, textAlign: "center", fontSize: 12, opacity: 0.9 }}>
+                <div style={{ width: 70, textAlign: "center", fontSize: 12, opacity: 0.9, color: "white" }}>
                   {Math.round(zoom * 100)}%
                 </div>
                 <button type="button" onClick={zoomIn} style={toolButtonStyle(false)}>
@@ -637,14 +589,30 @@ export default function DocumentEditor(props: {
           </div>
         </div>
 
-        {props.mode === "edit" && pdfjsMissing ? (
-          <div style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,200,0,0.35)", background: "rgba(255,200,0,0.10)" }}>
-            לא ניתן לערוך PDF כרגע כי חסרה הספרייה <b>pdfjs-dist</b>. אפשר לערוך תמונות. אם תרצי – אגיד לך בדיוק איך להוסיף.
+        {pdfNotSupported ? (
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(255,200,0,0.35)",
+              background: "rgba(255,200,0,0.10)",
+              color: "white",
+            }}
+          >
+            עריכת PDF עדיין לא זמינה בפרויקט שלך (אין <b>pdfjs</b>). אפשר לערוך תמונות. אם תרצי – נוסיף תמיכה ב-PDF בשלב הבא.
           </div>
         ) : null}
 
         {loadingBase ? (
-          <div style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.06)" }}>
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.06)",
+              color: "white",
+            }}
+          >
             טוען קובץ לעריכה...
           </div>
         ) : null}
@@ -689,6 +657,7 @@ export default function DocumentEditor(props: {
                     border: "1px solid rgba(255,255,255,0.18)",
                     borderRadius: 12,
                     padding: 10,
+                    color: "white",
                   }}
                 >
                   <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>הקלדת טקסט</div>
