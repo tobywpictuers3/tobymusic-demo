@@ -1,104 +1,129 @@
-import { useEffect, useMemo, useState } from "react";
+// StudentFiles.tsx
+import { useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, RefreshCw, Upload, Image as ImageIcon, FileAudio, Link2, File as FileIcon, Trash2, Eye } from "lucide-react";
-
-import { addFile, deleteFile, getFiles, updateFile } from "@/lib/storage";
-import { workerApi } from "@/lib/workerApi";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import type { FileEntry } from "@/lib/types";
 
-import HandwriteCanvas from "./HandwriteCanvas";
-import FileViewer from "./FileViewer";
+import type { FileEntry } from "@/lib/types";
+import { addFile, deleteFile, getFiles } from "@/lib/storage";
+import { workerApi } from "@/lib/workerApi";
+
+import DocumentEditor, { editorSourceFromFile } from "./DocumentEditor";
 
 interface StudentFilesProps {
   studentId: string;
 }
 
-type AddMode = "upload" | "camera" | "link" | "newpage";
+type AddMode = "upload" | "link" | "newpage";
 type NewPageTemplate = "blank" | "lines" | "staff";
+type EditPickMode = "from_app" | "from_device";
 
-const StudentFiles = ({ studentId }: StudentFilesProps) => {
+function nowStamp() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}.${mi}`;
+}
+
+function baseNameWithoutExt(name: string) {
+  const n = (name || "").trim();
+  if (!n) return "";
+  const lastDot = n.lastIndexOf(".");
+  if (lastDot > 0) return n.slice(0, lastDot);
+  return n;
+}
+
+function inferKindFromNameOrMime(fileName: string, mime?: string) {
+  const m = (mime || "").toLowerCase();
+  const n = (fileName || "").toLowerCase();
+  if (m.includes("pdf") || n.endsWith(".pdf")) return "pdf" as const;
+  if (m.startsWith("image/") || n.match(/\.(png|jpg|jpeg|webp|gif)$/)) return "image" as const;
+  return "image" as const;
+}
+
+async function fetchBlob(url: string): Promise<Blob> {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(`FETCH_FAILED: ${r.status}`);
+  return await r.blob();
+}
+
+export default function StudentFiles({ studentId }: StudentFilesProps) {
   const [refreshTick, setRefreshTick] = useState(0);
-  const files = useMemo(() => getFiles().filter((f) => f.studentId === studentId), [studentId, refreshTick]);
 
-  const [showDialog, setShowDialog] = useState(false);
-  const [mode, setMode] = useState<AddMode>("upload");
+  const files = useMemo(() => {
+    const all = getFiles();
+    return all
+      .filter((f) => f.studentId === studentId)
+      .sort((a, b) => (b.uploadDate || "").localeCompare(a.uploadDate || ""));
+  }, [studentId, refreshTick]);
 
+  // ---- Add dialog ----
+  const [addOpen, setAddOpen] = useState(false);
+  const [addMode, setAddMode] = useState<AddMode>("upload");
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
-
   const [template, setTemplate] = useState<NewPageTemplate>("blank");
+  const addFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // ---- Edit picker dialog ----
+  const [editPickOpen, setEditPickOpen] = useState(false);
+  const [editPickMode, setEditPickMode] = useState<EditPickMode>("from_app");
+  const [pickedAppFileId, setPickedAppFileId] = useState<string>("");
+  const editFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [viewer, setViewer] = useState<{ open: boolean; title: string; url: string }>({
-    open: false,
-    title: "",
-    url: "",
-  });
+  // ---- Editor modal ----
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorMode, setEditorMode] = useState<"new" | "edit">("new");
+  const [editorInitialName, setEditorInitialName] = useState("");
+  const [editorTemplate, setEditorTemplate] = useState<NewPageTemplate>("blank");
+  const [editorSource, setEditorSource] = useState<{ kind: "image" | "pdf"; blob: Blob } | undefined>(undefined);
 
-  useEffect(() => {
-    // reset form when opening
-    if (!showDialog) {
-      setMode("upload");
-      setTitle("");
-      setDescription("");
-      setLinkUrl("");
-      setTemplate("blank");
-      setSelectedFile(null);
-    }
-  }, [showDialog]);
-
-  const handleRefresh = () => {
-    setRefreshTick((x) => x + 1);
-    toast({ title: "רענון קבצים", description: "הקבצים עודכנו" });
+  const resetAddForm = () => {
+    setAddMode("upload");
+    setTitle("");
+    setLinkUrl("");
+    setTemplate("blank");
+    if (addFileInputRef.current) addFileInputRef.current.value = "";
   };
 
-  const openViewer = (file: FileEntry) => {
-    setViewer({ open: true, title: file.name, url: file.webViewLink });
+  const openEditorForNew = (nameBase: string, t: NewPageTemplate) => {
+    setEditorMode("new");
+    setEditorInitialName(nameBase);
+    setEditorTemplate(t);
+    setEditorSource(undefined);
+    setEditorOpen(true);
   };
 
-  const getFileIcon = (file: FileEntry) => {
-    const fileName = file.name || "";
-    const ext = fileName.toLowerCase().split(".").pop();
-    if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "")) return <ImageIcon className="h-5 w-5 text-primary" />;
-    if (ext === "pdf") return <FileIcon className="h-5 w-5 text-red-500" />;
-    if (["mp3", "wav", "ogg", "m4a"].includes(ext || "")) return <FileAudio className="h-5 w-5 text-green-500" />;
-    if (file.kind === "link") return <Link2 className="h-5 w-5 text-blue-500" />;
-    return <FileText className="h-5 w-5 text-primary" />;
+  const openEditorForEdit = (nameBase: string, source: { kind: "image" | "pdf"; blob: Blob }) => {
+    setEditorMode("edit");
+    setEditorInitialName(nameBase);
+    setEditorSource(source);
+    setEditorOpen(true);
   };
 
-  const requireTitle = () => {
+  const ensureTitle = () => {
     if (!title.trim()) {
-      toast({ title: "שגיאה", description: "יש למלא כותרת", variant: "destructive" });
+      toast({ title: "חסר שם", description: "נא לתת שם לקובץ לפני פתיחה", variant: "destructive" });
       return false;
     }
     return true;
   };
 
-  const uploadPhysicalFileToDropbox = async (file: File, overrideName?: string) => {
-    const fixedFile =
-      overrideName && overrideName.trim()
-        ? new File([file], overrideName.trim(), { type: file.type || "application/octet-stream" })
-        : file;
-
-    const r = await workerApi.uploadAttachment(fixedFile);
-    if (!r.success) throw new Error(r.error || "UPLOAD_FAILED");
-
-    // Worker returns { ok, path, webViewLink, name, size, type } (based on your existing worker behavior)
-    return r.data as any;
+  const handleAddOpen = () => {
+    resetAddForm();
+    setAddOpen(true);
   };
 
-  const handleAdd = async () => {
+  const handleAddSubmit = async () => {
     try {
-      if (mode === "link") {
-        if (!requireTitle()) return;
+      if (addMode === "link") {
+        if (!ensureTitle()) return;
         if (!linkUrl.trim()) {
           toast({ title: "שגיאה", description: "יש להדביק קישור", variant: "destructive" });
           return;
@@ -107,310 +132,375 @@ const StudentFiles = ({ studentId }: StudentFilesProps) => {
         addFile({
           studentId,
           name: title.trim(),
-          description: description.trim() || undefined,
           webViewLink: linkUrl.trim(),
           kind: "link",
+          uploadDate: new Date().toISOString(),
         });
 
-        setShowDialog(false);
-        handleRefresh();
-        toast({ title: "הצלחה", description: "הקישור נשמר" });
+        toast({ title: "נוסף", description: "הקישור נשמר" });
+        setAddOpen(false);
+        setRefreshTick((x) => x + 1);
         return;
       }
 
-      if (mode === "upload" || mode === "camera") {
-        if (!selectedFile) {
-          toast({ title: "שגיאה", description: "בחרי קובץ להעלאה", variant: "destructive" });
+      if (addMode === "newpage") {
+        if (!ensureTitle()) return;
+        openEditorForNew(title.trim(), template);
+        setAddOpen(false);
+        return;
+      }
+
+      // upload
+      const f = addFileInputRef.current?.files?.[0];
+      if (!f) {
+        toast({ title: "שגיאה", description: "נא לבחור קובץ", variant: "destructive" });
+        return;
+      }
+
+      const result = await workerApi.uploadAttachment(f);
+      if (!result.success || !result.data) {
+        toast({ title: "שגיאה", description: result.error || "העלאה נכשלה", variant: "destructive" });
+        return;
+      }
+
+      addFile({
+        studentId,
+        name: title.trim() || f.name,
+        webViewLink: result.data.webViewLink,
+        dropboxPath: result.data.path,
+        mimeType: result.data.type || f.type,
+        size: result.data.size || f.size,
+        kind: "upload",
+        uploadDate: new Date().toISOString(),
+      });
+
+      toast({ title: "הועלה", description: "הקובץ נוסף לתלמידה" });
+      setAddOpen(false);
+      setRefreshTick((x) => x + 1);
+    } catch (e: any) {
+      toast({ title: "שגיאה", description: e?.message || "תקלה בהוספה", variant: "destructive" });
+    }
+  };
+
+  const handleOpenEditPicker = () => {
+    setEditPickMode("from_app");
+    setPickedAppFileId(files[0]?.id || "");
+    if (editFileInputRef.current) editFileInputRef.current.value = "";
+    setEditPickOpen(true);
+  };
+
+  const handleEditPickContinue = async () => {
+    try {
+      if (editPickMode === "from_device") {
+        const f = editFileInputRef.current?.files?.[0];
+        if (!f) {
+          toast({ title: "שגיאה", description: "נא לבחור קובץ", variant: "destructive" });
           return;
         }
-        if (!requireTitle()) return;
-
-        // preserve extension if user gave title without ext
-        const origExt = selectedFile.name.includes(".") ? "." + selectedFile.name.split(".").pop() : "";
-        const titleHasExt = title.trim().includes(".");
-        const finalName = titleHasExt ? title.trim() : `${title.trim()}${origExt}`;
-
-        const uploaded = await uploadPhysicalFileToDropbox(selectedFile, finalName);
-
-        addFile({
-          studentId,
-          name: uploaded.name || finalName,
-          description: description.trim() || undefined,
-          webViewLink: uploaded.webViewLink,
-          dropboxPath: uploaded.path,
-          kind: "upload",
-          mimeType: uploaded.type || selectedFile.type || undefined,
-          size: uploaded.size || selectedFile.size || undefined,
-        });
-
-        setShowDialog(false);
-        handleRefresh();
-        toast({ title: "הצלחה", description: "הקובץ הועלה ונשמר בדרופבוקס" });
+        openEditorForEdit(baseNameWithoutExt(f.name) || "עריכה", editorSourceFromFile(f));
+        setEditPickOpen(false);
         return;
       }
 
-      // mode === newpage handled by HandwriteCanvas "onSave"
-    } catch (e) {
-      toast({ title: "שגיאה", description: (e as Error).message, variant: "destructive" });
+      // from app
+      const fe = files.find((x) => x.id === pickedAppFileId);
+      if (!fe) {
+        toast({ title: "שגיאה", description: "נא לבחור קובץ מתוך התוכנה", variant: "destructive" });
+        return;
+      }
+
+      const blob = await fetchBlob(fe.webViewLink);
+      const kind = inferKindFromNameOrMime(fe.name, fe.mimeType);
+
+      openEditorForEdit(baseNameWithoutExt(fe.name) || "עריכה", { kind, blob });
+      setEditPickOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "שגיאה",
+        description:
+          e?.message ||
+          "לא הצלחתי למשוך את הקובץ לעריכה. אם יש חסימת CORS נוכל להעביר את ההורדה דרך ה-Worker לפי path.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleDelete = async (file: FileEntry) => {
     try {
-      // delete from dropbox if we have path
       if (file.dropboxPath) {
         const r = await workerApi.deleteAttachment(file.dropboxPath);
-        if (!r.success) {
-          // still allow deleting from DB if dropbox already missing
-          // (workerApi already treats not_found as success)
-          throw new Error(r.error || "DELETE_FAILED");
-        }
+        if (!r.success) toast({ title: "אזהרה", description: "מחיקה מהדרופבוקס נכשלה (מוחק מהרשימה בלבד)" });
       }
 
-      await deleteFile(file.id);
-      handleRefresh();
+      const ok = await deleteFile(file.id);
+      if (!ok) {
+        toast({ title: "שגיאה", description: "לא נמצא למחיקה", variant: "destructive" });
+        return;
+      }
       toast({ title: "נמחק", description: "הקובץ הוסר" });
-    } catch (e) {
-      toast({ title: "שגיאה", description: (e as Error).message, variant: "destructive" });
+      setRefreshTick((x) => x + 1);
+    } catch (e: any) {
+      toast({ title: "שגיאה", description: e?.message || "מחיקה נכשלה", variant: "destructive" });
+    }
+  };
+
+  const handleEditorSave = async (payload: { fileNameBase: string; png: Blob; pdf: Blob }) => {
+    try {
+      const base = payload.fileNameBase;
+      const stamp = nowStamp();
+      const finalBase = editorMode === "edit" ? `${base} - ערוך ${stamp}` : base;
+
+      const pngFile = new File([payload.png], `${finalBase}.png`, { type: "image/png" });
+      const pdfFile = new File([payload.pdf], `${finalBase}.pdf`, { type: "application/pdf" });
+
+      const upPng = await workerApi.uploadAttachment(pngFile);
+      if (!upPng.success || !upPng.data) {
+        toast({ title: "שגיאה", description: upPng.error || "העלאת PNG נכשלה", variant: "destructive" });
+        return;
+      }
+
+      const upPdf = await workerApi.uploadAttachment(pdfFile);
+      if (!upPdf.success || !upPdf.data) {
+        toast({ title: "שגיאה", description: upPdf.error || "העלאת PDF נכשלה", variant: "destructive" });
+        return;
+      }
+
+      // Save as NEW VERSION(s): add entries without deleting originals
+      addFile({
+        studentId,
+        name: `${finalBase}.pdf`,
+        webViewLink: upPdf.data.webViewLink,
+        dropboxPath: upPdf.data.path,
+        mimeType: upPdf.data.type || "application/pdf",
+        size: upPdf.data.size,
+        kind: editorMode === "edit" ? "upload" : "handwrite",
+        template: editorMode === "edit" ? undefined : editorTemplate,
+        uploadDate: new Date().toISOString(),
+      });
+
+      addFile({
+        studentId,
+        name: `${finalBase}.png`,
+        webViewLink: upPng.data.webViewLink,
+        dropboxPath: upPng.data.path,
+        mimeType: upPng.data.type || "image/png",
+        size: upPng.data.size,
+        kind: editorMode === "edit" ? "upload" : "handwrite",
+        template: editorMode === "edit" ? undefined : editorTemplate,
+        uploadDate: new Date().toISOString(),
+      });
+
+      toast({ title: "נשמר", description: editorMode === "edit" ? "נשמרה גרסה חדשה" : "נשמר קובץ חדש" });
+      setEditorOpen(false);
+      setRefreshTick((x) => x + 1);
+    } catch (e: any) {
+      toast({ title: "שגיאה", description: e?.message || "שמירה נכשלה", variant: "destructive" });
     }
   };
 
   return (
-    <Card className="card-gradient card-shadow">
-      <CardHeader>
-        <div className="flex flex-col gap-3">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-2xl flex items-center gap-2">
-              <FileText className="h-6 w-6" />
-              קבצים
-            </CardTitle>
-
-            <div className="flex gap-2">
-              <Dialog open={showDialog} onOpenChange={setShowDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Upload className="h-4 w-4 mr-2" />
-                    הוספת קובץ
-                  </Button>
-                </DialogTrigger>
-
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>הוספת קובץ חדש</DialogTitle>
-                  </DialogHeader>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label>סוג הוספה</Label>
-                      <Select value={mode} onValueChange={(v) => setMode(v as AddMode)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="בחרי סוג" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="upload">העלאת קובץ (אחסון/Drive)</SelectItem>
-                          <SelectItem value="camera">צילום/סריקה (מצלמה)</SelectItem>
-                          <SelectItem value="link">קישור</SelectItem>
-                          <SelectItem value="newpage">קובץ חדש (דף ריק/שורות/חמשות)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {mode !== "newpage" && (
-                      <>
-                        <div>
-                          <Label>כותרת</Label>
-                          <Input
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="לדוגמה: תווים שיעור 5"
-                          />
-                        </div>
-
-                        <div>
-                          <Label>תיאור (אופציונלי)</Label>
-                          <Input
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="הסבר קצר על הקובץ"
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    {(mode === "upload" || mode === "camera") && (
-                      <div>
-                        <Label>בחירת קובץ</Label>
-                        <Input
-                          type="file"
-                          accept="image/*,application/pdf,audio/*"
-                          capture={mode === "camera" ? "environment" : undefined}
-                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                        />
-                        <div className="text-xs text-muted-foreground mt-1">
-                          בטאבלט זה יאפשר לבחור גם Drive/Files לפי מה שמותקן במכשיר.
-                        </div>
-                      </div>
-                    )}
-
-                    {mode === "link" && (
-                      <div>
-                        <Label>קישור</Label>
-                        <Input
-                          value={linkUrl}
-                          onChange={(e) => setLinkUrl(e.target.value)}
-                          placeholder="הדביקי כאן קישור (Google Drive / Dropbox / כל כתובת)"
-                        />
-                      </div>
-                    )}
-
-                    {mode === "newpage" && (
-                      <div className="space-y-3">
-                        <div>
-                          <Label>שם הדף</Label>
-                          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="לדוגמה: תרגיל אצבעות 3" />
-                        </div>
-
-                        <div>
-                          <Label>סוג דף</Label>
-                          <Select value={template} onValueChange={(v) => setTemplate(v as NewPageTemplate)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="בחרי תבנית" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="blank">דף ריק</SelectItem>
-                              <SelectItem value="lines">דף שורות</SelectItem>
-                              <SelectItem value="staff">דף חמשות</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="rounded-lg border p-3 bg-secondary/20">
-                          <HandwriteCanvas
-                            initialTemplate={template}
-                            initialTitle={title}
-                            onCancel={() => setShowDialog(false)}
-                            onSave={async ({ png, pdf }) => {
-                              if (!title.trim()) {
-                                toast({ title: "שגיאה", description: "יש לתת שם לדף", variant: "destructive" });
-                                return;
-                              }
-
-                              // Upload BOTH PNG and PDF. Keep both as separate files in list.
-                              const baseName = title.trim();
-
-                              // PNG
-                              const pngFile = new File([png], `${baseName}.png`, { type: "image/png" });
-                              const uploadedPng = await uploadPhysicalFileToDropbox(pngFile, `${baseName}.png`);
-
-                              addFile({
-                                studentId,
-                                name: `${baseName}.png`,
-                                description: description.trim() || "דף כתיבה (PNG)",
-                                webViewLink: uploadedPng.webViewLink,
-                                dropboxPath: uploadedPng.path,
-                                kind: "handwrite",
-                                template,
-                                mimeType: "image/png",
-                                size: pngFile.size,
-                              });
-
-                              // PDF
-                              const pdfFile = new File([pdf], `${baseName}.pdf`, { type: "application/pdf" });
-                              const uploadedPdf = await uploadPhysicalFileToDropbox(pdfFile, `${baseName}.pdf`);
-
-                              addFile({
-                                studentId,
-                                name: `${baseName}.pdf`,
-                                description: description.trim() || "דף כתיבה (PDF)",
-                                webViewLink: uploadedPdf.webViewLink,
-                                dropboxPath: uploadedPdf.path,
-                                kind: "handwrite",
-                                template,
-                                mimeType: "application/pdf",
-                                size: pdfFile.size,
-                              });
-
-                              setShowDialog(false);
-                              handleRefresh();
-                              toast({ title: "הצלחה", description: "הדף נשמר כ-PNG וכ-PDF בדרופבוקס" });
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {mode !== "newpage" && (
-                      <Button onClick={handleAdd} className="w-full hero-gradient">
-                        שמירה
-                      </Button>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              <Button onClick={handleRefresh} variant="outline">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                רענון
-              </Button>
-            </div>
-          </div>
-
-          <p className="text-sm text-muted-foreground">
-            כאן נמצאים קבצים אישיים לתלמידה: העלאות, דפי כתיבה, וקישורים.
-          </p>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>קבצים</CardTitle>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setRefreshTick((x) => x + 1)}>
+            רענון
+          </Button>
+          <Button variant="secondary" onClick={handleOpenEditPicker}>
+            עריכת קובץ
+          </Button>
+          <Button onClick={handleAddOpen}>הוספת קובץ</Button>
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
         {files.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">אין קבצים זמינים כרגע</div>
+          <div className="text-sm opacity-70">אין קבצים שמורים לתלמידה</div>
         ) : (
-          <div className="space-y-3">
-            {files
-              .slice()
-              .sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime())
-              .map((file) => (
-                <div key={file.id} className="p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors">
-                  <div className="flex items-start gap-3">
-                    {getFileIcon(file)}
-                    <div className="flex-1">
-                      <div className="font-medium">{file.name}</div>
-                      {file.description && <div className="text-sm text-muted-foreground mt-1">{file.description}</div>}
-                      <div className="text-xs text-muted-foreground mt-2">
-                        הועלה ב-{new Date(file.uploadDate).toLocaleDateString("he-IL")}
-                      </div>
-
-                      <div className="mt-3 flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => openViewer(file)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          צפייה
-                        </Button>
-
-                        <Button size="sm" variant="outline" onClick={() => window.open(file.webViewLink, "_blank")}>
-                          פתיחה בטאב
-                        </Button>
-
-                        <Button size="sm" variant="destructive" onClick={() => handleDelete(file)}>
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          מחיקה
-                        </Button>
-                      </div>
-                    </div>
+          <div className="grid gap-2">
+            {files.map((f) => (
+              <div
+                key={f.id}
+                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{f.name}</div>
+                  <div className="text-xs opacity-70">
+                    {new Date(f.uploadDate).toLocaleString("he-IL")} {f.mimeType ? `• ${f.mimeType}` : ""}
                   </div>
                 </div>
-              ))}
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => window.open(f.webViewLink, "_blank", "noopener,noreferrer")}
+                  >
+                    צפייה
+                  </Button>
+                  <Button variant="destructive" onClick={() => void handleDelete(f)}>
+                    מחיקה
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>
 
-      <FileViewer
-        open={viewer.open}
-        onOpenChange={(v) => setViewer((s) => ({ ...s, open: v }))}
-        title={viewer.title}
-        url={viewer.url}
-      />
+      {/* Add dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>הוספת קובץ</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <Label>סוג הוספה</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button variant={addMode === "upload" ? "default" : "secondary"} onClick={() => setAddMode("upload")}>
+                  העלאה (מכשיר/Drive/מצלמה)
+                </Button>
+                <Button
+                  variant={addMode === "newpage" ? "default" : "secondary"}
+                  onClick={() => setAddMode("newpage")}
+                >
+                  קובץ חדש
+                </Button>
+                <Button variant={addMode === "link" ? "default" : "secondary"} onClick={() => setAddMode("link")}>
+                  קישור
+                </Button>
+              </div>
+            </div>
+
+            {addMode === "upload" ? (
+              <div className="grid gap-2">
+                <Label>בחרי קובץ</Label>
+                <input ref={addFileInputRef} type="file" />
+                <div className="grid gap-2">
+                  <Label>שם (אופציונלי)</Label>
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="אם ריק – ישמור בשם המקורי"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {addMode === "newpage" ? (
+              <div className="grid gap-2">
+                <Label>שם הקובץ</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="למשל: שיעור 5" />
+                <Label>סוג דף</Label>
+                <div className="flex gap-2">
+                  <Button variant={template === "blank" ? "default" : "secondary"} onClick={() => setTemplate("blank")}>
+                    ריק
+                  </Button>
+                  <Button variant={template === "lines" ? "default" : "secondary"} onClick={() => setTemplate("lines")}>
+                    שורות
+                  </Button>
+                  <Button variant={template === "staff" ? "default" : "secondary"} onClick={() => setTemplate("staff")}>
+                    חמשות
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {addMode === "link" ? (
+              <div className="grid gap-2">
+                <Label>שם הקובץ</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="למשל: דף תווים" />
+                <Label>קישור</Label>
+                <Input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." />
+              </div>
+            ) : null}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setAddOpen(false)}>
+                ביטול
+              </Button>
+              <Button onClick={() => void handleAddSubmit()}>המשך</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit picker dialog */}
+      <Dialog open={editPickOpen} onOpenChange={setEditPickOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>עריכת קובץ</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <Label>מאיפה להביא קובץ לעריכה?</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={editPickMode === "from_app" ? "default" : "secondary"}
+                  onClick={() => setEditPickMode("from_app")}
+                >
+                  מהתוכנה (Dropbox)
+                </Button>
+                <Button
+                  variant={editPickMode === "from_device" ? "default" : "secondary"}
+                  onClick={() => setEditPickMode("from_device")}
+                >
+                  מהמכשיר / Drive
+                </Button>
+              </div>
+            </div>
+
+            {editPickMode === "from_app" ? (
+              <div className="grid gap-2">
+                <Label>בחרי קובץ קיים</Label>
+                <select
+                  value={pickedAppFileId}
+                  onChange={(e) => setPickedAppFileId(e.target.value)}
+                  className="h-10 rounded-md border border-white/10 bg-black/20 px-3"
+                >
+                  {files.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            {editPickMode === "from_device" ? (
+              <div className="grid gap-2">
+                <Label>בחרי קובץ מהמכשיר/Drive</Label>
+                <input ref={editFileInputRef} type="file" accept="image/*,application/pdf" />
+              </div>
+            ) : null}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setEditPickOpen(false)}>
+                ביטול
+              </Button>
+              <Button onClick={() => void handleEditPickContinue()}>פתיחה לעורך</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Editor dialog (near full screen) */}
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[95vh] max-h-[95vh] overflow-hidden p-4">
+          <div className="h-full">
+            <DocumentEditor
+              mode={editorMode}
+              initialFileName={editorInitialName}
+              initialTemplate={editorTemplate}
+              source={editorSource}
+              onCancel={() => setEditorOpen(false)}
+              onSave={handleEditorSave}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
-};
-
-export default StudentFiles;
+}
