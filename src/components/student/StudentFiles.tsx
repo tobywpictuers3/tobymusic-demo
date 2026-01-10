@@ -472,7 +472,7 @@ export default function StudentFiles({ studentId }: StudentFilesProps) {
             {editPickMode === "from_device" ? (
               <div className="grid gap-2">
                 <Label>בחרי קובץ מהמכשיר/Drive</Label>
-                <input ref={editFileInputRef} type="file" accept="image/*,application/pdf" />
+                <input ref={editFileInputRef} type="file" accept="image/*" />
               </div>
             ) : null}
 

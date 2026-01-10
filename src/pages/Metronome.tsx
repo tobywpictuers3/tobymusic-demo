@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -54,9 +54,7 @@ const SUB_LABELS: Record<SubdivisionMode, string> = {
 
 type HitEvent =
   | { kind: "main"; side: -1 | 1; isDownbeat: boolean; id: number }
-  | { kind: "sub"; id: number };
-
-function PendulumVisual(props: {
+  | { kind: "sub"function PendulumVisual(props: {
   running: boolean;
   bpm: number;
   beatsPerBar: number;
@@ -83,22 +81,21 @@ function PendulumVisual(props: {
   const t0Ref = useRef<number>(performance.now());
   const rafRef = useRef<number | null>(null);
 
-  const angleRef = useRef<number>(maxAngle);
   const [angle, setAngle] = useState<number>(maxAngle);
 
-  // trail per beat
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Trail per beat (canvas layer)
+  const trailCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
-  // burst only on main beat
-  const [burst, setBurst] = useState<{
+  // Burst layer (separate canvas so nothing "sticks")
+  const burstCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const burstRef = useRef<{
     x: number;
     y: number;
     isDownbeat: boolean;
-    id: number;
+    startedAt: number;
+    active: boolean;
   } | null>(null);
-
-  const burstKillTimerRef = useRef<number | null>(null);
 
   // subdivision blink (force retrigger)
   const [subBlinkId, setSubBlinkId] = useState<number>(0);
@@ -110,68 +107,64 @@ function PendulumVisual(props: {
     };
   }
 
-  function hardClearTrail() {
-    const c = canvasRef.current;
+  function hardClearCanvas(c: HTMLCanvasElement | null) {
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-
-    // HARD reset to avoid any leftover shadow/transform artifacts
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over";
     ctx.shadowBlur = 0;
     ctx.shadowColor = "transparent";
     ctx.clearRect(0, 0, c.width, c.height);
+  }
 
+  function clearTrail() {
+    hardClearCanvas(trailCanvasRef.current);
     lastPointRef.current = null;
   }
 
-  function scheduleBurstCleanup(burstId: number) {
-    if (burstKillTimerRef.current) window.clearTimeout(burstKillTimerRef.current);
-    // give the SVG animation time to finish, then remove the element
-    burstKillTimerRef.current = window.setTimeout(() => {
-      setBurst((cur) => (cur && cur.id === burstId ? null : cur));
-    }, 260);
+  function startBurstAt(x: number, y: number, isDownbeat: boolean) {
+    burstRef.current = {
+      x,
+      y,
+      isDownbeat,
+      startedAt: performance.now(),
+      active: true,
+    };
   }
 
-  // respond to tick events
-  useEffect(() => {
+  // Tick -> immediately update phase + clear trail + start burst
+  // useLayoutEffect helps reduce 1-frame lag vs useEffect
+  useLayoutEffect(() => {
     if (hit.kind === "main") {
       startSideRef.current = hit.side;
       t0Ref.current = performance.now();
 
+      // snap angle at impact
       const snap = hit.side * maxAngle;
-      angleRef.current = snap;
       setAngle(snap);
 
-      // reset trail on every main beat
-      hardClearTrail();
+      // each beat: reset trail
+      clearTrail();
 
-      // make sure any previous burst is gone BEFORE creating the new one
-      setBurst(null);
-
-      // create new burst exactly at impact
+      // burst start at exact impact point
       const p = bobPos(snap);
-      const newBurst = {
-        x: p.x,
-        y: p.y,
-        isDownbeat: hit.isDownbeat,
-        id: hit.id,
-      };
-      setBurst(newBurst);
-      scheduleBurstCleanup(hit.id);
+      startBurstAt(p.x, p.y, hit.isDownbeat);
     } else {
-      // subdivision blink: weight only (no burst, no trail reset)
+      // subdivision: blink weight only
       setSubBlinkId((prev) => prev + 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hit]);
 
-  // animation + trail
+  // Animation loop: update angle, draw trail, draw burst
   useEffect(() => {
     if (!running) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
+      clearTrail();
+      hardClearCanvas(burstCanvasRef.current);
+      burstRef.current = null;
       return;
     }
 
@@ -182,19 +175,16 @@ function PendulumVisual(props: {
       // smooth travel extreme->extreme
       const side = startSideRef.current;
       const a = side * Math.cos(Math.PI * p01) * maxAngle;
-
-      angleRef.current = a;
       setAngle(a);
 
-      // draw trail segment for THIS beat only (canvas already cleared on beat)
-      const c = canvasRef.current;
-      if (c) {
-        const ctx = c.getContext("2d");
+      // Trail (accumulates only within current beat)
+      const tc = trailCanvasRef.current;
+      if (tc) {
+        const ctx = tc.getContext("2d");
         if (ctx) {
           const pt = bobPos(a);
           const prev = lastPointRef.current;
 
-          // just in case: neutralize any previous shadow state
           ctx.shadowBlur = 0;
           ctx.shadowColor = "transparent";
 
@@ -210,7 +200,6 @@ function PendulumVisual(props: {
             ctx.stroke();
             ctx.shadowBlur = 0;
           } else {
-            // first point of the beat: small “seed” dot
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, 2.2, 0, Math.PI * 2);
             ctx.fillStyle = "rgba(244,189,86,0.55)";
@@ -218,6 +207,59 @@ function PendulumVisual(props: {
           }
 
           lastPointRef.current = pt;
+        }
+      }
+
+      // Burst (always clear burst layer each frame)
+      const bc = burstCanvasRef.current;
+      if (bc) {
+        const bctx = bc.getContext("2d");
+        if (bctx) {
+          bctx.setTransform(1, 0, 0, 1, 0, 0);
+          bctx.globalCompositeOperation = "source-over";
+          bctx.shadowBlur = 0;
+          bctx.shadowColor = "transparent";
+          bctx.clearRect(0, 0, bc.width, bc.height);
+
+          const br = burstRef.current;
+          if (br && br.active) {
+            const dur = 220; // ms
+            const t = clamp((now - br.startedAt) / dur, 0, 1);
+            if (t >= 1) {
+              br.active = false;
+            } else {
+              const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+              const r = 24 + ease * 96;
+              const alpha = 1 - ease;
+
+              const core = br.isDownbeat ? "rgba(255,45,75,0.95)" : "rgba(244,189,86,0.95)";
+              const mid = br.isDownbeat ? "rgba(255,45,75,0.25)" : "rgba(244,189,86,0.25)";
+              const glow = br.isDownbeat ? "rgba(255,45,75,0.55)" : "rgba(244,189,86,0.55)";
+
+              const g = bctx.createRadialGradient(br.x, br.y, 0, br.x, br.y, r);
+              g.addColorStop(0, core);
+              g.addColorStop(0.55, mid);
+              g.addColorStop(1, "rgba(0,0,0,0)");
+
+              bctx.globalAlpha = alpha;
+              bctx.fillStyle = g;
+              bctx.beginPath();
+              bctx.arc(br.x, br.y, r, 0, Math.PI * 2);
+              bctx.fill();
+
+              bctx.globalAlpha = alpha * 0.75;
+              bctx.strokeStyle = core;
+              bctx.lineWidth = 2;
+              bctx.shadowColor = glow;
+              bctx.shadowBlur = 24;
+              bctx.beginPath();
+              bctx.arc(br.x, br.y, r * 0.52, 0, Math.PI * 2);
+              bctx.stroke();
+
+              bctx.shadowBlur = 0;
+              bctx.globalAlpha = 1;
+            }
+          }
         }
       }
 
@@ -231,24 +273,17 @@ function PendulumVisual(props: {
     };
   }, [running, beatMs]);
 
-  // when stopping: clear the canvas so nothing “sticks”
+  // When stopping: clear layers so nothing stays
   useEffect(() => {
-    if (!running) hardClearTrail();
+    if (!running) {
+      clearTrail();
+      hardClearCanvas(burstCanvasRef.current);
+      burstRef.current = null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 
-  // cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      if (burstKillTimerRef.current) window.clearTimeout(burstKillTimerRef.current);
-    };
-  }, []);
-
   const p = bobPos(angle);
-
-  const burstCore = burst?.isDownbeat ? "rgba(255,45,75,0.95)" : "rgba(244,189,86,0.95)";
-  const burstGlow = burst?.isDownbeat ? "rgba(255,45,75,0.55)" : "rgba(244,189,86,0.55)";
-
   const showSub = subdivCount(subdivision) > 1;
 
   return (
@@ -277,27 +312,17 @@ function PendulumVisual(props: {
       <div className="rounded-2xl border border-white/10 bg-black/20 p-6">
         <div className="relative h-[260px] rounded-2xl border border-white/10 bg-black/10 overflow-hidden">
           {/* Trail */}
-          <canvas ref={canvasRef} width={W} height={H} className="absolute inset-0 w-full h-full" />
+          <canvas ref={trailCanvasRef} width={W} height={H} className="absolute inset-0 w-full h-full" />
+          {/* Burst layer */}
+          <canvas ref={burstCanvasRef} width={W} height={H} className="absolute inset-0 w-full h-full" />
 
-          {/* SVG overlay */}
+          {/* SVG overlay: rod + weight only */}
           <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
             <defs>
               <radialGradient id="weightGrad" cx="30%" cy="30%" r="70%">
                 <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
                 <stop offset="55%" stopColor="rgba(244,189,86,0.98)" />
                 <stop offset="100%" stopColor="rgba(244,189,86,0.65)" />
-              </radialGradient>
-
-              <radialGradient id="burstGradRed" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="rgba(255,45,75,0.95)" />
-                <stop offset="55%" stopColor="rgba(255,45,75,0.25)" />
-                <stop offset="100%" stopColor="rgba(255,45,75,0.0)" />
-              </radialGradient>
-
-              <radialGradient id="burstGradGold" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="rgba(244,189,86,0.95)" />
-                <stop offset="55%" stopColor="rgba(244,189,86,0.25)" />
-                <stop offset="100%" stopColor="rgba(244,189,86,0.0)" />
               </radialGradient>
             </defs>
 
@@ -320,40 +345,9 @@ function PendulumVisual(props: {
               <circle cx={p.x} cy={p.y} r={13} fill="url(#weightGrad)" className={showSub ? "tobyWeightBlink" : ""} />
               <circle cx={p.x - 4} cy={p.y - 5} r={4} fill="rgba(255,255,255,0.18)" className={showSub ? "tobyWeightBlink" : ""} />
             </g>
-
-            {/* BIG burst only on main beat (and it auto-clears) */}
-            {burst && (
-              <g key={burst.id}>
-                <circle
-                  cx={burst.x}
-                  cy={burst.y}
-                  r={95}
-                  fill={burst.isDownbeat ? "url(#burstGradRed)" : "url(#burstGradGold)"}
-                  style={{ animation: "tobyBurst 220ms ease-out" }}
-                />
-                <circle
-                  cx={burst.x}
-                  cy={burst.y}
-                  r={48}
-                  fill="transparent"
-                  stroke={burstCore}
-                  strokeOpacity={0.6}
-                  strokeWidth={2}
-                  style={{
-                    filter: `drop-shadow(0 0 24px ${burstGlow})`,
-                    animation: "tobyBurst 220ms ease-out",
-                  }}
-                />
-              </g>
-            )}
           </svg>
 
           <style>{`
-            @keyframes tobyBurst {
-              0% { transform: scale(0.55); opacity: 0; }
-              18% { opacity: 1; }
-              100% { transform: scale(1.18); opacity: 0; }
-            }
             .tobyWeightBlink {
               animation: tobyBlink 120ms ease-out;
               filter: drop-shadow(0 0 18px rgba(244,189,86,0.65));
@@ -367,6 +361,10 @@ function PendulumVisual(props: {
         </div>
       </div>
     </div>
+  );
+}
+
+  </div>
   );
 }
 
