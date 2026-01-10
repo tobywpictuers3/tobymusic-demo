@@ -2,18 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-
-import {
-  MetronomeEngine,
-  type SubdivisionMode,
-  type MetronomeSound,
-} from "@/lib/metronom/MetronomeEngine";
-
-import {
-  TunerEngine,
-  type TunerState,
-  type NoteMeasurement,
-} from "@/lib/tuner/TunerEngine";
+import { MetronomeEngine, type SubdivisionMode, type MetronomeSound } from "@/lib/metronom/MetronomeEngine";
+import { TunerEngine, type TunerState, type NoteMeasurement } from "@/lib/tuner/TunerEngine";
 
 /** ---------- helpers ---------- */
 function clamp(n: number, a: number, b: number) {
@@ -21,25 +11,17 @@ function clamp(n: number, a: number, b: number) {
 }
 function extractBeatInBar(e: any): number | null {
   const candidates = [e?.beatInBar, e?.beat, e?.beatIndex, e?.currentBeat, e?.barBeat];
-  for (const v of candidates) {
-    if (typeof v === "number" && isFinite(v)) return v;
-  }
+  for (const v of candidates) if (typeof v === "number" && isFinite(v)) return v;
   return null;
 }
 function subdivCount(mode: SubdivisionMode): number {
   switch (mode) {
-    case "quarter":
-      return 1;
-    case "eighths":
-      return 2;
-    case "triplets":
-      return 3;
-    case "sixteenths":
-      return 4;
-    case "swing":
-      return 2;
-    default:
-      return 1;
+    case "quarter": return 1;
+    case "eighths": return 2;
+    case "triplets": return 3;
+    case "sixteenths": return 4;
+    case "swing": return 2;
+    default: return 1;
   }
 }
 
@@ -64,7 +46,6 @@ const SUB_LABELS: Record<SubdivisionMode, string> = {
   swing: "סווינג",
 };
 
-/** ---------- Pendulum Visual (touch walls + correct trail per beat) ---------- */
 type HitEvent =
   | { kind: "main"; side: -1 | 1; isDownbeat: boolean; id: number }
   | { kind: "sub"; id: number };
@@ -79,39 +60,38 @@ function PendulumVisual(props: {
 }) {
   const { running, bpm, beatsPerBar, beatInBar, subdivision, hit } = props;
 
-  // virtual stage for geometry (independent from CSS size)
+  // virtual stage
   const W = 520;
   const H = 260;
 
   const pivotX = W / 2;
   const pivotY = 26;
 
-  const wallPad = 28; // walls inset
-  const leftWallX = wallPad;
-  const rightWallX = W - wallPad;
+  const wallPad = 26;
+  const wallThickness = 10;
 
-  // rod length must allow touching walls:
-  // sin(maxAngle) * rodLen = dx  => maxAngle = asin(dx/rodLen)
+  // IMPORTANT: wall face X is where collision happens
+  const leftWallFaceX = wallPad + wallThickness;                 // inner face
+  const rightWallFaceX = W - (wallPad + wallThickness);          // inner face
+
   const rodLen = 185;
-  const dx = pivotX - leftWallX; // same as rightWallX - pivotX
+  const dx = pivotX - leftWallFaceX; // equals rightWallFaceX - pivotX
 
-  // if rod is too short (shouldn't), clamp safely
   const ratio = clamp(dx / rodLen, 0, 0.999);
-  const maxAngleRad = Math.asin(ratio);
+  const maxAngle = Math.asin(ratio); // ensures bob touches wall face exactly
 
-  // beat timing
   const beatMs = 60000 / clamp(bpm, 20, 400);
 
   const startSideRef = useRef<1 | -1>(1);
   const t0Ref = useRef<number>(performance.now());
   const rafRef = useRef<number | null>(null);
 
-  const [angle, setAngle] = useState<number>(maxAngleRad);
-  const angleRef = useRef<number>(maxAngleRad);
+  const angleRef = useRef<number>(maxAngle);
+  const [angle, setAngle] = useState<number>(maxAngle);
 
-  // trail canvas: should show ONLY current beat path (reset on wall hit)
+  // canvas trail (only this beat)
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const lastBobRef = useRef<{ x: number; y: number } | null>(null);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
   const [burst, setBurst] = useState<{
     x: number;
@@ -120,19 +100,13 @@ function PendulumVisual(props: {
     id: number;
   } | null>(null);
 
-  const [subSpark, setSubSpark] = useState<{
-    x: number;
-    y: number;
-    id: number;
-  } | null>(null);
+  const [subPulse, setSubPulse] = useState<{ id: number } | null>(null);
 
-  const toPctX = (x: number) => `${(x / W) * 100}%`;
-  const toPctY = (y: number) => `${(y / H) * 100}%`;
-
-  function bobPosFromAngle(a: number) {
-    const x = pivotX + Math.sin(a) * rodLen;
-    const y = pivotY + Math.cos(a) * rodLen;
-    return { x, y };
+  function bobPos(a: number) {
+    return {
+      x: pivotX + Math.sin(a) * rodLen,
+      y: pivotY + Math.cos(a) * rodLen,
+    };
   }
 
   function clearTrail() {
@@ -141,37 +115,40 @@ function PendulumVisual(props: {
     const ctx = c.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, c.width, c.height);
-    // keep transparent; looks cleaner over background
-    lastBobRef.current = null;
+    lastPointRef.current = null;
   }
 
-  // handle tick events
+  // tick events
   useEffect(() => {
     if (hit.kind === "main") {
       startSideRef.current = hit.side;
       t0Ref.current = performance.now();
 
-      // snap to exact wall-contact angle
-      const snap = hit.side * maxAngleRad;
-      setAngle(snap);
+      const snap = hit.side * maxAngle;
       angleRef.current = snap;
+      setAngle(snap);
 
-      // reset trail for new beat
+      // reset trail exactly on each beat
       clearTrail();
 
-      const pos = bobPosFromAngle(snap);
+      // burst must be ON THE WALL FACE at the bob Y
+      const p = bobPos(snap);
+      const wallX = hit.side === 1 ? rightWallFaceX : leftWallFaceX;
 
-      // burst exactly at contact point (the bob)
-      setBurst({ x: pos.x, y: pos.y, isDownbeat: hit.isDownbeat, id: hit.id });
+      setBurst({
+        x: wallX,
+        y: p.y,
+        isDownbeat: hit.isDownbeat,
+        id: hit.id,
+      });
     } else {
-      // subdivision: tiny spark at CURRENT bob (not at walls)
-      const pos = bobPosFromAngle(angleRef.current);
-      setSubSpark({ x: pos.x, y: pos.y, id: hit.id });
+      // subdivision: pulse the weight only (no burst)
+      setSubPulse({ id: hit.id });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hit]);
 
-  // animation loop + draw trail (no fading; only current-beat path)
+  // animation + trail drawing
   useEffect(() => {
     if (!running) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -181,47 +158,42 @@ function PendulumVisual(props: {
 
     const loop = () => {
       const now = performance.now();
-      const elapsed = now - t0Ref.current;
-      const p = clamp(elapsed / beatMs, 0, 1);
+      const p = clamp((now - t0Ref.current) / beatMs, 0, 1);
 
-      // smooth travel from wall to wall: cos curve from +max to -max (or vice versa)
+      // smooth travel wall->wall
       const side = startSideRef.current;
-      const a = side * Math.cos(Math.PI * p) * maxAngleRad;
+      const a = side * Math.cos(Math.PI * p) * maxAngle;
 
-      setAngle(a);
       angleRef.current = a;
+      setAngle(a);
 
-      // draw trail segment
+      // draw trail segment (only this beat)
       const c = canvasRef.current;
       if (c) {
         const ctx = c.getContext("2d");
         if (ctx) {
-          const pos = bobPosFromAngle(a);
-          const prev = lastBobRef.current;
+          const pt = bobPos(a);
+          const prev = lastPointRef.current;
 
           if (prev) {
             ctx.beginPath();
             ctx.moveTo(prev.x, prev.y);
-            ctx.lineTo(pos.x, pos.y);
-            ctx.lineWidth = 5;
+            ctx.lineTo(pt.x, pt.y);
+            ctx.lineWidth = 6;
             ctx.lineCap = "round";
-
-            // gold trail (logo-ish)
             ctx.strokeStyle = "rgba(244,189,86,0.45)";
             ctx.shadowColor = "rgba(244,189,86,0.55)";
             ctx.shadowBlur = 12;
             ctx.stroke();
             ctx.shadowBlur = 0;
           } else {
-            // first point in this beat
-            // draw a tiny dot to start the trail cleanly
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 2.2, 0, Math.PI * 2);
+            ctx.arc(pt.x, pt.y, 2.2, 0, Math.PI * 2);
             ctx.fillStyle = "rgba(244,189,86,0.55)";
             ctx.fill();
           }
 
-          lastBobRef.current = pos;
+          lastPointRef.current = pt;
         }
       }
 
@@ -233,23 +205,17 @@ function PendulumVisual(props: {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [running, beatMs, maxAngleRad]);
+  }, [running, beatMs, maxAngle]);
 
-  // if stop -> clear trail
   useEffect(() => {
     if (!running) clearTrail();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 
-  // current positions for rod/bob render
-  const bob = bobPosFromAngle(angle);
+  const p = bobPos(angle);
 
-  const burstColor = burst?.isDownbeat
-    ? "rgba(255,45,75,0.95)"
-    : "rgba(244,189,86,0.95)";
-  const burstGlow = burst?.isDownbeat
-    ? "rgba(255,45,75,0.55)"
-    : "rgba(244,189,86,0.55)";
+  const burstCore = burst?.isDownbeat ? "rgba(255,45,75,0.95)" : "rgba(244,189,86,0.95)";
+  const burstGlow = burst?.isDownbeat ? "rgba(255,45,75,0.55)" : "rgba(244,189,86,0.55)";
 
   const showSub = subdivCount(subdivision) > 1;
 
@@ -280,123 +246,133 @@ function PendulumVisual(props: {
 
       <div className="rounded-2xl border border-white/10 bg-black/20 p-6">
         <div className="relative h-[260px] rounded-2xl border border-white/10 bg-black/10 overflow-hidden">
-          {/* trail canvas (transparent) */}
+          {/* Trail */}
           <canvas
             ref={canvasRef}
             width={W}
             height={H}
             className="absolute inset-0 w-full h-full"
-            style={{ opacity: 1 }}
           />
 
-          {/* walls */}
-          <div
-            className="absolute top-[8%] bottom-[8%] w-[12px] rounded-full"
-            style={{
-              left: `calc(${(leftWallX / W) * 100}% - 6px)`,
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.16), rgba(255,255,255,0.06))",
-              boxShadow: "0 0 18px rgba(255,255,255,0.10)",
-            }}
-          />
-          <div
-            className="absolute top-[8%] bottom-[8%] w-[12px] rounded-full"
-            style={{
-              left: `calc(${(rightWallX / W) * 100}% - 6px)`,
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.16), rgba(255,255,255,0.06))",
-              boxShadow: "0 0 18px rgba(255,255,255,0.10)",
-            }}
-          />
+          {/* SVG overlay (rod + weight + walls + burst) */}
+          <svg
+            className="absolute inset-0 w-full h-full"
+            viewBox={`0 0 ${W} ${H}`}
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <radialGradient id="weightGrad" cx="30%" cy="30%" r="70%">
+                <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
+                <stop offset="55%" stopColor="rgba(244,189,86,0.98)" />
+                <stop offset="100%" stopColor="rgba(244,189,86,0.65)" />
+              </radialGradient>
+              <radialGradient id="burstGradRed" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="rgba(255,45,75,0.95)" />
+                <stop offset="60%" stopColor="rgba(255,45,75,0.20)" />
+                <stop offset="100%" stopColor="rgba(255,45,75,0.0)" />
+              </radialGradient>
+              <radialGradient id="burstGradGold" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="rgba(244,189,86,0.95)" />
+                <stop offset="60%" stopColor="rgba(244,189,86,0.20)" />
+                <stop offset="100%" stopColor="rgba(244,189,86,0.0)" />
+              </radialGradient>
+            </defs>
 
-          {/* pivot */}
-          <div
-            className="absolute h-3 w-3 rounded-full"
-            style={{
-              left: toPctX(pivotX),
-              top: toPctY(pivotY),
-              transform: "translate(-50%, -50%)",
-              background: "rgba(255,255,255,0.25)",
-              boxShadow: "0 0 12px rgba(255,255,255,0.10)",
-            }}
-          />
-
-          {/* rod (rotates around pivot) */}
-          <div
-            className="absolute"
-            style={{
-              left: toPctX(pivotX),
-              top: toPctY(pivotY),
-              width: "2px",
-              height: `${(rodLen / H) * 100}%`,
-              transformOrigin: "top center",
-              transform: `translate(-50%, 0) rotate(${(angle * 180) / Math.PI}deg)`,
-              background: "linear-gradient(180deg, rgba(244,189,86,0.95), rgba(244,189,86,0.15))",
-              boxShadow: "0 0 10px rgba(244,189,86,0.22)",
-            }}
-          />
-
-          {/* bob */}
-          <div
-            className="absolute h-6 w-6 rounded-full"
-            style={{
-              left: toPctX(bob.x),
-              top: toPctY(bob.y),
-              transform: "translate(-50%, -50%)",
-              background:
-                "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), rgba(244,189,86,0.98))",
-              boxShadow: "0 0 22px rgba(244,189,86,0.40)",
-            }}
-          />
-
-          {/* contact burst exactly at bob on main beat */}
-          {burst && (
-            <div
-              key={burst.id}
-              className="absolute h-[140px] w-[140px] rounded-full pointer-events-none"
-              style={{
-                left: toPctX(burst.x),
-                top: toPctY(burst.y),
-                transform: "translate(-50%, -50%)",
-                background: `radial-gradient(circle, ${burstColor} 0%, rgba(255,255,255,0.0) 65%)`,
-                animation: "tobyBurst 220ms ease-out",
-                filter: "blur(0.2px)",
-                boxShadow: `0 0 28px ${burstGlow}`,
-              }}
+            {/* walls (NO constant glow) */}
+            <rect
+              x={wallPad}
+              y={22}
+              width={wallThickness}
+              height={H - 44}
+              rx={5}
+              fill="rgba(255,255,255,0.10)"
             />
-          )}
-
-          {/* subdivision sparkle at bob (not walls) */}
-          {showSub && subSpark && (
-            <div
-              key={subSpark.id}
-              className="absolute h-[70px] w-[70px] rounded-full pointer-events-none"
-              style={{
-                left: toPctX(subSpark.x),
-                top: toPctY(subSpark.y),
-                transform: "translate(-50%, -50%)",
-                background:
-                  "radial-gradient(circle, rgba(244,189,86,0.55) 0%, rgba(255,255,255,0.0) 70%)",
-                animation: "tobySpark 160ms ease-out",
-                filter: "blur(0.2px)",
-              }}
+            <rect
+              x={W - wallPad - wallThickness}
+              y={22}
+              width={wallThickness}
+              height={H - 44}
+              rx={5}
+              fill="rgba(255,255,255,0.10)"
             />
-          )}
+
+            {/* pivot */}
+            <circle cx={pivotX} cy={pivotY} r={5} fill="rgba(255,255,255,0.22)" />
+
+            {/* rod */}
+            <line
+              x1={pivotX}
+              y1={pivotY}
+              x2={p.x}
+              y2={p.y}
+              stroke="rgba(244,189,86,0.85)"
+              strokeWidth={2.2}
+              strokeLinecap="round"
+            />
+
+            {/* weight (main object) */}
+            <g>
+              {/* weight body */}
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={13}
+                fill="url(#weightGrad)"
+                className={showSub && subPulse ? "tobyWeightPulse" : ""}
+              />
+              {/* small cap highlight */}
+              <circle
+                cx={p.x - 4}
+                cy={p.y - 5}
+                r={4}
+                fill="rgba(255,255,255,0.18)"
+                className={showSub && subPulse ? "tobyWeightPulse" : ""}
+              />
+            </g>
+
+            {/* burst at wall contact ONLY on main beat */}
+            {burst && (
+              <g key={burst.id}>
+                <circle
+                  cx={burst.x}
+                  cy={burst.y}
+                  r={70}
+                  fill={burst.isDownbeat ? "url(#burstGradRed)" : "url(#burstGradGold)"}
+                  style={{ animation: "tobyBurst 220ms ease-out" }}
+                />
+                {/* extra glow */}
+                <circle
+                  cx={burst.x}
+                  cy={burst.y}
+                  r={34}
+                  fill="transparent"
+                  stroke={burstCore}
+                  strokeOpacity={0.55}
+                  strokeWidth={2}
+                  style={{ filter: `drop-shadow(0 0 18px ${burstGlow})`, animation: "tobyBurst 220ms ease-out" }}
+                />
+              </g>
+            )}
+          </svg>
+
+          <style>{`
+            @keyframes tobyBurst {
+              0% { transform: scale(0.55); opacity: 0; }
+              20% { opacity: 1; }
+              100% { transform: scale(1.25); opacity: 0; }
+            }
+            .tobyWeightPulse {
+              animation: tobyPulse 140ms ease-out;
+              filter: drop-shadow(0 0 14px rgba(244,189,86,0.60));
+            }
+            @keyframes tobyPulse {
+              0% { transform: scale(0.96); opacity: 0.75; }
+              40% { transform: scale(1.06); opacity: 1; }
+              100% { transform: scale(1.00); opacity: 1; }
+            }
+          `}</style>
         </div>
       </div>
-
-      <style>{`
-        @keyframes tobyBurst {
-          0% { transform: translate(-50%, -50%) scale(0.40); opacity: 0.0; }
-          20% { opacity: 1.0; }
-          100% { transform: translate(-50%, -50%) scale(1.35); opacity: 0.0; }
-        }
-        @keyframes tobySpark {
-          0% { transform: translate(-50%, -50%) scale(0.65); opacity: 0.0; }
-          25% { opacity: 1.0; }
-          100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.0; }
-        }
-      `}</style>
     </div>
   );
 }
@@ -411,30 +387,22 @@ export default function Metronome() {
   const [beatInBar, setBeatInBar] = useState<number>(1);
 
   // Accent toggle (ear only)
-  const [accentDownbeat, setAccentDownbeat] = useState<boolean>(() => {
-    const s = m.getSettings();
-    return (s.accentEvery ?? 0) > 0;
-  });
+  const [accentDownbeat, setAccentDownbeat] = useState<boolean>(() => (m.getSettings().accentEvery ?? 0) > 0);
 
   // events for visuals
   const eventIdRef = useRef(0);
   const hitSideRef = useRef<1 | -1>(1);
   const lastBeatRef = useRef<number>(1);
   const subTickRef = useRef<number>(0);
-
   const [hit, setHit] = useState<HitEvent>({ kind: "main", side: 1, isDownbeat: true, id: 0 });
 
   useEffect(() => {
     m.setOnState((running: boolean) => setMRunning(running));
 
     m.setOnTick((e: any) => {
-      const bRaw = extractBeatInBar(e);
       const beatsPerBar = m.getSettings().beatsPerBar;
-
-      const b =
-        typeof bRaw === "number"
-          ? clamp(Math.round(bRaw), 1, beatsPerBar)
-          : lastBeatRef.current;
+      const bRaw = extractBeatInBar(e);
+      const b = typeof bRaw === "number" ? clamp(Math.round(bRaw), 1, beatsPerBar) : lastBeatRef.current;
 
       const beatChanged = b !== lastBeatRef.current;
 
@@ -453,7 +421,6 @@ export default function Metronome() {
         const subN = subdivCount(m.getSettings().subdivision);
         if (subN > 1) {
           subTickRef.current += 1;
-          // only inner subdivision sparks (not walls)
           if (subTickRef.current < subN) {
             eventIdRef.current += 1;
             setHit({ kind: "sub", id: eventIdRef.current });
@@ -463,14 +430,12 @@ export default function Metronome() {
     });
 
     setMSettings(m.getSettings());
-
     return () => {
       m.setOnState(null as any);
       m.setOnTick(null as any);
     };
   }, [m]);
 
-  // keep accentEvery synced to beatsPerBar when toggle on
   useEffect(() => {
     if (!accentDownbeat) return;
     m.setAccentEvery(m.getSettings().beatsPerBar, true);
@@ -498,7 +463,6 @@ export default function Metronome() {
     setMSettings(m.getSettings());
     setBeatInBar((cur) => clamp(cur, 1, v));
   };
-
   const setSubdivision = (v: SubdivisionMode) => {
     m.setSubdivision(v, true);
     setMSettings(m.getSettings());
@@ -511,15 +475,11 @@ export default function Metronome() {
     m.setVolume(v, true);
     setMSettings(m.getSettings());
   };
-
   const toggleAccentDownbeat = () => {
     const next = !accentDownbeat;
     setAccentDownbeat(next);
-
-    // audio only
     if (next) m.setAccentEvery(m.getSettings().beatsPerBar, true);
     else m.setAccentEvery(0, true);
-
     setMSettings(m.getSettings());
   };
 
@@ -553,6 +513,10 @@ export default function Metronome() {
       attackMs: 40,
       releaseMs: 150,
       minNoteMs: 90,
+
+      // IMPORTANT: duration measurement target
+      durationTarget: "A4_A5",
+      durationTargetCents: 150,
     });
   };
 
@@ -571,7 +535,6 @@ export default function Metronome() {
   useEffect(() => {
     if (tState.status !== "running") return;
     if (!micShouldRunRef.current) return;
-
     (async () => {
       stopMic();
       await startMic();
@@ -619,7 +582,6 @@ export default function Metronome() {
             {/* ===================== METRONOME ===================== */}
             <TabsContent value="metronome" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Controls */}
                 <Card className="border-white/10 bg-black/20">
                   <CardHeader>
                     <CardTitle className="text-right">שליטה</CardTitle>
@@ -632,12 +594,8 @@ export default function Metronome() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Button onClick={startMetronome} disabled={mRunning}>
-                          התחל
-                        </Button>
-                        <Button variant="secondary" onClick={stopMetronome} disabled={!mRunning}>
-                          עצור
-                        </Button>
+                        <Button onClick={startMetronome} disabled={mRunning}>התחל</Button>
+                        <Button variant="secondary" onClick={stopMetronome} disabled={!mRunning}>עצור</Button>
                       </div>
                     </div>
 
@@ -664,10 +622,8 @@ export default function Metronome() {
                           value={mSettings.beatsPerBar}
                           onChange={(e) => setBeatsPerBar(Number(e.target.value))}
                         >
-                          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
+                          {[1,2,3,4,5,6,7].map((n) => (
+                            <option key={n} value={n}>{n}</option>
                           ))}
                         </select>
                       </div>
@@ -692,9 +648,7 @@ export default function Metronome() {
                           onChange={(e) => setSubdivision(e.target.value as SubdivisionMode)}
                         >
                           {Object.keys(SUB_LABELS).map((k) => (
-                            <option key={k} value={k}>
-                              {SUB_LABELS[k as SubdivisionMode]}
-                            </option>
+                            <option key={k} value={k}>{SUB_LABELS[k as SubdivisionMode]}</option>
                           ))}
                         </select>
                       </div>
@@ -707,9 +661,7 @@ export default function Metronome() {
                           onChange={(e) => setSound(e.target.value as MetronomeSound)}
                         >
                           {Object.keys(SOUND_LABELS).map((k) => (
-                            <option key={k} value={k}>
-                              {SOUND_LABELS[k as MetronomeSound]}
-                            </option>
+                            <option key={k} value={k}>{SOUND_LABELS[k as MetronomeSound]}</option>
                           ))}
                         </select>
                       </div>
@@ -732,7 +684,6 @@ export default function Metronome() {
                   </CardContent>
                 </Card>
 
-                {/* Visual */}
                 <Card className="border-white/10 bg-black/20">
                   <CardHeader>
                     <CardTitle className="text-right">מראה ויזואלי</CardTitle>
@@ -805,8 +756,12 @@ export default function Metronome() {
 
                     <div className="rounded-lg bg-black/25 border border-white/10 p-3 text-right">
                       <div className="text-sm text-white/70">סטייה (cents)</div>
-                      <div className={`text-3xl font-semibold ${tunerRunning ? (inTol ? "text-emerald-400" : "text-red-400") : "text-white"}`}>
-                        {tunerRunning ? (cents > 0 ? `+${cents}` : `${cents}`) : "--"}
+                      <div
+                        className={`text-3xl font-semibold ${
+                          tunerRunning ? (inTol ? "text-emerald-400" : "text-red-400") : "text-white"
+                        }`}
+                      >
+                        {tunerRunning ? (tState.cents > 0 ? `+${tState.cents}` : `${tState.cents}`) : "--"}
                       </div>
                     </div>
                   </div>
@@ -817,20 +772,28 @@ export default function Metronome() {
                     </div>
 
                     <div className="relative h-4 rounded bg-white/10 overflow-hidden">
-                      <div className="absolute top-0 h-4 bg-emerald-500/25" style={{ left: `${50 - 5}%`, width: `${10}%` }} />
+                      {/* green tolerance band that GLOWS when inTol */}
+                      <div
+                        className="absolute top-0 h-4"
+                        style={{
+                          left: `${50 - 5}%`,
+                          width: `${10}%`,
+                          background: inTol && tunerRunning ? "rgba(16,185,129,0.42)" : "rgba(16,185,129,0.20)",
+                          boxShadow: inTol && tunerRunning ? "0 0 22px rgba(16,185,129,0.55)" : "none",
+                          transition: "background 120ms ease, box-shadow 120ms ease",
+                        }}
+                      />
                       <div className="absolute top-0 h-4 w-[2px] bg-white/70 left-1/2 -translate-x-1/2" />
                       <div
-                        className={`absolute top-[-6px] h-7 w-[3px] rounded ${tunerRunning ? (inTol ? "bg-emerald-400" : "bg-red-400") : "bg-white/50"}`}
+                        className={`absolute top-[-6px] h-7 w-[3px] rounded ${
+                          tunerRunning ? (inTol ? "bg-emerald-400" : "bg-red-400") : "bg-white/50"
+                        }`}
                         style={{
                           left: `${markerLeft}%`,
                           transform: "translateX(-50%)",
                           transition: "left 80ms linear",
                         }}
                       />
-                    </div>
-
-                    <div className="text-right text-xs text-white/50">
-                      ירוק = בתחום המותר (±{TOL} סנט). אדום = מחוץ לתחום.
                     </div>
                   </div>
                 </CardContent>
@@ -850,7 +813,7 @@ export default function Metronome() {
                       <div className="text-sm text-white/70">מצב</div>
                       <div className="text-white">
                         {tState.status === "starting" && "מבקש הרשאת מיקרופון…"}
-                        {tState.status === "running" && "מקשיב ומודד אוטומטית"}
+                        {tState.status === "running" && "מקשיב ומודד אוטומטית (A4/A5 בלבד)"}
                         {tState.status === "no_signal" && "ממתין לצליל יציב"}
                         {tState.status === "idle" && "מוכן למדידה"}
                         {tState.status === "permission_denied" && "אין הרשאה למיקרופון"}
@@ -879,9 +842,6 @@ export default function Metronome() {
                           </div>
                         </div>
                       ))}
-                      {durations.length > 30 && (
-                        <div className="text-right text-white/50 text-xs">מציג 30 אחרונים מתוך {durations.length}</div>
-                      )}
                     </div>
                   )}
 
