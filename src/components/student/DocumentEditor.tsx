@@ -14,19 +14,20 @@ function drawTemplate(ctx: CanvasRenderingContext2D, w: number, h: number, templ
   ctx.save();
   ctx.clearRect(0, 0, w, h);
 
+  // page background
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
 
-  // frame
+  // page frame
   ctx.strokeStyle = "rgba(0,0,0,0.10)";
   ctx.lineWidth = 2;
   ctx.strokeRect(20, 20, w - 40, h - 40);
 
-  // lines
-  ctx.strokeStyle = "rgba(0,0,0,0.12)";
-  ctx.lineWidth = 2;
-
   if (template === "lines") {
+    // stronger than before (still subtle)
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    ctx.lineWidth = 2.5;
+
     const top = 90;
     const gap = 64;
     for (let y = top; y < h - 90; y += gap) {
@@ -38,18 +39,39 @@ function drawTemplate(ctx: CanvasRenderingContext2D, w: number, h: number, templ
   }
 
   if (template === "staff") {
+    // MUCH stronger staff lines
+    ctx.strokeStyle = "rgba(0,0,0,0.38)";
+    ctx.lineWidth = 3.2;
+
     const left = 70;
     const right = w - 70;
-    const groupTopStart = 90;
+    const groupTopStart = 95;
     const lineGap = 18;
-    const groupGap = 90;
+    const groupGap = 88;
 
-    for (let top = groupTopStart; top < h - 140; top += lineGap * 4 + groupGap) {
+    for (let top = groupTopStart; top < h - 150; top += lineGap * 4 + groupGap) {
       for (let i = 0; i < 5; i++) {
         const y = top + i * lineGap;
         ctx.beginPath();
         ctx.moveTo(left, y);
         ctx.lineTo(right, y);
+        ctx.stroke();
+      }
+    }
+
+    // optional: faint barlines (very subtle)
+    ctx.strokeStyle = "rgba(0,0,0,0.10)";
+    ctx.lineWidth = 2;
+    for (let top = groupTopStart; top < h - 150; top += lineGap * 4 + groupGap) {
+      const yTop = top;
+      const yBot = top + 4 * lineGap;
+      // a few barlines across the width
+      const bars = 4;
+      for (let b = 1; b <= bars; b++) {
+        const x = left + (b * (right - left)) / (bars + 1);
+        ctx.beginPath();
+        ctx.moveTo(x, yTop);
+        ctx.lineTo(x, yBot);
         ctx.stroke();
       }
     }
@@ -64,7 +86,6 @@ async function canvasToPdfBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   const base64 = dataUrl.split(",")[1] || "";
   const jpgBytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
-  // A4 points
   const pageW = 595.28;
   const pageH = 841.89;
 
@@ -154,6 +175,43 @@ function guessKindFromFile(file: File): EditorSourceKind {
   if (n.match(/\.(png|jpg|jpeg|webp|gif)$/)) return "image";
   return "image";
 }
+
+// cursors: simple inline SVG data-URI
+function svgCursor(svg: string, hotspotX: number, hotspotY: number) {
+  const encoded = encodeURIComponent(svg)
+    .replace(/'/g, "%27")
+    .replace(/"/g, "%22");
+  return `url("data:image/svg+xml,${encoded}") ${hotspotX} ${hotspotY}, auto`;
+}
+
+const CURSOR_PEN = svgCursor(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+    <path d="M6 26l4-1 14-14-3-3L7 22l-1 4z" fill="black"/>
+    <path d="M19 8l3 3" stroke="white" stroke-width="2"/>
+  </svg>`,
+  6,
+  26
+);
+
+const CURSOR_MARKER = svgCursor(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+    <path d="M7 26l6-2 10-10-4-4L9 20l-2 6z" fill="black"/>
+    <rect x="18" y="6" width="8" height="8" fill="rgba(255,205,0,0.9)"/>
+  </svg>`,
+  7,
+  26
+);
+
+const CURSOR_ERASER = svgCursor(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+    <path d="M9 22l8-10 8 6-6 8H9z" fill="black"/>
+    <path d="M12 22h14" stroke="white" stroke-width="2"/>
+  </svg>`,
+  10,
+  22
+);
+
+const CURSOR_TEXT = "text";
 
 export default function DocumentEditor(props: {
   initialFileName: string;
@@ -251,12 +309,10 @@ export default function DocumentEditor(props: {
 
       try {
         if (props.source.kind === "pdf") {
-          // No pdfjs-dist installed => disable PDF editing for now
           setPdfNotSupported(true);
           return;
         }
 
-        // image
         const url = URL.createObjectURL(props.source.blob);
         const img = new Image();
         img.crossOrigin = "anonymous";
@@ -458,8 +514,54 @@ export default function DocumentEditor(props: {
     await props.onSave({ fileNameBase: baseName, png: pngBlob, pdf: pdfBlob });
   };
 
+  const printPage = async () => {
+    const merged = await exportMergedCanvas();
+    const dataUrl = merged.toDataURL("image/png");
+
+    const win = window.open("", "_blank", "noopener,noreferrer");
+    if (!win) return;
+
+    // A4 print styling
+    win.document.open();
+    win.document.write(`
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>הדפסה</title>
+        <style>
+          @page { size: A4; margin: 10mm; }
+          html, body { height: 100%; margin: 0; padding: 0; background: #fff; }
+          .wrap { display:flex; align-items:center; justify-content:center; height: 100%; }
+          img { width: 100%; max-width: 190mm; height: auto; }
+        </style>
+      </head>
+      <body>
+        <div class="wrap"><img src="${dataUrl}" /></div>
+        <script>
+          window.onload = () => {
+            setTimeout(() => {
+              window.focus();
+              window.print();
+            }, 50);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
   const zoomOut = () => setZoom((z) => Math.max(0.6, +(z - 0.1).toFixed(2)));
   const zoomIn = () => setZoom((z) => Math.min(2.0, +(z + 0.1).toFixed(2)));
+
+  const cursorForTool = () => {
+    if (tool === "pen") return CURSOR_PEN;
+    if (tool === "marker") return CURSOR_MARKER;
+    if (tool === "eraser") return CURSOR_ERASER;
+    if (tool === "text") return CURSOR_TEXT;
+    return "auto";
+  };
 
   const toolButtonStyle = (active: boolean) => ({
     padding: "8px 10px",
@@ -560,6 +662,20 @@ export default function DocumentEditor(props: {
           <div style={{ display: "flex", gap: 10 }}>
             <button
               type="button"
+              onClick={printPage}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(0,0,0,0.25)",
+                color: "white",
+              }}
+            >
+              הדפסה
+            </button>
+
+            <button
+              type="button"
               onClick={props.onCancel}
               style={{
                 padding: "10px 14px",
@@ -571,6 +687,7 @@ export default function DocumentEditor(props: {
             >
               השלכה (Esc)
             </button>
+
             <button
               type="button"
               onClick={() => void save()}
@@ -599,7 +716,7 @@ export default function DocumentEditor(props: {
               color: "white",
             }}
           >
-            עריכת PDF עדיין לא זמינה בפרויקט שלך (אין <b>pdfjs</b>). אפשר לערוך תמונות. אם תרצי – נוסיף תמיכה ב-PDF בשלב הבא.
+            עריכת PDF עדיין לא זמינה כאן (ללא pdfjs). אפשר לערוך תמונות וליצור דפים חדשים.
           </div>
         ) : null}
 
@@ -638,7 +755,13 @@ export default function DocumentEditor(props: {
                 ref={inkRef}
                 width={w}
                 height={h}
-                style={{ position: "absolute", inset: 0, width: w / 2, height: h / 2 }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: w / 2,
+                  height: h / 2,
+                  cursor: cursorForTool(), // <<< tool cursor
+                }}
                 onPointerDown={beginStroke}
                 onPointerMove={moveStroke}
                 onPointerUp={endStroke}
