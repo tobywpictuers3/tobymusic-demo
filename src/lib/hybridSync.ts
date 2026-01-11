@@ -582,6 +582,68 @@ class HybridSyncManager {
     return await this.syncToWorker();
   }
 
+  /**
+   * Download a backup file to the user's device
+   */
+  downloadBackup(): void {
+    try {
+      const data = this.gatherAllData();
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `music-system-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      logger.info('✅ Backup downloaded successfully');
+    } catch (error) {
+      logger.error('❌ Error downloading backup:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Import a backup file and sync to Worker
+   */
+  async importBackup(file: File): Promise<{ success: boolean; message: string }> {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      // Validate the data has expected structure
+      const hasValidData = Object.keys(data).some(k => 
+        k.startsWith('musicSystem_') || k === 'oneTimePayments'
+      );
+      
+      if (!hasValidData) {
+        return { success: false, message: 'קובץ הגיבוי לא תקין - חסרים נתוני מערכת' };
+      }
+      
+      // Initialize storage with imported data
+      this.updateInMemoryStorage(data);
+      
+      // Sync to worker if online
+      if (!isDevMode() && this.syncState.isOnline) {
+        const syncResult = await this.directUpload();
+        if (syncResult) {
+          return { success: true, message: 'הגיבוי יובא וסונכרן בהצלחה' };
+        } else {
+          return { success: true, message: 'הגיבוי יובא, אך הסנכרון נכשל. יסונכרן בהמשך.' };
+        }
+      }
+      
+      return { success: true, message: 'הגיבוי יובא בהצלחה' };
+    } catch (error) {
+      logger.error('❌ Error importing backup:', error);
+      return { success: false, message: 'שגיאה בייבוא הגיבוי' };
+    }
+  }
+
   destroy() {
     if (this.retryInterval) clearInterval(this.retryInterval);
   }

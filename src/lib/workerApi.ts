@@ -29,9 +29,10 @@ const getJsonHeaders = () => ({
    NORMALIZERS (important for StudentFiles)
    =========================================================== */
 
-type UploadAttachmentResultNormalized = {
+export type UploadAttachmentResultNormalized = {
   path: string;
   webViewLink: string;
+  url: string;  // Alias for webViewLink for Attachment compatibility
   name: string;
   size?: number;
   type?: string;
@@ -58,6 +59,7 @@ function normalizeUploadAttachmentResult(raw: any): UploadAttachmentResultNormal
   return {
     path,
     webViewLink,
+    url: webViewLink,  // Add url as alias for Attachment compatibility
     name,
     size: data?.size,
     type: data?.type,

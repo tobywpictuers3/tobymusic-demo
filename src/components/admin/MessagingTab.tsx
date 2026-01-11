@@ -199,7 +199,15 @@ export default function MessagingTab() {
         const result = await workerApi.uploadAttachment(file);
         
         if (result.success && result.data) {
-          setAttachments(prev => [...prev, result.data]);
+          // Convert to Attachment type with required size field
+          const attachment = {
+            url: result.data.url,
+            path: result.data.path,
+            name: result.data.name,
+            size: result.data.size ?? file.size,
+            type: result.data.type
+          };
+          setAttachments(prev => [...prev, attachment]);
           toast.success(`${file.name} הועלה בהצלחה`);
         } else {
           toast.error(`שגיאה בהעלאת ${file.name}: ${result.error || 'שגיאה לא ידועה'}`);

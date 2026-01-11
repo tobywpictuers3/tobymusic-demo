@@ -16,7 +16,7 @@ import {
 import { History, Trash2, Pencil } from 'lucide-react';
 import { getStudentPracticeSessions, deletePracticeSession, updatePracticeSession } from '@/lib/storage';
 import { PracticeSession } from '@/lib/types';
-import { getDailyMedalInfo } from '@/lib/medalEngine';
+import { getDailyMedalInfo, getDailyMedalLevel } from '@/lib/medalEngine';
 import { toast } from '@/hooks/use-toast';
 
 interface PracticeHistoryProps {
@@ -224,7 +224,8 @@ const PracticeHistory = ({ studentId, refreshKey = 0, onRefresh }: PracticeHisto
 
             <TableBody>
               {dailyStats.map((day) => {
-                const medal = getDailyMedalInfo(day.totalMinutes);
+                const medalLevel = getDailyMedalLevel(day.totalMinutes);
+                const medal = getDailyMedalInfo(medalLevel);
 
                 return (
                   <TableRow key={day.date}>
@@ -284,7 +285,7 @@ const PracticeHistory = ({ studentId, refreshKey = 0, onRefresh }: PracticeHisto
                     </TableCell>
 
                     <TableCell>
-                      <span className="text-lg">{medal.emoji}</span>
+                      <span className="text-lg">{medal.icon}</span>
                     </TableCell>
 
                     <TableCell />
