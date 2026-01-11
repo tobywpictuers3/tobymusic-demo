@@ -35,10 +35,10 @@ async function canvasToPdfBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   const y = (pageH - drawH) / 2;
 
   const enc = new TextEncoder();
-  const parts: (string | Uint8Array)[] = [];
+  const parts: (string | ArrayBuffer)[] = [];
   const objOffsets: number[] = [];
-  const push = (p: string | Uint8Array) => parts.push(p);
-  const len = () => parts.reduce((s, p) => s + (typeof p === "string" ? enc.encode(p).length : p.length), 0);
+  const push = (p: string | Uint8Array) => parts.push(typeof p === 'string' ? p : p.buffer.slice(p.byteOffset, p.byteOffset + p.byteLength) as ArrayBuffer);
+  const len = () => parts.reduce((s, p) => s + (typeof p === "string" ? enc.encode(p).length : p.byteLength), 0);
 
   push("%PDF-1.3\n");
 
@@ -106,9 +106,11 @@ async function blobToImage(blob: Blob): Promise<HTMLImageElement> {
  */
 async function renderPdfFirstPageToCanvas(pdfBlob: Blob, targetW: number, targetH: number): Promise<HTMLCanvasElement> {
   // Lazy import — will work only if pdfjs-dist exists in project
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const pdfjs = await import("pdfjs-dist");
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // @ts-ignore - pdfjs-dist may not be installed
+  const pdfjs = await import("pdfjs-dist").catch(() => null);
+  if (!pdfjs) throw new Error("pdfjs-dist not installed");
+  
+  // @ts-ignore
   const workerSrc = await import("pdfjs-dist/build/pdf.worker?url").catch(() => null);
 
   // @ts-ignore

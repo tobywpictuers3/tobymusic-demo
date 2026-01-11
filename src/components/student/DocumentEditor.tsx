@@ -109,12 +109,12 @@ async function canvasToPdfBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   const y = (pageH - drawH) / 2;
 
   const enc = new TextEncoder();
-  const parts: (string | Uint8Array)[] = [];
+  const parts: (string | ArrayBuffer)[] = [];
   const objOffsets: number[] = [];
 
-  const push = (p: string | Uint8Array) => parts.push(p);
+  const push = (p: string | Uint8Array) => parts.push(typeof p === 'string' ? p : p.buffer.slice(p.byteOffset, p.byteOffset + p.byteLength) as ArrayBuffer);
   const len = () =>
-    parts.reduce((s, p) => s + (typeof p === "string" ? enc.encode(p).length : p.length), 0);
+    parts.reduce((s, p) => s + (typeof p === "string" ? enc.encode(p).length : p.byteLength), 0);
 
   push("%PDF-1.3\n");
 
