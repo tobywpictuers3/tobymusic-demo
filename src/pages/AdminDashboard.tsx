@@ -9,6 +9,7 @@ import { hybridSync } from '@/lib/hybridSync';
 import { PrintPDFButton } from '@/components/ui/print-pdf-button';
 import { SaveButton } from '@/components/ui/save-button';
 import { UnreadMessagesBadge } from '@/components/ui/unread-messages-badge';
+import SyncStatusBadge from '@/components/ui/SyncStatusBadge';
 import { clearClientCaches } from '@/lib/cacheManager';
 
 // Import components
@@ -110,6 +111,7 @@ const AdminDashboard = () => {
               </h1>
               <div className="flex gap-2 items-center">
                 <UnreadMessagesBadge userId="admin" />
+                <SyncStatusBadge />
                 <div className="relative">
                   <SaveButton />
                   <div className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -192,15 +194,15 @@ const AdminDashboard = () => {
               <PaymentManagement />
             </TabsContent>
 
-          <TabsContent value="performances">
-            <PerformancesManagement />
-          </TabsContent>
+            <TabsContent value="performances">
+              <PerformancesManagement />
+            </TabsContent>
 
-          <TabsContent value="practice">
-            <AdminPracticeStats />
-          </TabsContent>
+            <TabsContent value="practice">
+              <AdminPracticeStats />
+            </TabsContent>
 
-          <TabsContent value="messages">
+            <TabsContent value="messages">
               <MessagingTab />
             </TabsContent>
 
@@ -212,7 +214,7 @@ const AdminDashboard = () => {
                     לחצי על הכפתור למטה כדי למחוק את כל נתוני האימונים, ההישגים החודשיים והמדליות.
                     פעולה זו תאפשר להתחיל מחדש מנקודת שוויון.
                   </p>
-                  <Button 
+                  <Button
                     onClick={handleClearPracticeData}
                     variant="destructive"
                     className="w-full sm:w-auto"
