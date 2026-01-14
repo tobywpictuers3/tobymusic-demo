@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,10 @@ import { getCurrentUser, setCurrentUser, getStudents } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import { Student, Lesson } from "@/lib/types";
 import { getAllLessonsIncludingTemplates } from "@/lib/lessonUtils";
-import { useAccessMode } from "@/contexts/AccessModeContext";
 import { clearClientCaches } from "@/lib/cacheManager";
 
 import EditableStudentDetails from "@/components/student/EditableStudentDetails";
+import GeneralWeeklySchedule from "@/components/student/GeneralWeeklySchedule";
 import ContactsList from "@/components/student/ContactsList";
 import StudentFiles from "@/components/student/StudentFiles";
 import PaymentAlert from "@/components/student/PaymentAlert";
@@ -28,24 +28,17 @@ import SyncStatusBadge from "@/components/ui/SyncStatusBadge";
 
 import Metronome from "./Metronome";
 
-// ✅ החזרת המערכת הישנה + החלפות
-import StudentWeeklySchedule from "@/components/student/StudentWeeklySchedule";
-import StudentSwapPanel, { StudentSwapPanelRef } from "@/components/student/StudentSwapPanel";
+// ✅ החזרת “פלטפורמת החלפות” היציבה (לא תלויה בנתיבי swap panel מיוחדים)
+import SwapRequestForm from "@/components/student/SwapRequestForm";
+import SwapRequestsStatus from "@/components/student/SwapRequestsStatus";
 
 const StudentDashboard = () => {
   const { studentId } = useParams();
   const navigate = useNavigate();
-  const { accessMode } = useAccessMode();
 
   const [student, setStudent] = useState<Student | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [activeTab, setActiveTab] = useState("schedule");
-
-  // ✅ מצב שמדליק “מצב בחירה” במערכת השבועית (שלבים 2–3)
-  const [isSelectionActive, setIsSelectionActive] = useState(false);
-
-  // ✅ חיבור בין הקליק במערכת לבין StudentSwapPanel
-  const swapPanelRef = useRef<StudentSwapPanelRef | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -154,7 +147,6 @@ const StudentDashboard = () => {
 
           <TabsTrigger value="practice">מעקב אימונים</TabsTrigger>
 
-          {/* ✅ לשונית אם */}
           <TabsTrigger value="aids">עזרים</TabsTrigger>
 
           <TabsTrigger value="medals">המדליות שלי</TabsTrigger>
@@ -179,34 +171,19 @@ const StudentDashboard = () => {
           <TabsTrigger value="files">קבצים</TabsTrigger>
         </TabsList>
 
-        {/* ✅ מערכת שבועית + החלפות (חזר למבנה שהיה) */}
+        {/* ✅ מערכת שבועית + פלטפורמת החלפות (כמו שהיה בעבר, בצורה בטוחה לבילד) */}
         <TabsContent value="schedule" className="space-y-6">
-          <StudentWeeklySchedule
-            studentId={student.id}
-            isSelectionActive={isSelectionActive}
-            onLessonDoubleClick={(lesson) =>
-              swapPanelRef.current?.handleLessonDoubleClick(lesson)
-            }
-          />
+          <GeneralWeeklySchedule studentId={student.id} lessons={lessons} />
 
-          <StudentSwapPanel
-            ref={swapPanelRef}
-            student={student}
-            lessons={lessons}
-            students={getStudents()}
-            onStepChange={(step) => setIsSelectionActive(step === 2 || step === 3)}
-            onSwapCompleted={() => {
-              const allLessons = getAllLessonsIncludingTemplates();
-              setLessons(allLessons);
-            }}
-          />
+          {/* פלטפורמת ההחלפות – אחרי המערכת השבועית */}
+          <SwapRequestForm studentId={student.id} />
+          <SwapRequestsStatus studentId={student.id} />
         </TabsContent>
 
         <TabsContent value="practice" className="space-y-6">
           <PracticeTracking studentId={student.id} />
         </TabsContent>
 
-        {/* ✅ עזרים: בפנים יהיו 3 לשוניות משנה בתוך Metronome.tsx */}
         <TabsContent value="aids" className="space-y-6">
           <Metronome />
         </TabsContent>
