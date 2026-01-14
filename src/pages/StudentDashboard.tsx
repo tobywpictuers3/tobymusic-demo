@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { useAccessMode } from "@/contexts/AccessModeContext";
 import { clearClientCaches } from "@/lib/cacheManager";
 
 import EditableStudentDetails from "@/components/student/EditableStudentDetails";
-import GeneralWeeklySchedule from "@/components/student/GeneralWeeklySchedule";
 import ContactsList from "@/components/student/ContactsList";
 import StudentFiles from "@/components/student/StudentFiles";
 import PaymentAlert from "@/components/student/PaymentAlert";
@@ -29,6 +28,10 @@ import SyncStatusBadge from "@/components/ui/SyncStatusBadge";
 
 import Metronome from "./Metronome";
 
+// ✅ החזרת המערכת הישנה + החלפות
+import StudentWeeklySchedule from "@/components/student/StudentWeeklySchedule";
+import StudentSwapPanel, { StudentSwapPanelRef } from "@/components/student/StudentSwapPanel";
+
 const StudentDashboard = () => {
   const { studentId } = useParams();
   const navigate = useNavigate();
@@ -37,6 +40,12 @@ const StudentDashboard = () => {
   const [student, setStudent] = useState<Student | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [activeTab, setActiveTab] = useState("schedule");
+
+  // ✅ מצב שמדליק “מצב בחירה” במערכת השבועית (שלבים 2–3)
+  const [isSelectionActive, setIsSelectionActive] = useState(false);
+
+  // ✅ חיבור בין הקליק במערכת לבין StudentSwapPanel
+  const swapPanelRef = useRef<StudentSwapPanelRef | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -170,8 +179,27 @@ const StudentDashboard = () => {
           <TabsTrigger value="files">קבצים</TabsTrigger>
         </TabsList>
 
+        {/* ✅ מערכת שבועית + החלפות (חזר למבנה שהיה) */}
         <TabsContent value="schedule" className="space-y-6">
-          <GeneralWeeklySchedule studentId={student.id} lessons={lessons} />
+          <StudentWeeklySchedule
+            studentId={student.id}
+            isSelectionActive={isSelectionActive}
+            onLessonDoubleClick={(lesson) =>
+              swapPanelRef.current?.handleLessonDoubleClick(lesson)
+            }
+          />
+
+          <StudentSwapPanel
+            ref={swapPanelRef}
+            student={student}
+            lessons={lessons}
+            students={getStudents()}
+            onStepChange={(step) => setIsSelectionActive(step === 2 || step === 3)}
+            onSwapCompleted={() => {
+              const allLessons = getAllLessonsIncludingTemplates();
+              setLessons(allLessons);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="practice" className="space-y-6">
