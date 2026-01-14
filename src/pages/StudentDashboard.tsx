@@ -28,9 +28,10 @@ import SyncStatusBadge from "@/components/ui/SyncStatusBadge";
 
 import Metronome from "./Metronome";
 
-// ✅ החזרת “פלטפורמת החלפות” היציבה (לא תלויה בנתיבי swap panel מיוחדים)
-import SwapRequestForm from "@/components/student/SwapRequestForm";
-import SwapRequestsStatus from "@/components/student/SwapRequestsStatus";
+// ✅ הלוגיקה העדכנית של החלפות (קודים + בחירת שיעורים + אישור אוטומטי)
+import StudentSwapPanel, {
+  StudentSwapPanelRef,
+} from "@/components/student/lessonSwap/StudentSwapPanel";
 
 const StudentDashboard = () => {
   const { studentId } = useParams();
@@ -39,6 +40,18 @@ const StudentDashboard = () => {
   const [student, setStudent] = useState<Student | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [activeTab, setActiveTab] = useState("schedule");
+
+  // Swap wiring (latest logic)
+  const [swapPanelRef, setSwapPanelRef] = useState<StudentSwapPanelRef | null>(
+    null
+  );
+  const [currentSwapStep, setCurrentSwapStep] = useState<1 | 2 | 3 | 4>(1);
+  const [isSwapSelectionActive, setIsSwapSelectionActive] = useState(false);
+
+  // keep schedule highlight in sync with swap step (2-3 = selection)
+  useEffect(() => {
+    setIsSwapSelectionActive(currentSwapStep === 2 || currentSwapStep === 3);
+  }, [currentSwapStep]);
 
   useEffect(() => {
     const load = async () => {
@@ -69,8 +82,8 @@ const StudentDashboard = () => {
 
         setStudent(found);
 
-        const allLessons = getAllLessonsIncludingTemplates();
-        setLessons(allLessons);
+        // load lessons (including templates)
+        setLessons(getAllLessonsIncludingTemplates());
       } catch (e) {
         console.error(e);
         toast({
@@ -96,6 +109,16 @@ const StudentDashboard = () => {
     );
   }
 
+  const refreshLessons = () => {
+    setLessons(getAllLessonsIncludingTemplates());
+  };
+
+  const handleLessonDoubleClick = (lesson: Lesson) => {
+    if (swapPanelRef) {
+      swapPanelRef.handleLessonDoubleClick(lesson);
+    }
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
     clearClientCaches();
@@ -108,6 +131,8 @@ const StudentDashboard = () => {
     const found = students.find((s) => s?.id === student.id);
     if (found) setStudent(found);
   };
+
+  const allStudents = getStudents();
 
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-6">
@@ -146,7 +171,6 @@ const StudentDashboard = () => {
           </TabsTrigger>
 
           <TabsTrigger value="practice">מעקב אימונים</TabsTrigger>
-
           <TabsTrigger value="aids">עזרים</TabsTrigger>
 
           <TabsTrigger value="medals">המדליות שלי</TabsTrigger>
@@ -171,13 +195,24 @@ const StudentDashboard = () => {
           <TabsTrigger value="files">קבצים</TabsTrigger>
         </TabsList>
 
-        {/* ✅ מערכת שבועית + פלטפורמת החלפות (כמו שהיה בעבר, בצורה בטוחה לבילד) */}
+        {/* ✅ מערכת שבועית + החלפות (הלוגיקה החדשה) */}
         <TabsContent value="schedule" className="space-y-6">
-          <GeneralWeeklySchedule studentId={student.id} lessons={lessons} />
+          <GeneralWeeklySchedule
+            studentId={student.id}
+            lessons={lessons}
+            onLessonDoubleClick={handleLessonDoubleClick}
+            isSelectionActive={isSwapSelectionActive}
+            currentSwapStep={currentSwapStep}
+          />
 
-          {/* פלטפורמת ההחלפות – אחרי המערכת השבועית */}
-          <SwapRequestForm studentId={student.id} />
-          <SwapRequestsStatus studentId={student.id} />
+          <StudentSwapPanel
+            student={student}
+            lessons={lessons}
+            students={allStudents}
+            onMount={(ref) => setSwapPanelRef(ref)}
+            onStepChange={(step) => setCurrentSwapStep(step)}
+            onSwapCompleted={refreshLessons}
+          />
         </TabsContent>
 
         <TabsContent value="practice" className="space-y-6">
