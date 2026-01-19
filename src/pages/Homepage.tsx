@@ -125,7 +125,7 @@ const Homepage = () => {
           <div className="flex justify-center mb-8">
             <div className="relative">
               <img 
-                src="/lovable-uploads/927cfa3a-499f-41be-88c0-71a5351d7335.png" 
+                src="/lovable-uploads/toby-music-logo.png" 
                 alt="לוגו טובי וינברג" 
                 className="h-48 w-48 logo-crown float crown-glow object-contain"
               />
