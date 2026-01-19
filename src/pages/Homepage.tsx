@@ -129,95 +129,92 @@ const Homepage = () => {
             className="w-full h-auto object-contain"
           />
           
-          {/* Welcome Card - Overlapping bottom of banner */}
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-full max-w-4xl px-4">
-            <div className="bg-black/80 backdrop-blur-md rounded-2xl border-2 border-accent/30 p-6 md:p-8 shadow-gold">
-              <h1 className="text-2xl md:text-4xl font-bold text-accent mb-4 md:mb-6 drop-shadow-[0_0_20px_rgba(234,179,8,0.5)] text-center">
+          {/* Welcome Card - At the TOP of banner */}
+          <div className="absolute top-4 md:top-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4">
+            <div className="bg-black/80 backdrop-blur-md rounded-2xl border-2 border-accent/30 p-4 md:p-6 shadow-gold">
+              <h1 className="text-xl md:text-3xl font-bold text-accent mb-2 md:mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.5)] text-center">
                 ברוכות הבאות למערכת המוסיקלית של טובי וינברג
               </h1>
-              <div className="text-base md:text-lg text-foreground leading-relaxed space-y-2 text-center">
+              <div className="text-sm md:text-base text-foreground leading-relaxed space-y-1 text-center">
                 <p>דרך מערכת זו תוכלי לנהל ולהתנהל עם כל הנושאים הטכניים של השיעורים-</p>
                 <p>מערכת השיעורים, החלפות, נתוני תשלומים ועוד.</p>
               </div>
             </div>
           </div>
-        </div>
-        
-        {/* Spacer for overlapping welcome card */}
-        <div className="h-32 md:h-40"></div>
-        
-        {/* Login Cards - Positioned after welcome overlap */}
-        <div className="container mx-auto px-4 mt-8">
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {/* Admin Login */}
-            <Card className="relative overflow-hidden backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
-              <div className="absolute inset-0" style={{ backgroundImage: 'url(/toby-music-banner.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
-              <div className="absolute inset-0 bg-black/60"></div>
-              <CardHeader className="text-center relative z-10 pb-2">
-                <CardTitle className="text-xl text-foreground font-bold">כניסת מנהל</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 relative z-10 pt-2">
-                <div className="mx-auto p-3 bg-primary/20 rounded-full w-fit gold-shadow border border-accent/30">
-                  <Shield className="h-8 w-8 text-accent drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
-                </div>
-                <div>
-                  <Label htmlFor="admin-code" className="text-sm font-medium text-foreground">
-                    קוד מנהל
-                  </Label>
-                  <Input
-                    id="admin-code"
-                    type="password"
-                    value={adminCode}
-                    onChange={(e) => setAdminCode(e.target.value)}
-                    placeholder="הקש קוד מנהל"
-                    className="mt-1 bg-black/50 border-accent/30 text-foreground placeholder:text-muted-foreground"
-                    onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
-                  />
-                </div>
-                <Button 
-                  onClick={handleAdminLogin}
-                  className="w-full gold-gradient hover:scale-105 transition-musical text-accent-foreground font-semibold py-3 shadow-gold border border-accent/20"
-                >
-                  כניסה
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                </Button>
-              </CardContent>
-            </Card>
+          
+          {/* Login Cards - At the BOTTOM of banner, inside it */}
+          <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4">
+            <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+              {/* Admin Login */}
+              <Card className="relative overflow-hidden backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
+                <div className="absolute inset-0" style={{ backgroundImage: 'url(/toby-music-banner.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                <div className="absolute inset-0 bg-black/70"></div>
+                <CardHeader className="text-center relative z-10 pb-2">
+                  <CardTitle className="text-lg md:text-xl text-foreground font-bold">כניסת מנהל</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 relative z-10 pt-2">
+                  <div className="mx-auto p-2 md:p-3 bg-primary/20 rounded-full w-fit gold-shadow border border-accent/30">
+                    <Shield className="h-6 w-6 md:h-8 md:w-8 text-accent drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
+                  </div>
+                  <div>
+                    <Label htmlFor="admin-code" className="text-sm font-medium text-foreground">
+                      קוד מנהל
+                    </Label>
+                    <Input
+                      id="admin-code"
+                      type="password"
+                      value={adminCode}
+                      onChange={(e) => setAdminCode(e.target.value)}
+                      placeholder="הקש קוד מנהל"
+                      className="mt-1 bg-black/50 border-accent/30 text-foreground placeholder:text-muted-foreground"
+                      onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleAdminLogin}
+                    className="w-full gold-gradient hover:scale-105 transition-musical text-accent-foreground font-semibold py-2 md:py-3 shadow-gold border border-accent/20"
+                  >
+                    כניסה
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                  </Button>
+                </CardContent>
+              </Card>
 
-            {/* Student Personal Login */}
-            <Card className="relative overflow-hidden backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
-              <div className="absolute inset-0" style={{ backgroundImage: 'url(/toby-music-banner.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
-              <div className="absolute inset-0 bg-black/60"></div>
-              <CardHeader className="text-center relative z-10 pb-2">
-                <CardTitle className="text-xl text-foreground font-bold">אזור אישי</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 relative z-10 pt-2">
-                <div className="mx-auto p-3 bg-accent/20 rounded-full w-fit gold-shadow border border-accent/30">
-                  <GraduationCap className="h-8 w-8 text-accent drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
-                </div>
-                <div>
-                  <Label htmlFor="student-code" className="text-sm font-medium text-foreground">
-                    קוד אישי
-                  </Label>
-                  <Input
-                    id="student-code"
-                    type="text"
-                    value={studentCode}
-                    onChange={(e) => setStudentCode(e.target.value)}
-                    placeholder="הקישי קוד אישי"
-                    className="mt-1 bg-black/50 border-accent/30 text-foreground placeholder:text-muted-foreground"
-                    onKeyPress={(e) => e.key === 'Enter' && handleStudentLogin()}
-                  />
-                </div>
-                <Button 
-                  onClick={handleStudentLogin}
-                  className="w-full gold-gradient hover:scale-105 transition-musical text-accent-foreground font-semibold py-3 shadow-gold border border-accent/20"
-                >
-                  כניסה לאזור אישי
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                </Button>
-              </CardContent>
-            </Card>
+              {/* Student Personal Login */}
+              <Card className="relative overflow-hidden backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
+                <div className="absolute inset-0" style={{ backgroundImage: 'url(/toby-music-banner.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                <div className="absolute inset-0 bg-black/70"></div>
+                <CardHeader className="text-center relative z-10 pb-2">
+                  <CardTitle className="text-lg md:text-xl text-foreground font-bold">אזור אישי</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 relative z-10 pt-2">
+                  <div className="mx-auto p-2 md:p-3 bg-accent/20 rounded-full w-fit gold-shadow border border-accent/30">
+                    <GraduationCap className="h-6 w-6 md:h-8 md:w-8 text-accent drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
+                  </div>
+                  <div>
+                    <Label htmlFor="student-code" className="text-sm font-medium text-foreground">
+                      קוד אישי
+                    </Label>
+                    <Input
+                      id="student-code"
+                      type="text"
+                      value={studentCode}
+                      onChange={(e) => setStudentCode(e.target.value)}
+                      placeholder="הקישי קוד אישי"
+                      className="mt-1 bg-black/50 border-accent/30 text-foreground placeholder:text-muted-foreground"
+                      onKeyPress={(e) => e.key === 'Enter' && handleStudentLogin()}
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleStudentLogin}
+                    className="w-full gold-gradient hover:scale-105 transition-musical text-accent-foreground font-semibold py-2 md:py-3 shadow-gold border border-accent/20"
+                  >
+                    כניסה לאזור אישי
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
