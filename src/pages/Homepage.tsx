@@ -119,6 +119,15 @@ const Homepage = () => {
       {/* Dark Overlay for Better Contrast */}
       <div className="fixed inset-0 bg-black/30 z-[1]"></div>
       
+      {/* Full Width Banner */}
+      <div className="relative z-10 w-full">
+        <img 
+          src="/toby-music-banner.png" 
+          alt="Toby Music Banner" 
+          className="w-full h-auto object-contain"
+        />
+      </div>
+      
       <div className="relative z-10 container mx-auto p-4 space-y-8">
         {/* Header with Logo */}
         <div className="text-center py-12">
@@ -187,8 +196,9 @@ const Homepage = () => {
         {/* Login Cards */}
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {/* Admin Login */}
-          <Card className="relative overflow-hidden bg-black/70 backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url(/logo-background.png)', backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}></div>
+          <Card className="relative overflow-hidden backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
+            <div className="absolute inset-0" style={{ backgroundImage: 'url(/toby-music-banner.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+            <div className="absolute inset-0 bg-black/50"></div>
             <CardHeader className="text-center relative z-10">
               <div className="mx-auto mb-4 p-4 bg-primary/20 rounded-full w-fit gold-shadow border border-accent/30">
                 <Shield className="h-10 w-10 text-accent drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
@@ -221,8 +231,9 @@ const Homepage = () => {
           </Card>
 
           {/* Student Personal Login */}
-          <Card className="relative overflow-hidden bg-black/70 backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url(/logo-background.png)', backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}></div>
+          <Card className="relative overflow-hidden backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
+            <div className="absolute inset-0" style={{ backgroundImage: 'url(/toby-music-banner.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+            <div className="absolute inset-0 bg-black/50"></div>
             <CardHeader className="text-center relative z-10">
               <div className="mx-auto mb-4 p-4 bg-accent/20 rounded-full w-fit gold-shadow border border-accent/30">
                 <GraduationCap className="h-10 w-10 text-accent drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
