@@ -15,6 +15,7 @@ import StudentsSystem from "./pages/StudentsSystem";
 import StudentsViewSystem from "./pages/StudentsViewSystem";
 import NotFound from "./pages/NotFound";
 import Metronome from "./pages/Metronome";
+import BsiataDishmaya from "./components/ui/BsiataDishmaya";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const AppContent = () => {
   
   return (
     <>
+      <BsiataDishmaya />
       <Toaster />
       <Sonner />
       <BrowserRouter>

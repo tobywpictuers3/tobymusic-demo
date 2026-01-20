@@ -408,4 +408,20 @@
     opacity: 0.03;
     filter: brightness(1.5);
   }
+
+  /* Sparkle Text Animation for בסיעתא דשמיא */
+  @keyframes sparkle-text {
+    0%, 100% {
+      opacity: 0.7;
+      text-shadow: 0 0 5px hsl(45 95% 55% / 0.5), 0 0 10px hsl(45 95% 55% / 0.3);
+    }
+    50% {
+      opacity: 1;
+      text-shadow: 0 0 15px hsl(45 95% 55% / 0.9), 0 0 25px hsl(45 95% 55% / 0.6), 0 0 35px hsl(45 95% 55% / 0.4);
+    }
+  }
+
+  .animate-sparkle-text {
+    animation: sparkle-text 2s ease-in-out infinite;
+  }
 }

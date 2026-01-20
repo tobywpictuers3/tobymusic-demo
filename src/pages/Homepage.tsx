@@ -129,8 +129,8 @@ const Homepage = () => {
             className="w-full h-auto object-contain"
           />
           
-          {/* Welcome Card - At the TOP of banner */}
-          <div className="absolute top-4 md:top-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4">
+          {/* Welcome Card - At the TOP of banner, 80% width */}
+          <div className="absolute top-4 md:top-8 left-1/2 -translate-x-1/2 w-[80%] px-4">
             <div className="bg-black/80 backdrop-blur-md rounded-2xl border-2 border-accent/30 p-4 md:p-6 shadow-gold">
               <h1 className="text-xl md:text-3xl font-bold text-accent mb-2 md:mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.5)] text-center">
                 ברוכות הבאות למערכת המוסיקלית של טובי וינברג
@@ -147,15 +147,12 @@ const Homepage = () => {
             <div className="grid md:grid-cols-2 gap-4 md:gap-6">
               {/* Admin Login */}
               <Card className="relative overflow-hidden backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
-                <div className="absolute inset-0" style={{ backgroundImage: 'url(/toby-music-banner.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
-                <div className="absolute inset-0 bg-black/70"></div>
+                <div className="absolute inset-0" style={{ backgroundImage: 'url(/login-card-bg.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                <div className="absolute inset-0 bg-black/60"></div>
                 <CardHeader className="text-center relative z-10 pb-2">
                   <CardTitle className="text-lg md:text-xl text-foreground font-bold">כניסת מנהל</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 relative z-10 pt-2">
-                  <div className="mx-auto p-2 md:p-3 bg-primary/20 rounded-full w-fit gold-shadow border border-accent/30">
-                    <Shield className="h-6 w-6 md:h-8 md:w-8 text-accent drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
-                  </div>
                   <div>
                     <Label htmlFor="admin-code" className="text-sm font-medium text-foreground">
                       קוד מנהל
@@ -182,15 +179,12 @@ const Homepage = () => {
 
               {/* Student Personal Login */}
               <Card className="relative overflow-hidden backdrop-blur-md border-2 border-accent/40 hover:border-accent/60 transition-all duration-300 shadow-gold hover:shadow-hover">
-                <div className="absolute inset-0" style={{ backgroundImage: 'url(/toby-music-banner.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
-                <div className="absolute inset-0 bg-black/70"></div>
+                <div className="absolute inset-0" style={{ backgroundImage: 'url(/login-card-bg.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                <div className="absolute inset-0 bg-black/60"></div>
                 <CardHeader className="text-center relative z-10 pb-2">
                   <CardTitle className="text-lg md:text-xl text-foreground font-bold">אזור אישי</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 relative z-10 pt-2">
-                  <div className="mx-auto p-2 md:p-3 bg-accent/20 rounded-full w-fit gold-shadow border border-accent/30">
-                    <GraduationCap className="h-6 w-6 md:h-8 md:w-8 text-accent drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
-                  </div>
                   <div>
                     <Label htmlFor="student-code" className="text-sm font-medium text-foreground">
                       קוד אישי
