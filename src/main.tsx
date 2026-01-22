@@ -1,124 +1,167 @@
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'
-import { hybridSync } from './lib/hybridSync';
-import { logger } from './lib/logger';
-import { clearPracticeAndMedalData, setDevMode } from './lib/storage';
-import { clearClientCaches } from './lib/cacheManager';
-// Show loading screen
-const root = document.getElementById("root")!;
-root.innerHTML = `
-  <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-    <div style="text-align: center; color: white;">
-      <div style="font-size: 48px; margin-bottom: 16px;">🎵</div>
-      <div style="font-size: 24px; font-weight: bold; margin-bottom: 8px;">טוען...</div>
-      <div style="font-size: 16px; opacity: 0.9;">אנא המתן</div>
-    </div>
-  </div>
-`;
+import { createRoot } from "react-dom/client";
+import App from "./App.tsx";
+import "./index.css";
+import { hybridSync } from "./lib/hybridSync";
+import { logger } from "./lib/logger";
+import { setDevMode } from "./lib/storage";
 
-// localStorage cleanup function (not used automatically anymore)
-const cleanupLocalStorage = () => {
-  const keysToKeep = ['hybridSync_session'];
-  const allKeys = Object.keys(localStorage);
-  
-  allKeys.forEach(key => {
-    if (!keysToKeep.includes(key)) {
-      localStorage.removeItem(key);
-    }
-  });
-  
-  logger.info('🧹 localStorage cleaned - only session data kept');
+// Root element
+const root = document.getElementById("root")!;
+
+/**
+ * Minimal boot screens that follow TOBY MUSIC design language:
+ * - Background: #0B0B0B
+ * - Accent: #E6B65C
+ * - No emoji
+ * - No non-brand gradients
+ */
+const renderBootScreen = (opts: {
+  title: string;
+  subtitle?: string;
+  showRetry?: boolean;
+}) => {
+  const { title, subtitle, showRetry } = opts;
+
+  root.innerHTML = `
+    <div style="
+      min-height: 100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#0B0B0B;
+      color:#FFFFFF;
+      padding:24px;
+    ">
+      <div style="
+        width:min(520px, 100%);
+        border:1px solid rgba(230,182,92,0.35);
+        border-radius:6px;
+        background:#161616;
+        padding:28px 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,0.60);
+        text-align:center;
+      ">
+        <div style="
+          font-size:22px;
+          font-weight:600;
+          letter-spacing:0.2px;
+          color:#E6B65C;
+          margin-bottom:10px;
+        ">Toby Music</div>
+
+        <div style="
+          font-size:18px;
+          font-weight:600;
+          color:#FFFFFF;
+          margin-bottom:10px;
+        ">${title}</div>
+
+        ${
+          subtitle
+            ? `<div style="font-size:14px; line-height:1.6; color:rgba(255,255,255,0.78); margin-bottom:${showRetry ? "18px" : "0"};">
+                ${subtitle}
+               </div>`
+            : ""
+        }
+
+        ${
+          showRetry
+            ? `<button
+                onclick="window.location.reload()"
+                style="
+                  border:1px solid #E6B65C;
+                  color:#E6B65C;
+                  background:transparent;
+                  padding:12px 18px;
+                  border-radius:6px;
+                  font-size:14px;
+                  font-weight:600;
+                  cursor:pointer;
+                "
+                onmouseover="this.style.background='rgba(230,182,92,0.12)';"
+                onmouseout="this.style.background='transparent';"
+              >
+                נסי שוב
+              </button>`
+            : ""
+        }
+      </div>
+    </div>
+  `;
 };
 
+// Show loading screen immediately
+renderBootScreen({ title: "טוען…", subtitle: "אנא המתן" });
+
 // Register Service Worker for PWA (minimal, network-first)
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
     try {
       // Unregister old SWs first
       const registrations = await navigator.serviceWorker.getRegistrations();
       for (const registration of registrations) {
         await registration.unregister();
-        logger.info('🗑️ Old ServiceWorker unregistered');
+        logger.info("🗑️ Old ServiceWorker unregistered");
       }
 
       // Register new clean SW
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        updateViaCache: 'none', // Never cache SW file itself
-        scope: '/'
+      const registration = await navigator.serviceWorker.register("/sw.js", {
+        updateViaCache: "none",
+        scope: "/",
       });
 
       // Force update check on every load
       registration.update();
 
-      logger.info('✅ ServiceWorker registered (v1.0.2)');
-      
-      // Listen for updates
-      registration.addEventListener('updatefound', () => {
+      logger.info("✅ ServiceWorker registered (v1.0.2)");
+
+      registration.addEventListener("updatefound", () => {
         const newWorker = registration.installing;
         if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'activated') {
-              logger.info('🔄 New ServiceWorker activated');
+          newWorker.addEventListener("statechange", () => {
+            if (newWorker.state === "activated") {
+              logger.info("🔄 New ServiceWorker activated");
             }
           });
         }
       });
     } catch (error) {
-      logger.error('❌ ServiceWorker registration failed:', error);
+      logger.error("❌ ServiceWorker registration failed:", error);
     }
   });
 }
 
-// ❌ REMOVED: clearClientCaches() on load - causes conflicts with SW
-
-// ❌ REMOVED: Don't clean localStorage on app close
-// All data is in inMemoryStorage, and hybridSync handles beforeunload sync
-
 // Load data from Worker before starting the app
 async function initializeApp() {
   try {
-    logger.info('Starting app initialization...');
-    
-    // 🔒 CRITICAL: Ensure dev mode BEFORE loading any data
-    const forceDevByRoute = window.location.pathname.startsWith('/dev-admin');
+    logger.info("Starting app initialization...");
+
+    // 🔒 Ensure dev mode BEFORE loading any data
+    const forceDevByRoute = window.location.pathname.startsWith("/dev-admin");
     if (forceDevByRoute) {
       setDevMode(true);
-      sessionStorage.setItem('musicSystem_devMode', 'true');
-      logger.info('🔧 Dev mode forced by route - NO data will be loaded from Worker');
+      sessionStorage.setItem("musicSystem_devMode", "true");
+      logger.info("🔧 Dev mode forced by route - NO data will be loaded from Worker");
     }
 
-    const isDevModeActive = sessionStorage.getItem('musicSystem_devMode') === 'true';
+    const isDevModeActive = sessionStorage.getItem("musicSystem_devMode") === "true";
     if (isDevModeActive) {
       setDevMode(true);
-      logger.info('🔧 Dev mode active - NO data will be loaded from Worker');
+      logger.info("🔧 Dev mode active - NO data will be loaded from Worker");
     }
-    
+
     await hybridSync.loadDataOnInit();
-    logger.info('Data loaded successfully');
+    logger.info("Data loaded successfully");
+
     createRoot(root).render(<App />);
   } catch (error) {
-    logger.error('Failed to initialize app:', error);
-    
-    // Show error screen with retry option
-    root.innerHTML = `
-      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-        <div style="text-align: center; color: white; max-width: 500px; padding: 20px;">
-          <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
-          <div style="font-size: 24px; font-weight: bold; margin-bottom: 16px;">שגיאה בטעינת הנתונים</div>
-          <div style="font-size: 16px; margin-bottom: 24px; opacity: 0.9;">
-            לא הצלחנו לטעון את הנתונים מהשרת.<br/>
-            אנא בדקי את החיבור לאינטרנט ונסי שוב.
-          </div>
-          <button 
-            onclick="window.location.reload()" 
-            style="background: white; color: #667eea; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"
-          >
-            נסי שוב
-          </button>
-        </div>
-      </div>
-    `;
+    logger.error("Failed to initialize app:", error);
+
+    renderBootScreen({
+      title: "שגיאה בטעינת הנתונים",
+      subtitle: "לא הצלחנו לטעון את הנתונים מהשרת. אנא בדקי את החיבור לאינטרנט ונסי שוב.",
+      showRetry: true,
+    });
   }
 }
 
