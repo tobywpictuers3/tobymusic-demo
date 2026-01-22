@@ -1,0 +1,395 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================
+   TOBY MUSIC – DESIGN LANGUAGE & UI SYSTEM
+   Authoritative tokens + utilities (Dark-first)
+   ========================================================= */
+
+/* ---------- Base Tokens (CSS Variables) ---------- */
+@layer base {
+  :root {
+    /* Core Colors (HEX reference in comments)
+       --background: #0B0B0B
+       --card:       #161616
+       --gold-main:  #E6B65C
+       --gold-dark:  #B48A3A
+       --gold-light: #F4D98A (highlight only)
+       --red-wine:   #8C1D18
+    */
+
+    /* Tailwind/shadcn tokens (HSL: h s l) */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Gold = primary accent only */
+    --primary: 43 76% 63%;
+    --primary-foreground: 0 0% 5%;
+
+    /* Dark gold for depth (borders/shadows) */
+    --secondary: 41 52% 47%;
+    --secondary-foreground: 0 0% 98%;
+
+    /* Wine red = emotional accent (never dominant) */
+    --accent: 3 70% 32%;
+    --accent-foreground: 0 0% 98%;
+
+    /* Neutral system */
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 65%;
+
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Inputs / borders */
+    --border: 43 76% 63%;
+    --input: 0 0% 18%;
+    --ring: 43 76% 63%;
+
+    /* Radius (no pills) */
+    --radius: 6px;
+
+    /* Motion */
+    --transition-base: 200ms ease-out;
+    --transition-soft: 300ms ease-out;
+
+    /* ---------- Gradients (Allowed: subtle gold spotlight only) ---------- */
+    /* NOTE: keep these names because tailwind.config.ts references them */
+    --gradient-musical: radial-gradient(
+        80% 60% at 50% 0%,
+        rgba(230, 182, 92, 0.10) 0%,
+        rgba(230, 182, 92, 0.00) 60%
+      ),
+      linear-gradient(180deg, #0B0B0B 0%, #0B0B0B 100%);
+
+    --gradient-hero: radial-gradient(
+        70% 55% at 50% 25%,
+        rgba(230, 182, 92, 0.14) 0%,
+        rgba(230, 182, 92, 0.00) 62%
+      ),
+      linear-gradient(180deg, #0B0B0B 0%, #0B0B0B 100%);
+
+    --gradient-card: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      rgba(255, 255, 255, 0.00) 100%
+    );
+
+    /* ---------- Shadows (No fake “SaaS glow”, only subtle depth) ---------- */
+    --shadow-musical: 0 10px 30px rgba(0, 0, 0, 0.55);
+    --shadow-card: 0 6px 22px rgba(0, 0, 0, 0.45);
+    --shadow-hover: 0 12px 36px rgba(0, 0, 0, 0.60);
+
+    /* ---------- Asset Variables (optional; safe if files missing) ---------- */
+    --img-logo-flat: url("/brand/logo-flat.png");
+    --img-logo-3d: url("/brand/logo-3d.png");
+    --img-logo-color: url("/brand/logo-color.png");
+    --img-bg: url("/brand/bg.png");
+    --img-top-banner: url("/brand/top-banner.png");
+
+    /* Buttons sprites/images (1..20) */
+    --img-btn-01: url("/buttons/btn-01.png");
+    --img-btn-02: url("/buttons/btn-02.png");
+    --img-btn-03: url("/buttons/btn-03.png");
+    --img-btn-04: url("/buttons/btn-04.png");
+    --img-btn-05: url("/buttons/btn-05.png");
+    --img-btn-06: url("/buttons/btn-06.png");
+    --img-btn-07: url("/buttons/btn-07.png");
+    --img-btn-08: url("/buttons/btn-08.png");
+    --img-btn-09: url("/buttons/btn-09.png");
+    --img-btn-10: url("/buttons/btn-10.png");
+    --img-btn-11: url("/buttons/btn-11.png");
+    --img-btn-12: url("/buttons/btn-12.png");
+    --img-btn-13: url("/buttons/btn-13.png");
+    --img-btn-14: url("/buttons/btn-14.png");
+    --img-btn-15: url("/buttons/btn-15.png");
+    --img-btn-16: url("/buttons/btn-16.png");
+    --img-btn-17: url("/buttons/btn-17.png");
+    --img-btn-18: url("/buttons/btn-18.png");
+    --img-btn-19: url("/buttons/btn-19.png");
+    --img-btn-20: url("/buttons/btn-20.png");
+  }
+
+  /* If you later add real Light Mode, define it here in :root and keep .dark overrides.
+     For now: dark-first system only. */
+  .dark {
+    /* intentionally same as :root for consistency */
+  }
+
+  /* ---------- Global Base ---------- */
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Body: Assistant (as per system) */
+    font-family: "Assistant", system-ui, -apple-system, "Segoe UI", "Arial", sans-serif;
+    direction: rtl;
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Accessibility: focus ring in gold */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Links: gold underline only on hover */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  a:hover {
+    color: hsl(var(--primary));
+  }
+
+  /* RTL/LTR helpers */
+  .rtl { direction: rtl; }
+  .ltr { direction: ltr; }
+}
+
+/* ---------- Typography Utilities (Mandatory) ---------- */
+@layer components {
+  /* Headlines */
+  .font-head-en { font-family: "Playfair Display", "Times New Roman", serif; }
+  .font-head-he { font-family: "Frank Ruhl Libre", "Times New Roman", serif; }
+  .font-body    { font-family: "Assistant", system-ui, -apple-system, "Segoe UI", "Arial", sans-serif; }
+
+  /* Type scale */
+  .h1 { font-size: 64px; line-height: 1.15; }
+  .h2 { font-size: 42px; line-height: 1.2; }
+  .h3 { font-size: 32px; line-height: 1.25; }
+  .h4 { font-size: 24px; line-height: 1.3; }
+
+  .body-lg  { font-size: 18px; line-height: 1.6; }
+  .body     { font-size: 16px; line-height: 1.6; }
+  .body-sm  { font-size: 14px; line-height: 1.5; }
+
+  /* No mixed fonts inside a single sentence – enforce by usage:
+     Wrap EN headlines with .font-head-en and HE headlines with .font-head-he
+  */
+}
+
+/* ---------- Buttons (No pills. No shadows.) ---------- */
+@layer components {
+  .btn-primary {
+    border: 1px solid #E6B65C;
+    color: #E6B65C;
+    background: transparent;
+    padding: 14px 28px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: background var(--transition-base), color var(--transition-base), border-color var(--transition-base);
+  }
+  .btn-primary:hover {
+    background: rgba(230, 182, 92, 0.12);
+  }
+
+  .btn-secondary {
+    border: none;
+    color: #FFFFFF;
+    background: transparent;
+    padding: 14px 28px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: color var(--transition-base), text-decoration-color var(--transition-base);
+  }
+  .btn-secondary:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+    text-decoration-color: #E6B65C;
+  }
+
+  /* Optional: image buttons (use when you start uploading 20 buttons) */
+  .btn-img {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    border: 1px solid rgba(230, 182, 92, 0.55);
+    border-radius: 6px;
+    padding: 14px 28px;
+    color: #E6B65C;
+    transition: background var(--transition-base), border-color var(--transition-base);
+  }
+  .btn-img:hover {
+    background-color: rgba(230, 182, 92, 0.08);
+    border-color: rgba(244, 217, 138, 0.85);
+  }
+
+  /* Map 20 image slots */
+  .btn-01 { background-image: var(--img-btn-01); }
+  .btn-02 { background-image: var(--img-btn-02); }
+  .btn-03 { background-image: var(--img-btn-03); }
+  .btn-04 { background-image: var(--img-btn-04); }
+  .btn-05 { background-image: var(--img-btn-05); }
+  .btn-06 { background-image: var(--img-btn-06); }
+  .btn-07 { background-image: var(--img-btn-07); }
+  .btn-08 { background-image: var(--img-btn-08); }
+  .btn-09 { background-image: var(--img-btn-09); }
+  .btn-10 { background-image: var(--img-btn-10); }
+  .btn-11 { background-image: var(--img-btn-11); }
+  .btn-12 { background-image: var(--img-btn-12); }
+  .btn-13 { background-image: var(--img-btn-13); }
+  .btn-14 { background-image: var(--img-btn-14); }
+  .btn-15 { background-image: var(--img-btn-15); }
+  .btn-16 { background-image: var(--img-btn-16); }
+  .btn-17 { background-image: var(--img-btn-17); }
+  .btn-18 { background-image: var(--img-btn-18); }
+  .btn-19 { background-image: var(--img-btn-19); }
+  .btn-20 { background-image: var(--img-btn-20); }
+}
+
+/* ---------- Navigation: text-only + gold underline ---------- */
+@layer components {
+  .nav-link {
+    color: #FFFFFF;
+    transition: color var(--transition-base);
+    text-decoration: none;
+    position: relative;
+  }
+  .nav-link:hover {
+    color: #E6B65C;
+  }
+  .nav-link.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -8px;
+    height: 2px;
+    background: #E6B65C;
+  }
+}
+
+/* ---------- Iconography: line icons only (enforce color) ---------- */
+@layer components {
+  .icon-line {
+    color: #E6B65C;
+    stroke: currentColor;
+    fill: none;
+    transition: color var(--transition-base);
+  }
+  .icon-line:hover {
+    color: #F4D98A;
+  }
+}
+
+/* ---------- Background / Hero Helpers ---------- */
+@layer components {
+  .bg-musical {
+    background: var(--gradient-musical);
+  }
+
+  .hero-banner {
+    background: var(--gradient-hero);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Optional image layer (safe if image missing) */
+  .hero-banner::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--img-top-banner);
+    background-size: cover;
+    background-position: center;
+    opacity: 0.22;
+    filter: saturate(0.9) contrast(1.05);
+    pointer-events: none;
+  }
+
+  /* Burgundy curtain accent (deep wine red only) */
+  .curtain-wine {
+    background: linear-gradient(
+      90deg,
+      rgba(140, 29, 24, 0.35) 0%,
+      rgba(140, 29, 24, 0.05) 40%,
+      rgba(140, 29, 24, 0.00) 60%
+    );
+  }
+
+  .card-surface {
+    background: #161616;
+    background-image: var(--gradient-card);
+    border: 1px solid rgba(230, 182, 92, 0.35);
+    box-shadow: var(--shadow-card);
+    border-radius: 6px;
+  }
+
+  /* Gold spotlight overlay (subtle) */
+  .spotlight-gold {
+    position: relative;
+  }
+  .spotlight-gold::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    background: radial-gradient(
+      60% 55% at 50% 30%,
+      rgba(230, 182, 92, 0.18) 0%,
+      rgba(230, 182, 92, 0.00) 65%
+    );
+    pointer-events: none;
+  }
+}
+
+/* ---------- Motion: fade + slight up only (no bounce) ---------- */
+@layer components {
+  .reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity var(--transition-soft), transform var(--transition-soft);
+    will-change: opacity, transform;
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Scrollbar (subtle, gold accent) ---------- */
+@layer base {
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(255,255,255,0.06); }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(230, 182, 92, 0.55);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(244, 217, 138, 0.70);
+  }
+}
+
+/* ---------- Print: clean ---------- */
+@layer base {
+  @media print {
+    .no-print { display: none !important; }
+    body { background: white !important; color: black !important; }
+    * {
+      background: transparent !important;
+      color: black !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+    a, a:visited { text-decoration: underline; }
+  }
+}
