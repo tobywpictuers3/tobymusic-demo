@@ -2,36 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * TOBY MUSIC – Local styles only
- * All design tokens (colors, fonts, etc.) come from external CDN via BrandProvider
- * This file contains only: Tailwind directives, body reset, and essential animations
- */
-
 @layer base {
+  html {
+    direction: rtl;
+  }
+
   body {
     @apply bg-background text-foreground;
-    direction: rtl;
-    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-
-  * {
-    @apply border-border;
-  }
-}
-
-/* Sparkle animation for בסיעתא דשמיא overlay */
-@keyframes sparkle-text {
-  0%, 100% {
-    opacity: 0.7;
-    text-shadow: 0 0 4px currentColor;
-  }
-  50% {
-    opacity: 1;
-    text-shadow: 0 0 12px currentColor, 0 0 20px currentColor;
-  }
-}
-
-.sparkle-text {
-  animation: sparkle-text 2s ease-in-out infinite;
 }
