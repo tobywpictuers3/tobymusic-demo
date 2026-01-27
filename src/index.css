@@ -35,3 +35,63 @@
 .sparkle-text {
   animation: sparkle-text 2s ease-in-out infinite;
 }
+
+@layer utilities {
+  .card-gradient {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card)) 0%,
+      hsl(var(--card) / 0.95) 100%
+    );
+  }
+
+  .card-shadow {
+    box-shadow: var(--shadow-soft, 0 10px 30px rgba(20, 18, 16, 0.10));
+  }
+
+  .musical-gradient {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background)) 0%,
+      hsl(var(--background) / 0.95) 50%,
+      hsl(var(--muted) / 0.3) 100%
+    );
+  }
+
+  .crown-glow {
+    text-shadow:
+      0 0 10px hsl(var(--primary) / 0.5),
+      0 0 20px hsl(var(--primary) / 0.3);
+  }
+
+  .border-gold {
+    border-color: var(--gold-main, #e6b65c);
+  }
+
+  .text-gold {
+    color: var(--gold-main, #e6b65c);
+  }
+
+  .text-wine {
+    color: var(--wine-main, #8c1d18);
+  }
+
+  .shimmer-gold {
+    background: linear-gradient(
+      90deg,
+      var(--gold-dark, #8a6a22) 0%,
+      var(--gold-main, #e6b65c) 50%,
+      var(--gold-light, #f3d58a) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0%, 100% { background-position: 100% 0; }
+    50% { background-position: 0% 0; }
+  }
+}
