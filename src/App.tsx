@@ -1,9 +1,10 @@
+// src/App.tsx
 import { Toaster } from "@/components/safe-ui/toaster";
 import { Toaster as Sonner } from "@/components/safe-ui/sonner";
 import { TooltipProvider } from "@/components/safe-ui/tooltip";
 import { QueryClient } from "@tanstack/query-core";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AccessModeProvider } from "@/contexts/AccessModeContext";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 
@@ -18,6 +19,21 @@ import Metronome from "./pages/Metronome";
 
 const queryClient = new QueryClient();
 
+/**
+ * Default site wrapper for all pages that should have
+ * consistent spacing and max-width (most pages).
+ *
+ * IMPORTANT:
+ * Homepage (login) stays full-bleed by design.
+ */
+function DefaultPageLayout() {
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 py-8">
+      <Outlet />
+    </div>
+  );
+}
+
 const AppContent = () => {
   useVersionCheck();
 
@@ -28,14 +44,19 @@ const AppContent = () => {
 
       <BrowserRouter>
         <Routes>
+          {/* Full-bleed login page (you'll style it first) */}
           <Route path="/" element={<Homepage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/dev-admin" element={<DevAdminDashboard />} />
-          <Route path="/student/:studentId" element={<StudentDashboard />} />
-          <Route path="/students-system" element={<StudentsSystem />} />
-          <Route path="/students-view" element={<StudentsViewSystem />} />
-          <Route path="/metronome" element={<Metronome />} />
-          <Route path="*" element={<NotFound />} />
+
+          {/* Default layout for the rest of the site */}
+          <Route element={<DefaultPageLayout />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/dev-admin" element={<DevAdminDashboard />} />
+            <Route path="/student/:studentId" element={<StudentDashboard />} />
+            <Route path="/students-system" element={<StudentsSystem />} />
+            <Route path="/students-view" element={<StudentsViewSystem />} />
+            <Route path="/metronome" element={<Metronome />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </div>
