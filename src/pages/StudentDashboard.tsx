@@ -126,10 +126,12 @@ const StudentDashboard = () => {
 
   if (!student) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="text-center">
-          <div className="text-lg font-semibold">טוען אזור אישי…</div>
-          <div className="text-sm text-muted-foreground mt-2">רגע אחד</div>
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <div className="toby-surface toby-frame-glitter rounded-2xl p-8 text-center">
+          <div className="toby-title-glitter text-lg font-semibold">
+            טוען אזור אישי…
+          </div>
+          <div className="toby-subtitle-glitter text-sm mt-2">רגע אחד</div>
         </div>
       </div>
     );
@@ -138,15 +140,28 @@ const StudentDashboard = () => {
   const allStudents = getStudents();
 
   return (
-    <div className="min-h-screen p-4 md:p-8 space-y-6">
+    <div className="min-h-screen bg-background text-foreground p-4 md:p-8 space-y-6">
+      {/* HERO עליון */}
+      <section className="toby-hero toby-frame-glitter rounded-2xl p-6 md:p-8">
+        <div className="toby-surface rounded-2xl p-5 md:p-6 text-center">
+          <div className="toby-title-glitter text-2xl md:text-3xl font-bold">
+            אזור אישי — {student.firstName} {student.lastName}
+          </div>
+          <div className="toby-subtitle-glitter text-sm md:text-base mt-2">
+            ID: {student.id}
+          </div>
+        </div>
+      </section>
+
+      {/* שורת כלים */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <BackButton />
           <div>
-            <div className="text-xl md:text-2xl font-bold">
-              אזור אישי — {student.firstName} {student.lastName}
+            <div className="text-lg md:text-xl font-bold">ניווט</div>
+            <div className="text-sm text-muted-foreground">
+              בחרי לשונית כדי להמשיך
             </div>
-            <div className="text-sm text-muted-foreground">ID: {student.id}</div>
           </div>
         </div>
 
@@ -167,7 +182,7 @@ const StudentDashboard = () => {
       <PaymentAlert studentId={student.id} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-10 gap-2 h-auto">
+        <TabsList className="toby-surface toby-frame-glitter grid grid-cols-2 sm:grid-cols-4 md:grid-cols-10 gap-2 h-auto">
           <TabsTrigger value="schedule" className="gap-2">
             <Calendar className="w-4 h-4" />
             מערכת שבועית
@@ -246,7 +261,10 @@ const StudentDashboard = () => {
         </TabsContent>
 
         <TabsContent value="details" className="space-y-6">
-          <EditableStudentDetails student={student} onUpdate={handleStudentUpdate} />
+          <EditableStudentDetails
+            student={student}
+            onUpdate={handleStudentUpdate}
+          />
         </TabsContent>
 
         <TabsContent value="contacts" className="space-y-6">
