@@ -29,17 +29,23 @@ export function cdn(path: string): string {
   return TOBY_BRAND_BUST ? `${url}?v=${TOBY_BRAND_BUST}` : url;
 }
 
-// CSS URLs
+// ===============================
+// Brand CSS URLs (from stable / versioned CDN)
+// ===============================
 export const TOBY_THEME_CSS_URL = cdn("themes/toby.css");
 export const TOBY_SPRITES_CSS_URL = cdn("themes/sprites.css");
 
-// Image URLs
+// ===============================
+// Brand Image URLs
+// ===============================
 export const TOBY_LOGO_3D_URL = cdn("brand/logo/logo 3d.png");
 export const TOBY_BG_RED_URL = cdn("brand/images/background/red.png");
 
-// Export version for debugging
+// ===============================
+// Brand version info (debug / diagnostics)
+// ===============================
 export const TOBY_BRAND_VERSION_INFO = {
-  version: TOBY_BRAND_VERSION,
-  bust: TOBY_BRAND_BUST,
+  ref: TOBY_BRAND_VERSION,      // "stable" | "v1.0.x" | "main"
+  bust: TOBY_BRAND_BUST || null,
   cdnBase: TOBY_BRAND_CDN_BASE,
 };
