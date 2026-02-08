@@ -2,8 +2,24 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LogOut, Users, Calendar, CreditCard, MessageSquare, FileText, Settings, Music, History, Trophy } from 'lucide-react';
-import { setCurrentUser, getCurrentUser, clearPracticeAndMedalData, setDevMode } from '@/lib/storage';
+import {
+  LogOut,
+  Users,
+  Calendar,
+  CreditCard,
+  MessageSquare,
+  FileText,
+  Settings,
+  Music,
+  History,
+  Trophy
+} from 'lucide-react';
+import {
+  setCurrentUser,
+  getCurrentUser,
+  clearPracticeAndMedalData,
+  setDevMode
+} from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { hybridSync } from '@/lib/hybridSync';
 import { PrintPDFButton } from '@/components/ui/print-pdf-button';
@@ -31,43 +47,47 @@ const AdminDashboard = () => {
 
   const [activeTab, setActiveTab] = useState('students');
 
-  // ✅ ננהל user כ-state כדי שכשנזריק mock ב-Storybook יהיה re-render
+  // ✅ user ב-state (כדי לא “להיתקע” על null)
   const [user, setUser] = useState<any>(() => {
     const existing = getCurrentUser();
     if (existing) return existing;
 
-    // ב-Storybook נתחיל עם user מדומה כדי שהמסך לא יהיה ריק
-    if (typeof window !== 'undefined' && window.location?.port === '6006') {
+    // ✅ ב-Storybook: נתחיל עם admin מדומה כדי שהמסך יעלה
+    if (isStorybook) {
       return { id: 'storybook-admin', type: 'admin', name: 'Storybook Admin' } as any;
     }
+
     return null;
   });
 
   // 🔒 CRITICAL: Check and restore dev mode on every mount
   useEffect(() => {
     const isDevMode = sessionStorage.getItem('musicSystem_devMode') === 'true';
-    if (isDevMode) {
-      setDevMode(true);
-    }
+    if (isDevMode) setDevMode(true);
   }, []);
 
-  // ✅ ב-Storybook: נוודא שה-user המדומה באמת נשמר ב-storage (כדי שקוד פנימי לא ייפול)
+  // ✅ ב-Storybook: נוודא שגם ה-storage מקבל admin (כדי שילדים/טאבים לא יקרסו)
   useEffect(() => {
     if (!isStorybook) return;
 
-    const existing = getCurrentUser();
-    if (existing && existing.type === 'admin') {
-      setUser(existing);
-      return;
+    try {
+      const existing = getCurrentUser();
+      if (!existing || existing.type !== 'admin') {
+        const mockAdmin = { id: 'storybook-admin', type: 'admin', name: 'Storybook Admin' } as any;
+        setCurrentUser(mockAdmin);
+        setUser(mockAdmin);
+      } else {
+        setUser(existing);
+      }
+
+      sessionStorage.setItem('musicSystem_devMode', 'true');
+      setDevMode(true);
+
+      // אם יש לך guards לפי URL:
+      window.history.replaceState({}, '', '/admin/default');
+    } catch {
+      // no-op
     }
-
-    const mockAdmin = { id: 'storybook-admin', type: 'admin', name: 'Storybook Admin' } as any;
-    setCurrentUser(mockAdmin);
-    setUser(mockAdmin);
-
-    // אופציונלי: להפוך devMode לזמין בזמן עיצוב
-    sessionStorage.setItem('musicSystem_devMode', 'true');
-    setDevMode(true);
   }, [isStorybook]);
 
   const getTabName = (tab: string) => {
@@ -85,26 +105,27 @@ const AdminDashboard = () => {
     return tabNames[tab] || 'תצוגה';
   };
 
-  // ✅ redirect רק באפקט (לא בזמן render)
+  // ✅ Redirect רק בתוך useEffect (לא בזמן render!)
   useEffect(() => {
     if (!user || user.type !== 'admin') {
-      if (isStorybook) return;
+      if (isStorybook) return; // ב-Storybook לא מפנים
       navigate('/');
     }
   }, [user, isStorybook, navigate]);
 
-  // בזמן שהאתר האמיתי מפנה — נחזיר null (כמו קודם), אבל בלי לקרוא navigate בזמן render
+  // באתר האמיתי – אם אין admin, לא מציירים כלום (כמו קודם), אבל בלי navigate בזמן render
   if (!user || user.type !== 'admin') {
     return null;
   }
 
   const handleLogout = async () => {
     await clearClientCaches();
-    // Clear dev mode flag on logout
     sessionStorage.removeItem('musicSystem_devMode');
     setDevMode(false);
+
     setCurrentUser(null);
     setUser(null);
+
     navigate('/');
     toast({
       title: 'התנתקות מוצלחת',
@@ -177,8 +198,6 @@ const AdminDashboard = () => {
 
       <div className="max-h-screen overflow-y-auto">
         <div id="main-content" className="container mx-auto p-4 space-y-6 pt-2">
-
-          {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-10 royal-card royal-shadow">
               <TabsTrigger value="students" className="flex items-center gap-2 royal-tab">
@@ -255,11 +274,7 @@ const AdminDashboard = () => {
                     לחצי על הכפתור למטה כדי למחוק את כל נתוני האימונים, ההישגים החודשיים והמדליות.
                     פעולה זו תאפשר להתחיל מחדש מנקודת שוויון.
                   </p>
-                  <Button
-                    onClick={handleClearPracticeData}
-                    variant="destructive"
-                    className="w-full sm:w-auto"
-                  >
+                  <Button onClick={handleClearPracticeData} variant="destructive" className="w-full sm:w-auto">
                     🧹 מחק כל נתוני אימונים ומדליות
                   </Button>
                 </div>
