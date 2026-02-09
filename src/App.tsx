@@ -6,6 +6,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AccessModeProvider } from "@/contexts/AccessModeContext";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
+import PageBackground from "@/components/ui/PageBackground";
 
 import Homepage from "./pages/Homepage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -22,7 +23,8 @@ const AppContent = () => {
   useVersionCheck();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground relative">
+      <PageBackground />
       <Toaster />
       <Sonner />
 

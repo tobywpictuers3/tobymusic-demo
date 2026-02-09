@@ -114,4 +114,32 @@
     0%, 100% { background-position: 100% 0; }
     50% { background-position: 0% 0; }
   }
+
+  .glow-gold {
+    box-shadow: 0 0 15px rgba(230, 182, 92, 0.4),
+                0 0 30px rgba(230, 182, 92, 0.2),
+                0 0 45px rgba(230, 182, 92, 0.1);
+  }
+
+  .title-glow {
+    text-shadow:
+      0 0 10px rgba(230, 182, 92, 0.6),
+      0 0 20px rgba(230, 182, 92, 0.3),
+      0 0 40px rgba(230, 182, 92, 0.15);
+  }
+
+  .fade-slide-in {
+    animation: fadeSlideIn 0.4s ease-out;
+  }
+
+  @keyframes fadeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }

@@ -8,6 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import { Student, Lesson } from "@/lib/types";
 import { getAllLessonsIncludingTemplates } from "@/lib/lessonUtils";
 import { clearClientCaches } from "@/lib/cacheManager";
+import { ASSETS } from "@/brand/assets";
 
 import EditableStudentDetails from "@/components/student/EditableStudentDetails";
 import GeneralWeeklySchedule from "@/components/student/GeneralWeeklySchedule";
@@ -25,10 +26,10 @@ import BackButton from "@/components/ui/back-button";
 import { SaveButton } from "@/components/ui/save-button";
 import { UnreadMessagesBadge } from "@/components/ui/unread-messages-badge";
 import SyncStatusBadge from "@/components/ui/SyncStatusBadge";
+import BrandSection from "@/components/ui/BrandSection";
 
 import Metronome from "./Metronome";
 
-// ✅ הלוגיקה החדשה של החלפות (קודים + בחירת 2 שיעורים + אישור אוטומטי)
 import StudentSwapPanel, {
   StudentSwapPanelRef,
 } from "@/components/student/lessonSwap/StudentSwapPanel";
@@ -39,16 +40,16 @@ const StudentDashboard = () => {
 
   const [student, setStudent] = useState<Student | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [activeTab, setActiveTab] = useState("schedule");
+  const [activeTab, setActiveTab] = useState("practice"); // Practice first
 
-  // ✅ חיבור בין המערכת השבועית לבין פאנל ההחלפות
-  const [swapPanelRef, setSwapPanelRef] = useState<StudentSwapPanelRef | null>(
-    null
-  );
+  const [swapPanelRef, setSwapPanelRef] = useState<StudentSwapPanelRef | null>(null);
   const [currentSwapStep, setCurrentSwapStep] = useState<1 | 2 | 3 | 4>(1);
   const [isSwapSelectionActive, setIsSwapSelectionActive] = useState(false);
 
-  // טען שיעורים כולל תבניות
+  // Broadcast messages collapsed state
+  const [showAllBroadcasts, setShowAllBroadcasts] = useState(false);
+  const [showAllStarred, setShowAllStarred] = useState(false);
+
   useEffect(() => {
     setLessons(getAllLessonsIncludingTemplates());
   }, []);
@@ -57,12 +58,10 @@ const StudentDashboard = () => {
     setLessons(getAllLessonsIncludingTemplates());
   };
 
-  // מצב “בחירה” במערכת השבועית בזמן שלב 2/3
   useEffect(() => {
     setIsSwapSelectionActive(currentSwapStep === 2 || currentSwapStep === 3);
   }, [currentSwapStep]);
 
-  // טעינת תלמידה + הרשאה
   useEffect(() => {
     const load = async () => {
       try {
@@ -120,7 +119,6 @@ const StudentDashboard = () => {
   };
 
   const handleLessonDoubleClick = (lesson: Lesson) => {
-    // מעביר את הבחירה לפאנל ההחלפות (שלב 2/3)
     swapPanelRef?.handleLessonDoubleClick(lesson);
   };
 
@@ -138,12 +136,13 @@ const StudentDashboard = () => {
   const allStudents = getStudents();
 
   return (
-    <div className="min-h-screen p-4 md:p-8 space-y-6">
+    <div className="min-h-screen p-4 md:p-8 space-y-6 relative z-10">
+      {/* Header with title glow */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <BackButton />
           <div>
-            <div className="text-xl md:text-2xl font-bold">
+            <div className="text-xl md:text-2xl font-bold title-glow">
               אזור אישי — {student.firstName} {student.lastName}
             </div>
             <div className="text-sm text-muted-foreground">ID: {student.id}</div>
@@ -162,20 +161,28 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      <BroadcastMessageBanner studentId={student.id} />
-      <StarredMessagesBanner studentId={student.id} />
+      {/* Broadcast messages – collapsed to 1 */}
+      <CollapsedBanner show={showAllBroadcasts} onToggle={() => setShowAllBroadcasts(!showAllBroadcasts)}>
+        <BroadcastMessageBanner studentId={student.id} />
+      </CollapsedBanner>
+
+      <CollapsedBanner show={showAllStarred} onToggle={() => setShowAllStarred(!showAllStarred)}>
+        <StarredMessagesBanner studentId={student.id} />
+      </CollapsedBanner>
+
       <PaymentAlert studentId={student.id} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-10 gap-2 h-auto">
+          {/* Practice first */}
+          <TabsTrigger value="practice">מעקב אימונים</TabsTrigger>
+
           <TabsTrigger value="schedule" className="gap-2">
             <Calendar className="w-4 h-4" />
             מערכת שבועית
           </TabsTrigger>
 
-          <TabsTrigger value="practice">מעקב אימונים</TabsTrigger>
           <TabsTrigger value="aids">עזרים</TabsTrigger>
-
           <TabsTrigger value="medals">המדליות שלי</TabsTrigger>
           <TabsTrigger value="store">חנות</TabsTrigger>
           <TabsTrigger value="history">היסטוריית שיעורים</TabsTrigger>
@@ -198,15 +205,27 @@ const StudentDashboard = () => {
           <TabsTrigger value="files">קבצים</TabsTrigger>
         </TabsList>
 
-        {/* ✅ כאן נמצאת ההחלפה החדשה – לא הטופס הישן */}
-        <TabsContent value="schedule" className="space-y-6">
-          <GeneralWeeklySchedule
-            studentId={student.id}
-            lessons={lessons}
-            onLessonDoubleClick={handleLessonDoubleClick}
-            isSelectionActive={isSwapSelectionActive}
-            currentSwapStep={currentSwapStep}
-          />
+        {/* Practice first with red background */}
+        <TabsContent value="practice" className="fade-slide-in">
+          <BrandSection backgroundUrl={ASSETS.backgrounds.red}>
+            <div className="p-4">
+              <PracticeTracking studentId={student.id} />
+            </div>
+          </BrandSection>
+        </TabsContent>
+
+        <TabsContent value="schedule" className="space-y-6 fade-slide-in">
+          <BrandSection backgroundUrl={ASSETS.backgrounds.gold}>
+            <div className="p-4">
+              <GeneralWeeklySchedule
+                studentId={student.id}
+                lessons={lessons}
+                onLessonDoubleClick={handleLessonDoubleClick}
+                isSelectionActive={isSwapSelectionActive}
+                currentSwapStep={currentSwapStep}
+              />
+            </div>
+          </BrandSection>
 
           <StudentSwapPanel
             student={student}
@@ -218,47 +237,74 @@ const StudentDashboard = () => {
           />
         </TabsContent>
 
-        <TabsContent value="practice" className="space-y-6">
-          <PracticeTracking studentId={student.id} />
+        <TabsContent value="aids" className="space-y-6 fade-slide-in">
+          <BrandSection backgroundUrl={ASSETS.backgrounds.ard}>
+            <div className="p-4">
+              <Metronome />
+            </div>
+          </BrandSection>
         </TabsContent>
 
-        <TabsContent value="aids" className="space-y-6">
-          <Metronome />
+        <TabsContent value="medals" className="space-y-6 fade-slide-in">
+          <BrandSection backgroundUrl={ASSETS.backgrounds.lightGold}>
+            <div className="p-4">
+              <MedalCollection studentId={student.id} />
+            </div>
+          </BrandSection>
         </TabsContent>
 
-        <TabsContent value="medals" className="space-y-6">
-          <MedalCollection studentId={student.id} />
-        </TabsContent>
-
-        <TabsContent value="store" className="space-y-6">
+        <TabsContent value="store" className="space-y-6 fade-slide-in">
           <MedalStore studentId={student.id} />
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-6">
+        <TabsContent value="history" className="space-y-6 fade-slide-in">
           <LessonHistory student={student} />
         </TabsContent>
 
-        <TabsContent value="messages" className="space-y-6">
+        <TabsContent value="messages" className="space-y-6 fade-slide-in">
           <GmailStyleMessages
             studentId={student.id}
             studentName={`${student.firstName} ${student.lastName}`}
           />
         </TabsContent>
 
-        <TabsContent value="details" className="space-y-6">
+        <TabsContent value="details" className="space-y-6 fade-slide-in">
           <EditableStudentDetails student={student} onUpdate={handleStudentUpdate} />
         </TabsContent>
 
-        <TabsContent value="contacts" className="space-y-6">
+        <TabsContent value="contacts" className="space-y-6 fade-slide-in">
           <ContactsList />
         </TabsContent>
 
-        <TabsContent value="files" className="space-y-6">
+        <TabsContent value="files" className="space-y-6 fade-slide-in">
           <StudentFiles studentId={student.id} />
         </TabsContent>
       </Tabs>
     </div>
   );
 };
+
+/** Helper: shows only 1 line of children content, with an expand button */
+const CollapsedBanner = ({
+  children,
+  show,
+  onToggle,
+}: {
+  children: React.ReactNode;
+  show: boolean;
+  onToggle: () => void;
+}) => (
+  <div>
+    <div className={show ? "" : "max-h-[80px] overflow-hidden relative"}>
+      {children}
+      {!show && (
+        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent" />
+      )}
+    </div>
+    <Button variant="ghost" size="sm" onClick={onToggle} className="text-xs mt-1">
+      {show ? "הסתר" : "הצג עוד"}
+    </Button>
+  </div>
+);
 
 export default StudentDashboard;

@@ -9,7 +9,7 @@ import { getStudents, setCurrentUser, setDevMode } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import { useAccessMode } from "@/contexts/AccessModeContext";
 import { ThemeToggle } from "@/brand/ThemeToggle";
-import { TOBY_LOGO_3D_URL } from "@/brand/tobyBrand";
+import { ASSETS } from "@/brand/assets";
 import BsiataDishmaya from "@/components/ui/BsiataDishmaya";
 
 const Homepage = () => {
@@ -64,7 +64,7 @@ const Homepage = () => {
     if (!studentCode.trim()) {
       toast({
         title: "שגיאה",
-        description: "אנא הקישי את הקוד האישי שלך",
+        description: "אנא הקishi את הקוד האישי שלך",
         variant: "destructive",
       });
       return;
@@ -117,15 +117,15 @@ const Homepage = () => {
 
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
-        {/* HERO AREA (piano+flute + subtle overlay) */}
+        {/* HERO AREA */}
         <div className="w-full max-w-5xl rounded-3xl overflow-hidden mb-8 toby-hero toby-frame-glitter">
           <div className="w-full h-full bg-background/60 backdrop-blur-[2px] px-6 py-10 md:px-10 md:py-14 flex flex-col items-center">
-            {/* Logo */}
-            <div className="mb-6">
+            {/* Logo – centered, 50% width */}
+            <div className="mb-6 w-full flex justify-center">
               <img
-                src={TOBY_LOGO_3D_URL}
+                src={ASSETS.logos.noBackground}
                 alt="Toby Music Logo"
-                className="w-28 h-28 md:w-40 md:h-40 object-contain drop-shadow-2xl"
+                className="w-[50%] object-contain drop-shadow-2xl"
               />
             </div>
 
@@ -146,18 +146,26 @@ const Homepage = () => {
           </div>
         </div>
 
-        {/* Login Cards */}
+        {/* Login Cards – red background, gold text */}
         <div className="w-full max-w-4xl grid md:grid-cols-2 gap-6 mb-8">
           {/* Admin Login */}
-          <Card className="toby-surface toby-frame-glitter border-0">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-lg md:text-xl font-bold toby-subtitle-glitter">
+          <Card
+            className="glow-gold border-0 overflow-hidden relative"
+            style={{
+              backgroundImage: `url(${ASSETS.backgrounds.red})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <CardHeader className="text-center pb-2 relative z-10">
+              <CardTitle className="text-lg md:text-xl font-bold text-gold">
                 כניסת מנהל
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 pt-2">
+            <CardContent className="space-y-4 pt-2 relative z-10">
               <div>
-                <Label htmlFor="admin-code" className="text-sm font-medium toby-text">
+                <Label htmlFor="admin-code" className="text-sm font-medium text-gold">
                   קוד מנהל
                 </Label>
                 <Input
@@ -166,13 +174,13 @@ const Homepage = () => {
                   value={adminCode}
                   onChange={(e) => setAdminCode(e.target.value)}
                   placeholder="הקש קוד מנהל"
-                  className="mt-1 bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  className="mt-1 bg-black/30 border-gold text-gold placeholder:text-gold/50"
                   onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
                 />
               </div>
               <Button
                 onClick={handleAdminLogin}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3"
+                className="w-full border-gold text-gold bg-transparent hover:bg-gold/10 font-semibold py-3 border"
               >
                 כניסה
                 <ArrowRight className="h-4 w-4 mr-2" />
@@ -181,15 +189,23 @@ const Homepage = () => {
           </Card>
 
           {/* Student Login */}
-          <Card className="toby-surface toby-frame-glitter border-0">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-lg md:text-xl font-bold toby-subtitle-glitter">
+          <Card
+            className="glow-gold border-0 overflow-hidden relative"
+            style={{
+              backgroundImage: `url(${ASSETS.backgrounds.red})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <CardHeader className="text-center pb-2 relative z-10">
+              <CardTitle className="text-lg md:text-xl font-bold text-gold">
                 אזור אישי
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 pt-2">
+            <CardContent className="space-y-4 pt-2 relative z-10">
               <div>
-                <Label htmlFor="student-code" className="text-sm font-medium toby-text">
+                <Label htmlFor="student-code" className="text-sm font-medium text-gold">
                   קוד אישי
                 </Label>
                 <Input
@@ -197,14 +213,14 @@ const Homepage = () => {
                   type="text"
                   value={studentCode}
                   onChange={(e) => setStudentCode(e.target.value)}
-                  placeholder="הקישי קוד אישי"
-                  className="mt-1 bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  placeholder="הקishi קוד אישי"
+                  className="mt-1 bg-black/30 border-gold text-gold placeholder:text-gold/50"
                   onKeyDown={(e) => e.key === "Enter" && handleStudentLogin()}
                 />
               </div>
               <Button
                 onClick={handleStudentLogin}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3"
+                className="w-full border-gold text-gold bg-transparent hover:bg-gold/10 font-semibold py-3 border"
               >
                 כניסה לאזור אישי
                 <ArrowRight className="h-4 w-4 mr-2" />
@@ -213,34 +229,42 @@ const Homepage = () => {
           </Card>
         </div>
 
-        {/* Contact Details */}
-        <Card className="w-full max-w-3xl toby-surface toby-frame-glitter border-0 mb-8">
-          <CardContent className="p-6 space-y-3">
-            <p className="font-semibold text-lg text-center toby-subtitle-glitter">פרטי קשר:</p>
+        {/* Contact Details – gold background, wine text */}
+        <Card
+          className="w-full max-w-3xl glow-gold border-0 overflow-hidden relative mb-8"
+          style={{
+            backgroundImage: `url(${ASSETS.backgrounds.gold})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
+          <div className="absolute inset-0 bg-white/30 dark:bg-black/20" />
+          <CardContent className="p-6 space-y-3 relative z-10">
+            <p className="font-semibold text-lg text-center text-wine">פרטי קשר:</p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 toby-text">
-              <Mail className="h-4 w-4 text-primary" />
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 text-wine">
+              <Mail className="h-4 w-4" />
               <span>תוכלי ליצור קשר גם במייל:</span>
               <a
                 href="mailto:toby.musicartist@gmail.com"
-                className="hover:text-primary transition-colors font-medium"
+                className="hover:opacity-80 transition-opacity font-medium"
               >
                 toby.musicartist@gmail.com
               </a>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 toby-text">
-              <Phone className="h-4 w-4 text-primary" />
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 text-wine">
+              <Phone className="h-4 w-4" />
               <span>או בנייד:</span>
-              <a href="tel:0504124161" className="hover:text-primary transition-colors font-medium">
+              <a href="tel:0504124161" className="hover:opacity-80 transition-opacity font-medium">
                 0504124161
               </a>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 toby-text">
-              <MessageCircle className="h-4 w-4 text-primary" />
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 text-wine">
+              <MessageCircle className="h-4 w-4" />
               <span>כמו כן נשלחות הודעות עידכון גם לווטסאפ הטלפוני:</span>
-              <a href="tel:0733837098" className="hover:text-primary transition-colors font-medium">
+              <a href="tel:0733837098" className="hover:opacity-80 transition-opacity font-medium">
                 0733837098
               </a>
             </div>
@@ -256,8 +280,8 @@ const Homepage = () => {
           </CardContent>
         </Card>
 
-        {/* Developer Login */}
-        <Card className="w-full max-w-md bg-card/60 backdrop-blur-md border-muted">
+        {/* Developer Login – theme-aware, no translucent bg */}
+        <Card className="w-full max-w-md bg-background border-border">
           <CardContent className="pt-6 space-y-3">
             <p className="text-xs text-muted-foreground text-center mb-2">כניסת מפתחים</p>
             <Input
