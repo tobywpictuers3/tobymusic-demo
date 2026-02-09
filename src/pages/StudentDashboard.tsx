@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LogOut, Calendar, User, Phone, FileText } from "lucide-react";
+import { LogOut, Calendar, User, Phone, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { getCurrentUser, setCurrentUser, getStudents } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import { Student, Lesson } from "@/lib/types";
 import { getAllLessonsIncludingTemplates } from "@/lib/lessonUtils";
 import { clearClientCaches } from "@/lib/cacheManager";
+import { ThemeToggle } from "@/brand/ThemeToggle";
+import { ASSETS } from "@/brand/assets";
 
 import EditableStudentDetails from "@/components/student/EditableStudentDetails";
 import GeneralWeeklySchedule from "@/components/student/GeneralWeeklySchedule";
@@ -28,10 +30,35 @@ import SyncStatusBadge from "@/components/ui/SyncStatusBadge";
 
 import Metronome from "./Metronome";
 
-// ✅ הלוגיקה החדשה של החלפות (קודים + בחירת 2 שיעורים + אישור אוטומטי)
 import StudentSwapPanel, {
   StudentSwapPanelRef,
 } from "@/components/student/lessonSwap/StudentSwapPanel";
+
+/** Brand section backgrounds in order */
+const BRAND_BGS = [
+  ASSETS.backgrounds.red,
+  ASSETS.backgrounds.gold,
+  ASSETS.backgrounds.ard,
+  ASSETS.backgrounds.lightGold,
+];
+
+const BrandSection = ({ index, children }: { index: number; children: React.ReactNode }) => {
+  const bg = BRAND_BGS[index % BRAND_BGS.length];
+  return (
+    <div
+      className="relative rounded-xl overflow-hidden"
+      style={{
+        backgroundImage: `url(${bg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      {/* Light mode: white overlay for 40% saturation. Dark mode: full saturation */}
+      <div className="absolute inset-0 bg-white/60 dark:bg-transparent pointer-events-none" />
+      <div className="relative z-10 p-4">{children}</div>
+    </div>
+  );
+};
 
 const StudentDashboard = () => {
   const { studentId } = useParams();
@@ -39,16 +66,13 @@ const StudentDashboard = () => {
 
   const [student, setStudent] = useState<Student | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [activeTab, setActiveTab] = useState("schedule");
+  const [activeTab, setActiveTab] = useState("practice");
+  const [showAllMessages, setShowAllMessages] = useState(false);
 
-  // ✅ חיבור בין המערכת השבועית לבין פאנל ההחלפות
-  const [swapPanelRef, setSwapPanelRef] = useState<StudentSwapPanelRef | null>(
-    null
-  );
+  const [swapPanelRef, setSwapPanelRef] = useState<StudentSwapPanelRef | null>(null);
   const [currentSwapStep, setCurrentSwapStep] = useState<1 | 2 | 3 | 4>(1);
   const [isSwapSelectionActive, setIsSwapSelectionActive] = useState(false);
 
-  // טען שיעורים כולל תבניות
   useEffect(() => {
     setLessons(getAllLessonsIncludingTemplates());
   }, []);
@@ -57,52 +81,31 @@ const StudentDashboard = () => {
     setLessons(getAllLessonsIncludingTemplates());
   };
 
-  // מצב “בחירה” במערכת השבועית בזמן שלב 2/3
   useEffect(() => {
     setIsSwapSelectionActive(currentSwapStep === 2 || currentSwapStep === 3);
   }, [currentSwapStep]);
 
-  // טעינת תלמידה + הרשאה
   useEffect(() => {
     const load = async () => {
       try {
-        if (studentId === "public") {
-          navigate("/", { replace: true });
-          return;
-        }
-
+        if (studentId === "public") { navigate("/", { replace: true }); return; }
         const current = getCurrentUser();
-        if (!current) {
-          navigate("/", { replace: true });
-          return;
-        }
-
+        if (!current) { navigate("/", { replace: true }); return; }
         const students = getStudents();
         const found = students.find((s) => s?.id === studentId);
-
         if (!found) {
-          toast({
-            title: "תלמיד לא נמצא",
-            description: "לא נמצאו פרטי תלמיד עבור הקישור הזה.",
-            variant: "destructive",
-          });
+          toast({ title: "תלמיד לא נמצא", description: "לא נמצאו פרטי תלמיד עבור הקישור הזה.", variant: "destructive" });
           navigate("/", { replace: true });
           return;
         }
-
         setStudent(found);
         setLessons(getAllLessonsIncludingTemplates());
       } catch (e) {
         console.error(e);
-        toast({
-          title: "שגיאה",
-          description: "לא הצלחנו לטעון את האזור האישי.",
-          variant: "destructive",
-        });
+        toast({ title: "שגיאה", description: "לא הצלחנו לטעון את האזור האישי.", variant: "destructive" });
         navigate("/", { replace: true });
       }
     };
-
     load();
   }, [studentId, navigate]);
 
@@ -120,7 +123,6 @@ const StudentDashboard = () => {
   };
 
   const handleLessonDoubleClick = (lesson: Lesson) => {
-    // מעביר את הבחירה לפאנל ההחלפות (שלב 2/3)
     swapPanelRef?.handleLessonDoubleClick(lesson);
   };
 
@@ -138,12 +140,12 @@ const StudentDashboard = () => {
   const allStudents = getStudents();
 
   return (
-    <div className="min-h-screen p-4 md:p-8 space-y-6">
+    <div className="relative z-10 min-h-screen p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <BackButton />
           <div>
-            <div className="text-xl md:text-2xl font-bold">
+            <div className="text-xl md:text-2xl font-bold title-glow">
               אזור אישי — {student.firstName} {student.lastName}
             </div>
             <div className="text-sm text-muted-foreground">ID: {student.id}</div>
@@ -151,10 +153,10 @@ const StudentDashboard = () => {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap justify-end">
+          <ThemeToggle />
           <UnreadMessagesBadge userId={student.id} />
           <SyncStatusBadge />
           <SaveButton />
-
           <Button variant="outline" onClick={handleLogout} className="gap-2">
             <LogOut className="w-4 h-4" />
             התנתקות
@@ -162,98 +164,120 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      <BroadcastMessageBanner studentId={student.id} />
-      <StarredMessagesBanner studentId={student.id} />
+      {/* Messages — collapsed to single row with expand */}
+      <div className="space-y-2">
+        <div className={showAllMessages ? "" : "max-h-14 overflow-hidden"}>
+          <BroadcastMessageBanner studentId={student.id} />
+          <StarredMessagesBanner studentId={student.id} />
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowAllMessages(!showAllMessages)}
+          className="w-full text-xs text-muted-foreground"
+        >
+          {showAllMessages ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
+          {showAllMessages ? "צמצם הודעות" : "הרחב הודעות"}
+        </Button>
+      </div>
+
       <PaymentAlert studentId={student.id} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-10 gap-2 h-auto">
+          <TabsTrigger value="practice">מעקב אימונים</TabsTrigger>
           <TabsTrigger value="schedule" className="gap-2">
             <Calendar className="w-4 h-4" />
             מערכת שבועית
           </TabsTrigger>
-
-          <TabsTrigger value="practice">מעקב אימונים</TabsTrigger>
           <TabsTrigger value="aids">עזרים</TabsTrigger>
-
           <TabsTrigger value="medals">המדליות שלי</TabsTrigger>
           <TabsTrigger value="store">חנות</TabsTrigger>
           <TabsTrigger value="history">היסטוריית שיעורים</TabsTrigger>
-
           <TabsTrigger value="messages" className="gap-2">
             <FileText className="w-4 h-4" />
             הודעות
           </TabsTrigger>
-
           <TabsTrigger value="details" className="gap-2">
             <User className="w-4 h-4" />
             פרטים שלי
           </TabsTrigger>
-
           <TabsTrigger value="contacts" className="gap-2">
             <Phone className="w-4 h-4" />
             אנשי קשר
           </TabsTrigger>
-
           <TabsTrigger value="files">קבצים</TabsTrigger>
         </TabsList>
 
-        {/* ✅ כאן נמצאת ההחלפה החדשה – לא הטופס הישן */}
-        <TabsContent value="schedule" className="space-y-6">
-          <GeneralWeeklySchedule
-            studentId={student.id}
-            lessons={lessons}
-            onLessonDoubleClick={handleLessonDoubleClick}
-            isSelectionActive={isSwapSelectionActive}
-            currentSwapStep={currentSwapStep}
-          />
-
-          <StudentSwapPanel
-            student={student}
-            lessons={lessons}
-            students={allStudents}
-            onMount={(ref) => setSwapPanelRef(ref)}
-            onStepChange={(step) => setCurrentSwapStep(step)}
-            onSwapCompleted={() => refreshLessons()}
-          />
+        <TabsContent value="practice" className="fade-slide-in space-y-6">
+          <BrandSection index={0}>
+            <PracticeTracking studentId={student.id} />
+          </BrandSection>
         </TabsContent>
 
-        <TabsContent value="practice" className="space-y-6">
-          <PracticeTracking studentId={student.id} />
+        <TabsContent value="schedule" className="fade-slide-in space-y-6">
+          <BrandSection index={0}>
+            <GeneralWeeklySchedule
+              studentId={student.id}
+              lessons={lessons}
+              onLessonDoubleClick={handleLessonDoubleClick}
+              isSelectionActive={isSwapSelectionActive}
+              currentSwapStep={currentSwapStep}
+            />
+          </BrandSection>
+
+          <BrandSection index={1}>
+            <StudentSwapPanel
+              student={student}
+              lessons={lessons}
+              students={allStudents}
+              onMount={(ref) => setSwapPanelRef(ref)}
+              onStepChange={(step) => setCurrentSwapStep(step)}
+              onSwapCompleted={() => refreshLessons()}
+            />
+          </BrandSection>
         </TabsContent>
 
-        <TabsContent value="aids" className="space-y-6">
+        <TabsContent value="aids" className="fade-slide-in space-y-6">
           <Metronome />
         </TabsContent>
 
-        <TabsContent value="medals" className="space-y-6">
-          <MedalCollection studentId={student.id} />
+        <TabsContent value="medals" className="fade-slide-in space-y-6">
+          <BrandSection index={0}>
+            <MedalCollection studentId={student.id} />
+          </BrandSection>
         </TabsContent>
 
-        <TabsContent value="store" className="space-y-6">
-          <MedalStore studentId={student.id} />
+        <TabsContent value="store" className="fade-slide-in space-y-6">
+          <BrandSection index={1}>
+            <MedalStore studentId={student.id} />
+          </BrandSection>
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-6">
-          <LessonHistory student={student} />
+        <TabsContent value="history" className="fade-slide-in space-y-6">
+          <BrandSection index={2}>
+            <LessonHistory student={student} />
+          </BrandSection>
         </TabsContent>
 
-        <TabsContent value="messages" className="space-y-6">
+        <TabsContent value="messages" className="fade-slide-in space-y-6">
           <GmailStyleMessages
             studentId={student.id}
             studentName={`${student.firstName} ${student.lastName}`}
           />
         </TabsContent>
 
-        <TabsContent value="details" className="space-y-6">
-          <EditableStudentDetails student={student} onUpdate={handleStudentUpdate} />
+        <TabsContent value="details" className="fade-slide-in space-y-6">
+          <BrandSection index={3}>
+            <EditableStudentDetails student={student} onUpdate={handleStudentUpdate} />
+          </BrandSection>
         </TabsContent>
 
-        <TabsContent value="contacts" className="space-y-6">
+        <TabsContent value="contacts" className="fade-slide-in space-y-6">
           <ContactsList />
         </TabsContent>
 
-        <TabsContent value="files" className="space-y-6">
+        <TabsContent value="files" className="fade-slide-in space-y-6">
           <StudentFiles studentId={student.id} />
         </TabsContent>
       </Tabs>

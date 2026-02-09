@@ -14,7 +14,7 @@
  *   src/styles/site.css
  */
 
-@import "./styles/site.css"; /* <-- keep tokens in one place */
+/* tokens loaded externally via BrandProvider (toby.css) */
 
 /* ===== ROOT FONT (narrow regular everywhere) ===== */
 @layer base {
@@ -110,8 +110,36 @@
     animation: shimmer 2s ease-in-out infinite;
   }
 
+  .glow-gold {
+    box-shadow:
+      0 0 15px rgba(230, 182, 92, 0.4),
+      0 0 30px rgba(230, 182, 92, 0.2),
+      0 0 45px rgba(230, 182, 92, 0.1);
+  }
+
+  .title-glow {
+    text-shadow:
+      0 0 10px rgba(230, 182, 92, 0.6),
+      0 0 25px rgba(230, 182, 92, 0.3);
+  }
+
   @keyframes shimmer {
     0%, 100% { background-position: 100% 0; }
     50% { background-position: 0% 0; }
+  }
+
+  @keyframes fade-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-slide-in {
+    animation: fade-slide-in 0.35s ease-out;
   }
 }
