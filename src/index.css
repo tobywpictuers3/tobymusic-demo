@@ -1,97 +1,345 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* ==========================================================================
+   TOBY — Global Theme (Light + Dark) — READY TO PASTE
+   Uses ONLY your “fixed” assets (everything else stays separate).
 
-/*
- * TOBY MUSIC – Local styles only
- * All design tokens (colors, fonts, etc.) come from external CDN via BrandProvider
- * This file contains only: Tailwind directives, body reset, and essential animations
- */
+   Assets (RAW):
+   - Logo:           https://raw.githubusercontent.com/tobywsharotslicha/toby-brand-assets/main/brand/logo/logonoreka.png
+   - Card bg (dark): https://raw.githubusercontent.com/tobywsharotslicha/toby-brand-assets/main/brand/images/background/redbrown.png
+   - Card bg (light):https://raw.githubusercontent.com/tobywsharotslicha/toby-brand-assets/main/brand/images/background/lightgold.png
+   - Top dashboard:  https://raw.githubusercontent.com/tobywsharotslicha/toby-brand-assets/main/brand/images/hero/stagevilon.png
+   ========================================================================== */
 
-@layer base {
-  body {
-    @apply bg-background text-foreground;
-    direction: rtl;
-    margin: 0;
-  }
+/* Optional font loading (remove if you load fonts elsewhere) */
+@import url("https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap");
 
-  * {
-    @apply border-border;
-  }
+/* ===== THEME VARIABLES ===== */
+:root {
+  /* ---------- ASSET REGISTRY (fixed) ---------- */
+  --asset-logo: url("https://raw.githubusercontent.com/tobywsharotslicha/toby-brand-assets/main/brand/logo/logonoreka.png");
+  --asset-card-bg-light: url("https://raw.githubusercontent.com/tobywsharotslicha/toby-brand-assets/main/brand/images/background/lightgold.png");
+  --asset-card-bg-dark: url("https://raw.githubusercontent.com/tobywsharotslicha/toby-brand-assets/main/brand/images/background/redbrown.png");
+  --asset-dashboard-top: url("https://raw.githubusercontent.com/tobywsharotslicha/toby-brand-assets/main/brand/images/hero/stagevilon.png");
+
+  /* ---------- LIGHT MODE (Cream) ---------- */
+  --background: #fff7ef;      /* cream-white */
+  --foreground: #1a1412;
+
+  --card: #fffcfa;
+  --card-foreground: #1a1412;
+
+  --muted: #f7eee7;
+  --muted-foreground: #5f514c;
+
+  --border: #e7d6c9;
+  --input: #e7d6c9;
+
+  --primary: #7a1e1b;         /* wine */
+  --primary-foreground: #fff7ef;
+
+  --accent: #e6b65c;          /* gold */
+  --accent-foreground: #1a1412;
+
+  /* ---------- TYPOGRAPHY ---------- */
+  --font-family: "Assistant", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-display: "Playfair Display", "Frank Ruhl Libre", serif;
+
+  --font-size-base: 16px;
+  --h1: 64px;
+  --h2: 42px;
+  --h3: 32px;
+  --h4: 24px;
+
+  /* ---------- SPACING / RADIUS ---------- */
+  --spacing-unit: 8px;
+  --radius: 6px;
+
+  /* ---------- EFFECTS ---------- */
+  --shadow-1: 0 10px 18px -2px rgba(0, 0, 0, 0.12);
+  --shadow-2: 0 18px 32px -6px rgba(0, 0, 0, 0.14);
+  --ring: 0 0 0 3px rgba(230, 182, 92, 0.35);
+
+  /* ---------- SLOTS (what the site uses) ---------- */
+  --logo: var(--asset-logo);
+  --card-bg: var(--asset-card-bg-light);
+  --dashboard-top-bg: var(--asset-dashboard-top);
+
+  /* Dashboard fade tuning (Light) */
+  --dashboard-fade-start: 55%;       /* where fade begins */
+  --dashboard-fade-end: 100%;        /* should reach page background at bottom */
+  --dashboard-dim: 0.18;             /* subtle dim over image (0..1) */
 }
 
-/* Sparkle animation for בסיעתא דשמיא overlay */
-@keyframes sparkle-text {
-  0%, 100% {
-    opacity: 0.7;
-    text-shadow: 0 0 4px currentColor;
-  }
-  50% {
-    opacity: 1;
-    text-shadow: 0 0 12px currentColor, 0 0 20px currentColor;
-  }
+/* ===== DARK MODE =====
+   Toggle by adding: <html class="dark">  OR  <html data-theme="dark">
+*/
+html.dark,
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #0b0b0b;      /* pure black */
+  --foreground: #fff7ef;
+
+  --card: #161616;
+  --card-foreground: #fff7ef;
+
+  --muted: #1f1f1f;
+  --muted-foreground: #c9bdb5;
+
+  --border: #2a2a2a;
+  --input: #2a2a2a;
+
+  /* In dark mode: primary becomes gold (best on black) */
+  --primary: #e6b65c;
+  --primary-foreground: #0b0b0b;
+
+  --accent: #f4d98a;
+  --accent-foreground: #0b0b0b;
+
+  --shadow-1: 0 14px 28px -10px rgba(0, 0, 0, 0.55);
+  --shadow-2: 0 22px 44px -14px rgba(0, 0, 0, 0.62);
+  --ring: 0 0 0 3px rgba(244, 217, 138, 0.35);
+
+  /* slot override */
+  --card-bg: var(--asset-card-bg-dark);
+
+  /* Dashboard fade tuning (Dark) */
+  --dashboard-fade-start: 52%;
+  --dashboard-fade-end: 100%;
+  --dashboard-dim: 0.30;
 }
 
-.sparkle-text {
-  animation: sparkle-text 2s ease-in-out infinite;
+/* ===== BASE ===== */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { font-size: 16px; }
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  background: var(--background);
+  color: var(--foreground);
+  text-rendering: optimizeLegibility;
 }
 
-@layer utilities {
-  .card-gradient {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--card)) 0%,
-      hsl(var(--card) / 0.95) 100%
-    );
-  }
+/* Headings */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  margin: 0 0 calc(var(--spacing-unit) * 2);
+  color: var(--foreground);
+  letter-spacing: 0.2px;
+}
+h1 { font-size: var(--h1); line-height: 1.15; font-weight: 600; }
+h2 { font-size: var(--h2); line-height: 1.20; font-weight: 600; }
+h3 { font-size: var(--h3); line-height: 1.25; font-weight: 600; }
+h4 { font-size: var(--h4); line-height: 1.30; font-weight: 600; }
 
-  .card-shadow {
-    box-shadow: var(--shadow-soft, 0 10px 30px rgba(20, 18, 16, 0.10));
-  }
+/* Hebrew headings preference */
+:lang(he) h1,
+:lang(he) h2,
+:lang(he) h3,
+:lang(he) h4 { font-family: "Frank Ruhl Libre", serif; }
 
-  .musical-gradient {
-    background: linear-gradient(
-      180deg,
-      hsl(var(--background)) 0%,
-      hsl(var(--background) / 0.95) 50%,
-      hsl(var(--muted) / 0.3) 100%
-    );
-  }
+/* Links */
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 200ms ease-out, text-decoration-color 200ms ease-out;
+}
+a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(230, 182, 92, 0.6);
+}
 
-  .crown-glow {
-    text-shadow:
-      0 0 10px hsl(var(--primary) / 0.5),
-      0 0 20px hsl(var(--primary) / 0.3);
-  }
+/* Focus ring */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: calc(var(--radius) + 2px);
+}
 
-  .border-gold {
-    border-color: var(--gold-main, #e6b65c);
-  }
+/* ===== BACKGROUNDS ===== */
 
-  .text-gold {
-    color: var(--gold-main, #e6b65c);
-  }
+/* 1) Dashboard top background (stagevilon) + ALWAYS fades downward into page background.
+   Use this on a wrapper section at the top of a dashboard page. */
+.bg-dashboard-top {
+  position: relative;
+  background-image:
+    /* subtle dim over the image (keeps text readable) */
+    linear-gradient(
+      to bottom,
+      rgba(0,0,0,var(--dashboard-dim)) 0%,
+      rgba(0,0,0,var(--dashboard-dim)) var(--dashboard-fade-start),
+      rgba(0,0,0,0) var(--dashboard-fade-end)
+    ),
+    /* main fade-to-page-background */
+    linear-gradient(
+      to bottom,
+      rgba(0,0,0,0) 0%,
+      rgba(0,0,0,0) var(--dashboard-fade-start),
+      var(--background) var(--dashboard-fade-end)
+    ),
+    var(--dashboard-top-bg);
 
-  .text-wine {
-    color: var(--wine-main, #8c1d18);
-  }
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
 
-  .shimmer-gold {
-    background: linear-gradient(
-      90deg,
-      var(--gold-dark, #8a6a22) 0%,
-      var(--gold-main, #e6b65c) 50%,
-      var(--gold-light, #f3d58a) 100%
-    );
-    background-size: 200% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: shimmer 2s ease-in-out infinite;
-  }
+/* Optional: give it a pleasant default height if you want */
+.bg-dashboard-top--tall { min-height: 360px; }
+.bg-dashboard-top--short { min-height: 240px; }
 
-  @keyframes shimmer {
-    0%, 100% { background-position: 100% 0; }
-    50% { background-position: 0% 0; }
-  }
+/* ===== BRAND ASSETS ===== */
+
+/* Logo as a background (for headers, cards, etc.) */
+.logo-bg {
+  background-image: var(--logo);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* If you want a consistent logo block size */
+.logo-bg--sm { width: 140px; height: 44px; }
+.logo-bg--md { width: 220px; height: 70px; }
+.logo-bg--lg { width: 320px; height: 110px; }
+
+/* ===== COMPONENTS ===== */
+
+/* Cards — uses your lightgold/redbrown textures automatically per theme */
+.card,
+.toby-card {
+  background-image:
+    /* soft overlay so text stays consistent */
+    linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.65) 0%,
+      rgba(255,255,255,0.35) 100%
+    ),
+    var(--card-bg);
+  background-color: var(--card);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 2);
+  padding: calc(var(--spacing-unit) * 3);
+  box-shadow: var(--shadow-1);
+}
+
+/* Adjust overlay in dark mode so it doesn’t wash out */
+html.dark .card,
+html.dark .toby-card,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .toby-card {
+  background-image:
+    linear-gradient(
+      to bottom,
+      rgba(0,0,0,0.35) 0%,
+      rgba(0,0,0,0.15) 100%
+    ),
+    var(--card-bg);
+}
+
+/* Inputs */
+.input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  font-family: inherit;
+  font-size: 16px;
+  background: rgba(255,255,255,0.55);
+  color: var(--foreground);
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  transition: border-color 200ms ease-out, box-shadow 200ms ease-out, background-color 200ms ease-out;
+}
+
+html.dark .input,
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark textarea,
+html.dark select,
+html[data-theme="dark"] .input,
+html[data-theme="dark"] input[type="text"],
+html[data-theme="dark"] input[type="email"],
+html[data-theme="dark"] input[type="password"],
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background: rgba(255,255,255,0.06);
+  color: var(--foreground);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(230, 182, 92, 0.75);
+  box-shadow: var(--ring);
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border-radius: var(--radius);
+  padding: 14px 28px;
+  font-weight: 600;
+  font-size: 16px;
+
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-1);
+
+  cursor: pointer;
+  user-select: none;
+  transition: transform 200ms ease-out, filter 200ms ease-out, box-shadow 200ms ease-out;
+}
+.btn-primary:hover { filter: brightness(1.05); box-shadow: var(--shadow-2); }
+.btn-primary:active { transform: translateY(1px); }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: var(--radius);
+  padding: 14px 28px;
+  font-weight: 600;
+  font-size: 16px;
+
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--accent);
+
+  cursor: pointer;
+  transition: background-color 200ms ease-out, color 200ms ease-out, border-color 200ms ease-out;
+}
+.btn-secondary:hover { background: rgba(230,182,92,0.12); }
+
+/* ===== OPTIONAL: subtle “stage” divider line ===== */
+.accent-line {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(230,182,92,0),
+    rgba(230,182,92,0.75),
+    rgba(230,182,92,0)
+  );
 }
