@@ -11,6 +11,7 @@ import { useAccessMode } from "@/contexts/AccessModeContext";
 import { ThemeToggle } from "@/brand/ThemeToggle";
 import { ASSETS } from "@/brand/assets";
 import BsiataDishmaya from "@/components/ui/BsiataDishmaya";
+import { verifyAdminCode, verifyDevCode, verifyPublicCode } from "@/lib/authCodes";
 
 const Homepage = () => {
   const [adminCode, setAdminCode] = useState("");
@@ -19,7 +20,7 @@ const Homepage = () => {
   const { setAccessMode } = useAccessMode();
 
   const handleAdminLogin = async () => {
-    if (adminCode === "toby2026") {
+    if (verifyAdminCode(adminCode)) {
       setDevMode(false);
       sessionStorage.removeItem("musicSystem_devMode");
       setCurrentUser({ type: "admin", adminCode });
@@ -31,7 +32,7 @@ const Homepage = () => {
   };
 
   const handleDevAdminLogin = async () => {
-    if (adminCode === "1234E") {
+    if (verifyDevCode(adminCode)) {
       setDevMode(true);
       sessionStorage.setItem("musicSystem_devMode", "true");
       setCurrentUser({ type: "admin", adminCode });
@@ -48,7 +49,7 @@ const Homepage = () => {
       return;
     }
 
-    if (studentCode.trim().toUpperCase() === "STUDENTS2026") {
+    if (verifyPublicCode(studentCode.trim())) {
       setAccessMode("public");
       setCurrentUser({ type: "public_view" });
       navigate("/student/public");
