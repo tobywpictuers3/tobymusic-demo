@@ -143,3 +143,41 @@
     animation: fade-slide-in 0.35s ease-out;
   }
 }
+:root{
+  /* התאימי מספרים אם יש לך גוונים מדויקים */
+  --brand-gold: 199 151 67;     /* זהב */
+  --brand-burgundy: 92 18 34;   /* בורדו */
+}
+
+@layer components {
+  /* פנימיות: זהוב-בורדו, אטימות 80% */
+  .bg-brand-inner {
+    background-image: linear-gradient(
+      135deg,
+      rgb(var(--brand-gold) / 0.80),
+      rgb(var(--brand-burgundy) / 0.80)
+    );
+  }
+
+  /* קומפוננטה גדולה: אטום למעלה -> שקוף למטה */
+  .panel-brand-fade {
+    position: relative;
+    overflow: hidden;
+  }
+  .panel-brand-fade::before{
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: linear-gradient(
+      180deg,
+      rgb(var(--brand-gold) / 0.92) 0%,
+      rgb(var(--brand-burgundy) / 0.92) 18%,
+      rgb(var(--brand-burgundy) / 0.00) 100%
+    );
+  }
+  .panel-brand-fade > *{
+    position: relative; /* שהילדים יהיו מעל ה־::before */
+  }
+}
