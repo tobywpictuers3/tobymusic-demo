@@ -2,16 +2,7 @@ import { ASSETS } from "@/brand/assets";
 
 const PageBackground = () => (
   <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true">
-    {/* Top: wine-burgundy tinted gradient */}
-    <div
-      className="absolute inset-0"
-      style={{
-        background:
-          "linear-gradient(180deg, hsl(350 40% 18% / 0.25) 0%, transparent 50%)",
-      }}
-    />
-
-    {/* Full page: pianoflute — no fade, sharp cut */}
+    {/* Full page: pianoflute background */}
     <div
       className="absolute inset-0"
       style={{
@@ -20,6 +11,35 @@ const PageBackground = () => (
         backgroundPosition: "center bottom",
       }}
     />
+
+    {/* Overlay: inset with feathered edges */}
+    <div
+      className="absolute"
+      style={{
+        inset: "12px",
+        borderRadius: "18px",
+        maskImage:
+          "radial-gradient(ellipse at center, black 85%, transparent 100%)",
+        WebkitMaskImage:
+          "radial-gradient(ellipse at center, black 85%, transparent 100%)",
+      }}
+    >
+      {/* Light mode: golden-white overlay */}
+      <div
+        className="absolute inset-0 dark:hidden"
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(255,248,230,0.85) 0%, rgba(230,182,92,0.85) 100%)",
+        }}
+      />
+      {/* Dark mode: black overlay */}
+      <div
+        className="absolute inset-0 hidden dark:block"
+        style={{
+          background: "rgba(0,0,0,0.85)",
+        }}
+      />
+    </div>
   </div>
 );
 
