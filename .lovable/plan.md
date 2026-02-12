@@ -1,82 +1,161 @@
 
 
-## תוכנית: תיקון טעינה + יישום עיצוב מלא
+## תוכנית: עדכון עיצוב כולל -- כרטיסים, כפתורים, טבלאות, אפקטים
 
-### שלב 0: תיקון חסימת הבנייה (קריטי)
+### שלב 0: תיקון שגיאת בנייה (קריטי)
 
-**הבעיה:** `src/index.css` שורה 17 מייבאת `@import "./styles/site.css"` -- קובץ שלא קיים. זה מונע את בניית הפרויקט לחלוטין.
+**קובץ:** `src/pages/Homepage.tsx` שורה 86
 
-**פתרון:** מחיקת שורת ה-import. כל הטוקנים מגיעים מ-`toby.css` החיצוני (נטען דרך BrandProvider), ואין צורך בקובץ מקומי.
-
----
-
-### שלב 1: דף הבית (Homepage.tsx)
-
-1. **לוגו:** החלפת `TOBY_LOGO_3D_URL` ב-`ASSETS.logos.noBackground` (logonoreka), ממורכז ב-50% רוחב
-2. **כרטיסי כניסה (מנהל + אזור אישי):** רקע `ASSETS.backgrounds.red`, פונט זהוב (`text-gold`), אפקט `.glow-gold`
-3. **פרטי קשר:** רקע `ASSETS.backgrounds.gold`, פונט בורדו (`text-wine`)
-4. **כניסת מפתחים:** הסרת `bg-card/60 backdrop-blur-md`, החלפה ב-`bg-background`
-5. **חתימה (להשתמע):** שימור כ-Card רגיל עם ערכת נושא
+`ASSETS.backgrounds.pianoflute` לא קיים. הנכס הנכון הוא `ASSETS.hero.pianoFlute`. מחליפים את הרקע בדף הבית בהתאם.
 
 ---
 
-### שלב 2: רקע pianoflute גלובלי (PageBackground.tsx -- קומפוננטה חדשה)
+### שלב 1: כרטיסים -- בורדו-זהב 80% אטימות
 
-- קומפוננטה `fixed` ב-`z-0` מאחורי כל התוכן
-- חלק תחתון: `ASSETS.hero.pianoFlute` עם `mask-image` fade מלמעלה
-- חלק עליון: gradient עם נטיה לבורדו-יין
-- משולב ב-`App.tsx`
+**קובץ:** `src/index.css`
+
+עדכון `.card-wine-gold-70` (או יצירת מחלקה חדשה `.card-brand`) עם gradient בורדו-זהב ב-80% אטימות:
+
+```css
+.card-brand {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--wine-main) 80%, transparent) 0%,
+    color-mix(in srgb, var(--gold-main) 80%, transparent) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--gold-main) 50%, transparent);
+}
+```
+
+החלה על כל Card ברחבי האפליקציה (Homepage, Dashboards).
 
 ---
 
-### שלב 3: CSS חדש (index.css)
+### שלב 2: קומפוננטות ראשיות -- לבן/שחור עם fade לשקיפות
 
-הוספת מחלקות:
+**קובץ:** `src/index.css`
 
-```text
-.glow-gold      -- box-shadow זהוב מסביב לקומפוננטות
-.title-glow     -- text-shadow זהוב לכותרות דפים
-.fade-slide-in  -- אנימציית כניסה לתוכן לשוניות
+מחלקה חדשה `.section-fade`:
+
+```css
+.section-fade {
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--background)) 0%,
+    hsl(var(--background) / 0.8) 60%,
+    transparent 100%
+  );
+}
+```
+
+כך שהחלק העליון (עם טקסט) אטום, ובסוף הקומפוננטה -- שקיפות מלאה שמגלה את הרקע מאחור.
+
+---
+
+### שלב 3: כפתורים -- צבעי מותג
+
+**קובץ:** `src/index.css`
+
+מחלקות כפתורים חדשות:
+
+```css
+.btn-gold {
+  background: var(--gold-main);
+  color: var(--wine-main);
+}
+.btn-confirm {
+  background: var(--brand-red, #b71c1c);
+  color: white;
+}
+.btn-delete {
+  background: var(--wine-main);
+  color: white;
+}
+.btn-edit-theme {
+  /* light: black, dark: gold */
+  background: black;
+  color: white;
+}
+.dark .btn-edit-theme {
+  background: var(--gold-main);
+  color: var(--wine-main);
+}
+```
+
+עדכון כפתורים ב-Homepage (כניסה = gold, כניסה כמנהל = red), AdminDashboard (מחיקה = burgundy, עריכה = theme-aware), StudentDashboard (בהתאם).
+
+---
+
+### שלב 4: ביטול fade בתמונת pianoflute
+
+**קובץ:** `src/components/ui/PageBackground.tsx`
+
+הסרת `maskImage` ו-`WebkitMaskImage` מהרכיב התחתון. התמונה תוצג ללא כל fade -- חתך ישיר.
+
+---
+
+### שלב 5: טבלאות -- gold בבהיר, red בכהה
+
+**קובץ:** `src/index.css`
+
+```css
+table, .table-brand {
+  background-image: url(...gold...);
+}
+.dark table, .dark .table-brand {
+  background-image: url(...red...);
+}
+```
+
+מכיוון שה-URL מגיע מ-ASSETS (runtime), נשתמש ב-CSS custom properties שנקבעים ב-JS:
+
+**קובץ:** `src/components/ui/PageBackground.tsx` (או BrandProvider)
+
+הגדרת `--table-bg-light` ו-`--table-bg-dark` כ-CSS variables, ואז בטבלאות:
+
+```css
+table {
+  background-image: var(--table-bg);
+  background-size: cover;
+}
 ```
 
 ---
 
-### שלב 4: דשבורד תלמידות (StudentDashboard.tsx)
+### שלב 6: אפקטים -- גלילה, מעברי עמודים, נצנוץ בריחוף
 
-1. **סדר לשוניות:** `practice` ראשונה (defaultValue), אח"כ `schedule`, ואז השאר
-2. **הודעות:** `BroadcastMessageBanner` + `StarredMessagesBanner` בשורה אחת עם כפתור "הרחב"
-3. **רקעי סקציות:** wrapper `BrandSection` עם רקעים לפי סדר: red -> gold -> ard -> lightGold
-4. **כותרת:** הוספת `.title-glow`
-5. **ThemeToggle:** הוספה לכותרת
+**קובץ:** `src/index.css`
 
----
+**נצנוץ בריחוף:**
+```css
+.hover-sparkle {
+  transition: box-shadow 0.3s, transform 0.2s;
+}
+.hover-sparkle:hover {
+  box-shadow: 0 0 20px rgba(230, 182, 92, 0.5),
+              0 0 40px rgba(230, 182, 92, 0.3);
+  transform: translateY(-2px);
+}
+```
 
-### שלב 5: דשבורד מנהל (AdminDashboard.tsx)
+**אפקט גלילה (scroll reveal):**
 
-1. **החלפת מחלקות `royal-*`** (שאינן קיימות) במחלקות מותג פעילות:
-   - `royal-gradient` -> `musical-gradient`
-   - `royal-card` -> `card-gradient card-shadow`
-   - `royal-shadow` -> `card-shadow`
-   - `text-royal-gold` -> `text-gold`
-   - `royal-glow` -> `crown-glow`
-   - `text-royal-text` -> `text-foreground`
-   - `royal-tab` -> (הסרה, שימוש ב-default)
-   - `border-royal-burgundy` / `text-royal-burgundy` -> `border-gold` / `text-wine`
-   - `text-royal-white` / `hover:bg-royal-burgundy` -> `text-primary-foreground` / `hover:bg-destructive`
-2. **רקעי סקציות:** אותו דפוס כמו דשבורד תלמידות (red -> gold -> ard -> lightGold)
-3. **כותרת:** הוספת `.title-glow` + `ThemeToggle`
-4. **מעברים:** `.fade-slide-in` על כל `TabsContent`
+מחלקת `.scroll-reveal` עם `opacity: 0; transform: translateY(20px)` שמופעלת עם IntersectionObserver ב-JS. קומפוננטה קטנה `ScrollReveal` שעוטפת תוכן.
+
+**מעברי עמודים:**
+
+עדכון `.fade-slide-in` הקיימת להיות חלקה יותר (0.4s) והחלה על כל `TabsContent` ו-route transitions.
 
 ---
 
-### קבצים
+### סיכום קבצים
 
 | פעולה | קובץ |
 |-------|------|
-| עריכה | `src/index.css` -- מחיקת import שבור + הוספת glow-gold, title-glow, fade-slide-in |
-| עריכה | `src/pages/Homepage.tsx` -- לוגו, רקעים, צבעים |
-| יצירה | `src/components/ui/PageBackground.tsx` -- רקע pianoflute גלובלי |
-| עריכה | `src/App.tsx` -- שילוב PageBackground |
-| עריכה | `src/pages/StudentDashboard.tsx` -- סדר לשוניות, הודעות, רקעים, כותרת |
-| עריכה | `src/pages/AdminDashboard.tsx` -- החלפת royal-* classes, רקעים, כותרת |
+| עריכה | `src/index.css` -- מחלקות חדשות: card-brand, section-fade, btn-*, hover-sparkle, scroll-reveal, טבלאות |
+| עריכה | `src/pages/Homepage.tsx` -- תיקון build error (pianoflute), החלת card-brand, btn-gold/btn-confirm |
+| עריכה | `src/components/ui/PageBackground.tsx` -- הסרת mask/fade מ-pianoflute, הוספת CSS vars לטבלאות |
+| עריכה | `src/pages/AdminDashboard.tsx` -- החלת card-brand, section-fade, btn-delete/btn-edit-theme, hover-sparkle |
+| עריכה | `src/pages/StudentDashboard.tsx` -- החלת card-brand, section-fade, hover-sparkle על כרטיסים |
+| יצירה | `src/components/ui/ScrollReveal.tsx` -- wrapper קומפוננטה עם IntersectionObserver לאפקט גלילה |
 
