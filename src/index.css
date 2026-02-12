@@ -160,6 +160,12 @@
     border: 1px solid rgba(230, 182, 92, 0.50);
   }
 
+  /* Homepage cards: theme-aware 85% opacity */
+  .card-homepage {
+    background: rgba(255, 248, 230, 0.85);
+    border: 1px solid rgba(230, 182, 92, 0.50);
+  }
+
   /* Section fade: solid top -> transparent bottom */
   .section-fade {
     background: linear-gradient(
@@ -244,6 +250,10 @@
 .dark .btn-edit-theme {
   background: #e6b65c;
   color: #8c1d18;
+}
+.dark .card-homepage {
+  background: rgba(0, 0, 0, 0.85);
+  border-color: rgba(230, 182, 92, 0.30);
 }
 .dark .table-brand,
 .dark .table-brand table {

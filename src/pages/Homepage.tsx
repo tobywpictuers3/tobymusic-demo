@@ -74,7 +74,7 @@ const Homepage = () => {
     }
   };
 
-  const surface = "card-brand hover-sparkle";
+  const surface = "card-homepage hover-sparkle";
 
   return (
     <div className="min-h-screen relative overflow-x-hidden page-enter">
