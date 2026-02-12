@@ -134,7 +134,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="relative z-10 min-h-screen musical-gradient overflow-hidden">
+    <div className="relative z-10 min-h-screen musical-gradient overflow-hidden page-enter">
       {/* Sticky Header */}
       <div className="sticky top-0 z-50 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-sm border-b border-primary/20 shadow-lg">
         <div className="container mx-auto p-4">

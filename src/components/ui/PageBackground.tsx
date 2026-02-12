@@ -11,15 +11,13 @@ const PageBackground = () => (
       }}
     />
 
-    {/* Bottom: pianoflute with fade-in from top */}
+    {/* Bottom: pianoflute — no fade, sharp cut */}
     <div
       className="absolute inset-x-0 bottom-0 h-[55%]"
       style={{
         backgroundImage: `url(${ASSETS.hero.pianoFlute})`,
         backgroundSize: "cover",
         backgroundPosition: "center bottom",
-        maskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
-        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
       }}
     />
   </div>
