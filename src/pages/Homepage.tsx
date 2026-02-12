@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,30 +12,11 @@ import { ThemeToggle } from "@/brand/ThemeToggle";
 import { ASSETS } from "@/brand/assets";
 import BsiataDishmaya from "@/components/ui/BsiataDishmaya";
 
-const TOPBAR_H = 120; // גובה “דשבורד” הלוגו (אפשר לשחק 110–140)
-const LOGO_SCALE = 1.4; // +40%
-
-// גרדיאנט רוחבי בורדו -> זהב, עם אטימות 70% (כלומר 30% שקיפות)
-const CARD_BG_GRADIENT = `linear-gradient(
-  90deg,
-  rgba(78, 10, 24, 0.70) 0%,
-  rgba(120, 18, 36, 0.70) 45%,
-  rgba(185, 140, 55, 0.70) 100%
-)`;
-
-const CARD_BORDER = "rgba(185, 140, 55, 0.65)";
-
 const Homepage = () => {
   const [adminCode, setAdminCode] = useState("");
   const [studentCode, setStudentCode] = useState("");
   const navigate = useNavigate();
   const { setAccessMode } = useAccessMode();
-
-  // מסמן ל-CSS “זה דף הבית” כדי לבטל פייד/אוברליי גלובלי רק כאן
-  useEffect(() => {
-    document.body.classList.add("home-no-fade");
-    return () => document.body.classList.remove("home-no-fade");
-  }, []);
 
   const handleAdminLogin = async () => {
     if (adminCode === "toby2026") {
@@ -93,76 +74,49 @@ const Homepage = () => {
     }
   };
 
-  // Card wrapper עם שכבת רקע גרדיאנט אטומה 70% (רק הרקע, לא הטקסט)
-  const GradientCard = ({
-    className = "",
-    children,
-  }: {
-    className?: string;
-    children: React.ReactNode;
-  }) => (
-    <Card className={`relative overflow-hidden border ${className}`} style={{ borderColor: CARD_BORDER }}>
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: CARD_BG_GRADIENT,
-        }}
-      />
-      <div className="relative z-10">{children}</div>
-    </Card>
-  );
+  // כרטיסים: פחות שקוף + רוויית יין
+  // (אם תרצי עוד יותר רווי: bg-wine/95, אם תרצי טיפה יותר שקוף: bg-wine/85)
+  const surface = "border border-border/60 bg-wine/90 backdrop-blur-[2px]";
 
   return (
     <div
       className="min-h-screen relative overflow-x-hidden"
       style={{
-        // רקע תמונה נקי (בלי פייד מקומי)
+        // רקע נקי בלבד — בלי גרדיאנט/פייד מקומי
         backgroundImage: `url(${ASSETS.backgrounds.pianoflute})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        backgroundAttachment: "scroll",
       }}
     >
       <BsiataDishmaya />
 
-      {/* Header נעול בגלילה */}
-      <header
-        className="fixed top-0 left-0 right-0 z-50"
-        style={{
-          height: TOPBAR_H,
-          // חשוב: בלי רקע בכלל כדי שלא “יוסיף פייד”
-          background: "transparent",
-        }}
-      >
-        <div className="relative h-full flex items-start justify-center px-4 pt-2">
+      {/* דשבורד עליון: STICKY (לא נחתך, והגלילה מתחילה מתחתיו טבעי) */}
+      <header className="sticky top-0 z-50">
+        {/* שקוף לגמרי: לא מוסיפים שום bg/blur כדי לא “להלבין” את הרקע */}
+        <div className="relative flex items-start justify-center px-4 pt-2 pb-1">
           <div className="absolute left-4 top-3">
             <ThemeToggle />
           </div>
 
+          {/* הלוגו לא נחתך: נותנים maxHeight + object-contain */}
           <img
             src={ASSETS.logos.noBackground}
             alt="Toby Music Logo"
-            className="object-contain drop-shadow-2xl"
+            className="w-[92%] max-w-3xl object-contain drop-shadow-2xl"
             style={{
-              // גדול ב-40% בלי חיתוך
-              width: `${Math.round(920 * LOGO_SCALE)}px`,
-              maxWidth: "92vw",
-              maxHeight: TOPBAR_H - 10, // “שוליים עליונים”, אבל לא חותך
-              marginTop: 4, // שוליים עליונים קטנים
+              maxHeight: 96,   // להגדיל/להקטין פה בלי חיתוך
+              marginTop: -6,   // מעלה אותו יותר, בלי שוליים מיותרים
             }}
           />
         </div>
       </header>
 
-      {/* Spacer כדי שהתוכן יתחיל מתחת ללוגו */}
-      <div style={{ height: TOPBAR_H }} />
-
-      {/* Main */}
+      {/* Main Content */}
       <div className="relative z-10 min-h-screen flex flex-col items-center px-4 pb-10 pt-6">
         {/* Welcome */}
         <div className="w-full max-w-2xl mb-8">
-          <GradientCard>
+          <Card className={surface}>
             <CardContent className="p-6 text-center">
               <h1 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">
                 ברוכות הבאות למערכת המוסיקלית של טובי וינברג
@@ -172,12 +126,12 @@ const Homepage = () => {
                 <p>מערכת השיעורים, החלפות, נתוני תשלומים ועוד.</p>
               </div>
             </CardContent>
-          </GradientCard>
+          </Card>
         </div>
 
         {/* Login Cards */}
         <div className="w-full max-w-4xl grid md:grid-cols-2 gap-6 mb-8">
-          <GradientCard className="glow-gold">
+          <Card className={`glow-gold ${surface}`}>
             <CardHeader className="text-center pb-2">
               <CardTitle className="text-lg md:text-xl font-bold text-gold">כניסת מנהל</CardTitle>
             </CardHeader>
@@ -192,7 +146,7 @@ const Homepage = () => {
                   value={adminCode}
                   onChange={(e) => setAdminCode(e.target.value)}
                   placeholder="הקש קוד מנהל"
-                  className="mt-1 bg-black/15 border-gold text-gold placeholder:text-gold/50"
+                  className="mt-1 bg-black/10 border-gold text-gold placeholder:text-gold/50"
                   onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
                 />
               </div>
@@ -204,9 +158,9 @@ const Homepage = () => {
                 <ArrowRight className="h-4 w-4 mr-2" />
               </Button>
             </CardContent>
-          </GradientCard>
+          </Card>
 
-          <GradientCard className="glow-gold">
+          <Card className={`glow-gold ${surface}`}>
             <CardHeader className="text-center pb-2">
               <CardTitle className="text-lg md:text-xl font-bold text-gold">אזור אישי</CardTitle>
             </CardHeader>
@@ -221,7 +175,7 @@ const Homepage = () => {
                   value={studentCode}
                   onChange={(e) => setStudentCode(e.target.value)}
                   placeholder="הקישי קוד אישי"
-                  className="mt-1 bg-black/15 border-gold text-gold placeholder:text-gold/50"
+                  className="mt-1 bg-black/10 border-gold text-gold placeholder:text-gold/50"
                   onKeyDown={(e) => e.key === "Enter" && handleStudentLogin()}
                 />
               </div>
@@ -233,11 +187,11 @@ const Homepage = () => {
                 <ArrowRight className="h-4 w-4 mr-2" />
               </Button>
             </CardContent>
-          </GradientCard>
+          </Card>
         </div>
 
         {/* Contact */}
-        <GradientCard className="w-full max-w-3xl mb-8">
+        <Card className={`w-full max-w-3xl mb-8 ${surface}`}>
           <CardContent className="p-6 space-y-3">
             <p className="font-semibold text-lg text-center text-foreground">פרטי קשר:</p>
 
@@ -274,19 +228,19 @@ const Homepage = () => {
               </a>
             </div>
           </CardContent>
-        </GradientCard>
+        </Card>
 
         {/* Signature */}
-        <GradientCard className="w-full max-w-2xl mb-8">
+        <Card className={`w-full max-w-2xl mb-8 ${surface}`}>
           <CardContent className="p-6 text-center space-y-2">
             <p className="text-2xl font-semibold title-glow text-foreground">להשתמע!</p>
             <p className="text-xl font-bold text-foreground">טובי וינברג</p>
             <p className="italic text-foreground/80 text-lg">איתך, כל הדרך אל המוסיקה</p>
           </CardContent>
-        </GradientCard>
+        </Card>
 
         {/* Dev */}
-        <GradientCard className="w-full max-w-md">
+        <Card className={`w-full max-w-md ${surface}`}>
           <CardContent className="pt-6 space-y-3">
             <p className="text-xs text-foreground/70 text-center mb-2">כניסת מפתחים</p>
             <Input
@@ -294,14 +248,14 @@ const Homepage = () => {
               value={adminCode}
               onChange={(e) => setAdminCode(e.target.value)}
               placeholder="קוד מפתחים"
-              className="bg-black/15 border-border text-foreground text-sm"
+              className="bg-black/10 border-border text-foreground text-sm"
               onKeyDown={(e) => e.key === "Enter" && handleDevAdminLogin()}
             />
             <Button onClick={handleDevAdminLogin} variant="outline" className="w-full text-sm">
               כניסה למצב מפתחים
             </Button>
           </CardContent>
-        </GradientCard>
+        </Card>
       </div>
     </div>
   );
