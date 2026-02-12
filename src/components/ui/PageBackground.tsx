@@ -11,9 +11,9 @@ const PageBackground = () => (
       }}
     />
 
-    {/* Bottom: pianoflute — no fade, sharp cut */}
+    {/* Full page: pianoflute — no fade, sharp cut */}
     <div
-      className="absolute inset-x-0 bottom-0 h-[55%]"
+      className="absolute inset-0"
       style={{
         backgroundImage: `url(${ASSETS.hero.pianoFlute})`,
         backgroundSize: "cover",

@@ -94,8 +94,8 @@ const Homepage = () => {
             alt="Toby Music Logo"
             className="w-[92%] max-w-3xl object-contain drop-shadow-2xl"
             style={{
-              maxHeight: 96,   // להגדיל/להקטין פה בלי חיתוך
-              marginTop: -6,   // מעלה אותו יותר, בלי שוליים מיותרים
+              maxHeight: 160,
+              marginTop: 4,
             }}
           />
         </div>
