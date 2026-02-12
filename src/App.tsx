@@ -24,11 +24,11 @@ const AppContent = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <PageBackground />
       <Toaster />
       <Sonner />
 
       <BrowserRouter>
+        <PageBackground />
         <Routes>
           <Route path="/" element={<Homepage />} />
           <Route path="/admin" element={<AdminDashboard />} />
