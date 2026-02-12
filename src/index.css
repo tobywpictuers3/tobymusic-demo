@@ -142,7 +142,7 @@
   }
 
   .fade-slide-in {
-    animation: fade-slide-in 0.35s ease-out;
+    animation: fade-slide-in 0.4s ease-out;
   }
 
   /* ===== NEW: Wine->Gold horizontal gradient with 70% opacity (30% transparent) =====
@@ -161,4 +161,107 @@
   .border-gold-soft {
     border-color: color-mix(in srgb, var(--gold-main) 65%, transparent);
   }
+
+  /* ===== Card brand: burgundy-gold 80% opacity ===== */
+  .card-brand {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--wine-main) 80%, transparent) 0%,
+      color-mix(in srgb, var(--gold-main) 80%, transparent) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--gold-main) 50%, transparent);
+  }
+
+  /* ===== Section fade: solid top -> transparent bottom ===== */
+  .section-fade {
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--background)) 0%,
+      hsl(var(--background) / 0.8) 60%,
+      transparent 100%
+    );
+  }
+
+  /* ===== Brand buttons ===== */
+  .btn-gold {
+    background: var(--gold-main, #e6b65c);
+    color: var(--wine-main, #8c1d18);
+    border: none;
+  }
+  .btn-gold:hover {
+    filter: brightness(1.1);
+  }
+
+  .btn-confirm {
+    background: var(--brand-red, #b71c1c);
+    color: white;
+    border: none;
+  }
+  .btn-confirm:hover {
+    filter: brightness(1.15);
+  }
+
+  .btn-delete {
+    background: var(--wine-main, #8c1d18);
+    color: white;
+    border: none;
+  }
+  .btn-delete:hover {
+    filter: brightness(1.15);
+  }
+
+  .btn-edit-theme {
+    background: black;
+    color: white;
+    border: none;
+  }
+  .btn-edit-theme:hover {
+    filter: brightness(1.2);
+  }
+
+  /* ===== Table brand backgrounds ===== */
+  .table-brand,
+  .table-brand table {
+    background: color-mix(in srgb, var(--gold-main, #e6b65c) 15%, transparent);
+  }
+
+  /* ===== Hover sparkle ===== */
+  .hover-sparkle {
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+  }
+  .hover-sparkle:hover {
+    box-shadow: 0 0 20px rgba(230, 182, 92, 0.5),
+                0 0 40px rgba(230, 182, 92, 0.3);
+    transform: translateY(-2px);
+  }
+
+  /* ===== Scroll reveal ===== */
+  .scroll-reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  }
+  .scroll-reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ===== Page transition ===== */
+  .page-enter {
+    animation: page-fade-in 0.4s ease-out;
+  }
+  @keyframes page-fade-in {
+    from { opacity: 0; transform: scale(0.98) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+}
+
+/* Dark mode overrides outside @layer */
+.dark .btn-edit-theme {
+  background: var(--gold-main, #e6b65c);
+  color: var(--wine-main, #8c1d18);
+}
+.dark .table-brand,
+.dark .table-brand table {
+  background: color-mix(in srgb, var(--brand-red, #b71c1c) 20%, transparent);
 }

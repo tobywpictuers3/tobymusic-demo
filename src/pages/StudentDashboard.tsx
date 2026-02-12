@@ -140,7 +140,7 @@ const StudentDashboard = () => {
   const allStudents = getStudents();
 
   return (
-    <div className="relative z-10 min-h-screen p-4 md:p-8 space-y-6">
+    <div className="relative z-10 min-h-screen p-4 md:p-8 space-y-6 page-enter">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <BackButton />

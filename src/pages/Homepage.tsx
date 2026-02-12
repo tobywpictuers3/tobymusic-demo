@@ -74,21 +74,10 @@ const Homepage = () => {
     }
   };
 
-  // כרטיסים: פחות שקוף + רוויית יין
-  // (אם תרצי עוד יותר רווי: bg-wine/95, אם תרצי טיפה יותר שקוף: bg-wine/85)
-  const surface = "border border-border/60 bg-wine/90 backdrop-blur-[2px]";
+  const surface = "card-brand hover-sparkle";
 
   return (
-    <div
-      className="min-h-screen relative overflow-x-hidden"
-      style={{
-        // רקע נקי בלבד — בלי גרדיאנט/פייד מקומי
-        backgroundImage: `url(${ASSETS.backgrounds.pianoflute})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }}
-    >
+    <div className="min-h-screen relative overflow-x-hidden page-enter">
       <BsiataDishmaya />
 
       {/* דשבורד עליון: STICKY (לא נחתך, והגלילה מתחילה מתחתיו טבעי) */}
@@ -152,7 +141,7 @@ const Homepage = () => {
               </div>
               <Button
                 onClick={handleAdminLogin}
-                className="w-full border border-gold bg-transparent hover:bg-gold/20 text-gold font-semibold py-3"
+                className="w-full btn-confirm font-semibold py-3"
               >
                 כניסה
                 <ArrowRight className="h-4 w-4 mr-2" />
@@ -181,7 +170,7 @@ const Homepage = () => {
               </div>
               <Button
                 onClick={handleStudentLogin}
-                className="w-full border border-gold bg-transparent hover:bg-gold/20 text-gold font-semibold py-3"
+                className="w-full btn-gold font-semibold py-3"
               >
                 כניסה לאזור אישי
                 <ArrowRight className="h-4 w-4 mr-2" />
