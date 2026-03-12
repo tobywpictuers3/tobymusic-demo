@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type MouseEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/safe-ui/card';
 import { Button } from '@/components/safe-ui/button';
 import { Badge } from '@/components/safe-ui/badge';
@@ -7,28 +7,27 @@ import { workerApi } from '@/lib/workerApi';
 import { logger } from '@/lib/logger';
 import { isDevMode } from '@/lib/storage';
 import { restorePracticeSessionsFromVersion } from '@/lib/practiceRestore';
-import { 
-  History, 
-  Download, 
-  RefreshCw, 
+import {
+  History,
+  RefreshCw,
   RotateCcw,
   Calendar,
   HardDrive,
   Loader2,
   Dumbbell,
-  CheckCircle
+  CheckCircle,
 } from 'lucide-react';
-import { 
-  getStudents, 
-  getLessons, 
-  getPayments, 
-  getPracticeSessions, 
-  getSwapRequests, 
-  getFiles, 
-  getMonthlyAchievements, 
-  getMedalRecords, 
+import {
+  getStudents,
+  getLessons,
+  getPayments,
+  getPracticeSessions,
+  getSwapRequests,
+  getFiles,
+  getMonthlyAchievements,
+  getMedalRecords,
   getStudentStatistics,
-  getOneTimePayments
+  getOneTimePayments,
 } from '@/lib/storage';
 import { getMessages } from '@/lib/messages';
 import {
@@ -38,7 +37,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/safe-ui/table";
+} from '@/components/safe-ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,7 +47,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/safe-ui/alert-dialog";
+} from '@/components/safe-ui/alert-dialog';
 
 interface VersionInfo {
   path: string;
@@ -57,28 +56,23 @@ interface VersionInfo {
   content_hash?: string;
 }
 
-const BackupHistory = () => {
-  // 🔒 CRITICAL: Block entire component in dev mode
-  if (isDevMode()) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="h-5 w-5" />
-            היסטוריית גיבויים
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <div className="text-4xl mb-4">🔧</div>
-            <p className="text-lg font-medium mb-2">לא זמין במצב מפתחים</p>
-            <p className="text-sm">היסטוריית גיבויים זמינה רק במצב ניהול רגיל</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
+const extractVersions = (data: unknown): VersionInfo[] => {
+  if (Array.isArray(data)) return data as VersionInfo[];
+
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+
+    if (Array.isArray(obj.entries)) return obj.entries as VersionInfo[];
+    if (Array.isArray(obj.versions)) return obj.versions as VersionInfo[];
+    if (Array.isArray(obj.items)) return obj.items as VersionInfo[];
+    if (Array.isArray(obj.files)) return obj.files as VersionInfo[];
+    if (Array.isArray(obj.result)) return obj.result as VersionInfo[];
   }
-  
+
+  return [];
+};
+
+const BackupHistory = () => {
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<VersionInfo | null>(null);
@@ -87,11 +81,13 @@ const BackupHistory = () => {
   const [isPracticeRestoreDialogOpen, setIsPracticeRestoreDialogOpen] = useState(false);
   const [isRestoringPractice, setIsRestoringPractice] = useState(false);
 
+  const devMode = isDevMode();
+
   const runIntegrityCheck = () => {
-    const studentIds = getStudents().map(s => s.id);
+    const studentIds = getStudents().map((s) => s.id);
     const lessons = getLessons();
     const payments = getPayments();
-    const oneTime = getOneTimePayments();
+    getOneTimePayments();
     const sessions = getPracticeSessions();
     const swaps = getSwapRequests();
     const files = getFiles();
@@ -101,64 +97,61 @@ const BackupHistory = () => {
 
     const errors: string[] = [];
 
-    // שיעורים יתומים
-    lessons.forEach(l => {
-      if (!studentIds.includes(l.studentId))
+    lessons.forEach((l) => {
+      if (!studentIds.includes(l.studentId)) {
         errors.push(`שיעור ${l.id} שייך לתלמידה שאינה קיימת (${l.studentId})`);
+      }
     });
 
-    // תשלומים יתומים
-    payments.forEach(p => {
-      if (!studentIds.includes(p.studentId))
+    payments.forEach((p) => {
+      if (!studentIds.includes(p.studentId)) {
         errors.push(`תשלום ${p.id} שייך לתלמידה שאינה קיימת`);
+      }
     });
 
-    // תשלומים חד־פעמיים - לא קשורים לתלמידות ספציפיות (בדיקה מדולגת)
-
-    // אימונים יתומים
-    sessions.forEach(s => {
-      if (!studentIds.includes(s.studentId))
+    sessions.forEach((s) => {
+      if (!studentIds.includes(s.studentId)) {
         errors.push(`אימון ${s.id} שייך לתלמידה שאינה קיימת`);
+      }
     });
 
-    // בקשות החלפה יתומות
-    swaps.forEach(sw => {
-      if (sw.requesterId && !studentIds.includes(sw.requesterId))
+    swaps.forEach((sw) => {
+      if (sw.requesterId && !studentIds.includes(sw.requesterId)) {
         errors.push(`SwapRequest יתום עם requesterId חסר (${sw.requesterId})`);
-      if (sw.targetId && !studentIds.includes(sw.targetId))
+      }
+      if (sw.targetId && !studentIds.includes(sw.targetId)) {
         errors.push(`SwapRequest יתום עם targetId חסר (${sw.targetId})`);
+      }
     });
 
-    // קבצים יתומים
-    files.forEach(f => {
-      if (!studentIds.includes(f.studentId))
+    files.forEach((f) => {
+      if (!studentIds.includes(f.studentId)) {
         errors.push(`קובץ ${f.id} יתום ללא תלמידה`);
+      }
     });
 
-    // הודעות עם נמענים שאינם קיימים
-    msgs.forEach(m => {
-      m.recipientIds.forEach(r => {
-        if (r !== 'all' && r !== 'admin' && !studentIds.includes(r))
+    msgs.forEach((m) => {
+      m.recipientIds.forEach((r) => {
+        if (r !== 'all' && r !== 'admin' && !studentIds.includes(r)) {
           errors.push(`הודעה ${m.id} מכילה נמענת שאינה קיימת (${r})`);
+        }
       });
     });
 
-    // הישגים יתומים
-    achievements.forEach(a => {
-      if (!studentIds.includes(a.studentId))
+    achievements.forEach((a) => {
+      if (!studentIds.includes(a.studentId)) {
         errors.push(`Achievement יתום עבור ${a.studentId}`);
+      }
     });
 
-    // מדליות יתומות
-    medals.forEach(m => {
-      if (!studentIds.includes(m.studentId))
+    medals.forEach((m) => {
+      if (!studentIds.includes(m.studentId)) {
         errors.push(`Medal יתום עבור ${m.studentId}`);
+      }
     });
 
-    // סטטיסטיקות יתומות
-    studentIds.forEach(id => {
-      const stats = getStudentStatistics(id);
-      // This just validates existing stats are for valid students
+    studentIds.forEach((id) => {
+      getStudentStatistics(id);
     });
 
     if (errors.length === 0) {
@@ -169,27 +162,29 @@ const BackupHistory = () => {
     } else {
       toast({
         title: `⚠️ נמצאו ${errors.length} בעיות`,
-        description: errors.slice(0, 3).join('\n') + (errors.length > 3 ? `\n...ועוד ${errors.length - 3}` : ''),
+        description:
+          errors.slice(0, 3).join('\n') +
+          (errors.length > 3 ? `\n...ועוד ${errors.length - 3}` : ''),
         variant: 'destructive',
       });
       console.log('Integrity check errors:', errors);
     }
   };
 
-  useEffect(() => {
-    loadVersions();
-  }, []);
-
   const loadVersions = async () => {
     setIsLoading(true);
     try {
       const result = await workerApi.listVersions();
-      
+
       if (result.success && result.data) {
-        // Sort by date: newest first
-        const sorted = result.data.sort((a: VersionInfo, b: VersionInfo) => 
-          new Date(b.server_modified).getTime() - new Date(a.server_modified).getTime()
+        const versionsArray = extractVersions(result.data);
+
+        const sorted = [...versionsArray].sort(
+          (a, b) =>
+            new Date(b.server_modified).getTime() -
+            new Date(a.server_modified).getTime()
         );
+
         setVersions(sorted);
         logger.info(`Loaded ${sorted.length} versions`);
       } else {
@@ -213,12 +208,21 @@ const BackupHistory = () => {
     }
   };
 
+  useEffect(() => {
+    if (!devMode) {
+      void loadVersions();
+    }
+  }, [devMode]);
+
   const handleVersionClick = (version: VersionInfo) => {
     setSelectedVersion(version);
     setIsRestoreDialogOpen(true);
   };
 
-  const handlePracticeRestoreClick = (version: VersionInfo, e: React.MouseEvent) => {
+  const handlePracticeRestoreClick = (
+    version: VersionInfo,
+    e: MouseEvent<HTMLButtonElement>
+  ) => {
     e.stopPropagation();
     setSelectedVersion(version);
     setIsPracticeRestoreDialogOpen(true);
@@ -230,7 +234,7 @@ const BackupHistory = () => {
     setIsRestoringPractice(true);
     try {
       const result = await restorePracticeSessionsFromVersion(selectedVersion.path);
-      
+
       if (result.success) {
         toast({
           title: '✅ שחזור אימונים הושלם',
@@ -266,10 +270,9 @@ const BackupHistory = () => {
     setIsRestoring(true);
     try {
       const result = await workerApi.downloadByPath(selectedVersion.path);
-      
+
       if (result.success && result.data) {
-        // Update localStorage with restored data
-        Object.keys(result.data).forEach(key => {
+        Object.keys(result.data).forEach((key) => {
           const value = result.data[key];
           localStorage.setItem(
             key,
@@ -282,7 +285,6 @@ const BackupHistory = () => {
           description: 'הנתונים שוחזרו בהצלחה. הדף יתרענן...',
         });
 
-        // Reload the page to apply changes
         setTimeout(() => {
           window.location.reload();
         }, 1500);
@@ -323,6 +325,26 @@ const BackupHistory = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  if (devMode) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            היסטוריית גיבויים
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <div className="text-4xl mb-4">🔧</div>
+            <p className="text-lg font-medium mb-2">לא זמין במצב מפתחים</p>
+            <p className="text-sm">היסטוריית גיבויים זמינה רק במצב ניהול רגיל</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card className="card-gradient card-shadow">
@@ -336,20 +358,11 @@ const BackupHistory = () => {
               )}
             </CardTitle>
             <div className="flex gap-2">
-              <Button 
-                onClick={runIntegrityCheck}
-                variant="outline"
-                size="sm"
-              >
+              <Button onClick={runIntegrityCheck} variant="outline" size="sm">
                 <CheckCircle className="h-4 w-4 ml-2" />
                 בדוק תקינות נתונים
               </Button>
-              <Button 
-                onClick={loadVersions} 
-                disabled={isLoading}
-                variant="outline"
-                size="sm"
-              >
+              <Button onClick={loadVersions} disabled={isLoading} variant="outline" size="sm">
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin ml-2" />
                 ) : (
@@ -391,12 +404,14 @@ const BackupHistory = () => {
                       <TableHead className="text-right">תאריך ושעה</TableHead>
                       <TableHead className="text-right">גודל</TableHead>
                       <TableHead className="text-right">נתיב</TableHead>
-                      <TableHead className="text-right" colSpan={2}>פעולות</TableHead>
+                      <TableHead className="text-right" colSpan={2}>
+                        פעולות
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {versions.map((version, index) => (
-                      <TableRow 
+                      <TableRow
                         key={version.path}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => handleVersionClick(version)}
@@ -449,16 +464,13 @@ const BackupHistory = () => {
         </CardContent>
       </Card>
 
-      {/* Full Restore Dialog */}
       <AlertDialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>שחזור גרסה</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>
-                  האם את בטוחה שברצונך לשחזר את הגרסה הזו?
-                </p>
+                <p>האם את בטוחה שברצונך לשחזר את הגרסה הזו?</p>
                 {selectedVersion && (
                   <div className="p-4 bg-muted rounded-lg space-y-2">
                     <div className="flex justify-between text-sm">
@@ -479,7 +491,7 @@ const BackupHistory = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRestoring}>ביטול</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleRestore}
               disabled={isRestoring}
               className="bg-primary"
@@ -500,16 +512,16 @@ const BackupHistory = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Practice Sessions Only Restore Dialog */}
-      <AlertDialog open={isPracticeRestoreDialogOpen} onOpenChange={setIsPracticeRestoreDialogOpen}>
+      <AlertDialog
+        open={isPracticeRestoreDialogOpen}
+        onOpenChange={setIsPracticeRestoreDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>שחזור אימונים בלבד</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>
-                  פעולה זו תשחזר רק את נתוני האימונים מהגרסה הזו.
-                </p>
+                <p>פעולה זו תשחזר רק את נתוני האימונים מהגרסה הזו.</p>
                 {selectedVersion && (
                   <div className="p-4 bg-muted rounded-lg space-y-2">
                     <div className="flex justify-between text-sm">
@@ -535,7 +547,7 @@ const BackupHistory = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRestoringPractice}>ביטול</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handlePracticeRestore}
               disabled={isRestoringPractice}
               className="bg-primary"
