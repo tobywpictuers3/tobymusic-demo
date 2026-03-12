@@ -136,7 +136,7 @@ const Homepage = () => {
                   value={adminCode}
                   onChange={(e) => setAdminCode(e.target.value)}
                   placeholder="הקש קוד מנהל"
-                  className="mt-1 bg-black/10 border-gold text-gold placeholder:text-gold/50"
+                  className="mt-1 bg-black/10 border-gold text-[#800020] placeholder:text-gold/50"
                   onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
                 />
               </div>
@@ -165,7 +165,7 @@ const Homepage = () => {
                   value={studentCode}
                   onChange={(e) => setStudentCode(e.target.value)}
                   placeholder="הקישי קוד אישי"
-                  className="mt-1 bg-black/10 border-gold text-gold placeholder:text-gold/50"
+                  className="mt-1 bg-black/10 border-gold text-[#800020] placeholder:text-gold/50"
                   onKeyDown={(e) => e.key === "Enter" && handleStudentLogin()}
                 />
               </div>
