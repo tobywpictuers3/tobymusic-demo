@@ -220,41 +220,50 @@ const BackupHistory = () => {
   };
 
   const loadVersions = async () => {
-    setIsLoading(true);
-    try {
-      const result = await workerApi.listVersions();
+  setIsLoading(true);
+  try {
+    const result = await workerApi.listVersions();
 
-      if (result.success && result.data) {
-        const versionsArray = extractVersions(result.data);
+    console.log('listVersions raw result:', result);
 
-        const sorted = [...versionsArray].sort(
-          (a, b) =>
-            new Date(b.server_modified).getTime() -
-            new Date(a.server_modified).getTime()
-        );
+    if (result.success && result.data) {
+      const versionsArray = extractVersions(result.data);
 
-        setVersions(sorted);
-        logger.info(`Loaded ${sorted.length} versions`);
-      } else {
-        logger.error('Failed to load versions:', result.error);
-        toast({
-          title: '❌ שגיאה בטעינת היסטוריה',
-          description: `שגיאה: ${result.error || 'לא ניתן לטעון את רשימת הגרסאות'}`,
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      logger.error('Error loading versions:', error);
-      const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
+      console.log('versionsArray count:', versionsArray.length);
+      console.log('first 10 raw versions:', versionsArray.slice(0, 10));
+
+      const sorted = [...versionsArray].sort(
+        (a, b) =>
+          new Date(b.server_modified).getTime() -
+          new Date(a.server_modified).getTime()
+      );
+
+      console.log('newest version after sort:', sorted[0]);
+      console.log('oldest version after sort:', sorted[sorted.length - 1]);
+
+      setVersions(sorted);
+      logger.info(`Loaded ${sorted.length} versions`);
+    } else {
+      logger.error('Failed to load versions:', result.error);
       toast({
-        title: '❌ שגיאה',
-        description: `אירעה תקלה: ${errorMessage}`,
+        title: '❌ שגיאה בטעינת היסטוריה',
+        description: `שגיאה: ${result.error || 'לא ניתן לטעון את רשימת הגרסאות'}`,
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
-  };
+  } catch (error) {
+    logger.error('Error loading versions:', error);
+    const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
+    toast({
+      title: '❌ שגיאה',
+      description: `אירעה תקלה: ${errorMessage}`,
+      variant: 'destructive',
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
+  
 
   useEffect(() => {
     if (!devMode) {
