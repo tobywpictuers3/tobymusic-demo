@@ -87,17 +87,24 @@ const Homepage = () => {
       <ThemeToggle />
     </div>
 
-    <img
-      src={ASSETS.logos.noBackground}
-      alt="Toby Music Logo"
+    <div
       className="
-        block
-        w-[78%] sm:w-[82%] md:w-[90%] lg:w-full
-        max-w-[240px] sm:max-w-md md:max-w-4xl lg:max-w-5xl
-        max-h-[90px] sm:max-h-[120px] md:max-h-[180px] lg:max-h-[260px]
-        h-auto object-contain drop-shadow-2xl
+        relative mx-auto overflow-hidden
+        w-[260px] sm:w-[320px] md:w-[460px] lg:w-[620px]
+        h-[85px] sm:h-[105px] md:h-[145px] lg:h-[190px]
       "
-    />
+    >
+      <img
+        src={ASSETS.logos.noBackground}
+        alt="Toby Music Logo"
+        className="
+          absolute left-1/2 top-1/2
+          w-full h-full object-contain drop-shadow-2xl
+          -translate-x-1/2 -translate-y-1/2
+          scale-[2.15]
+        "
+      />
+    </div>
   </div>
 </header>
 
