@@ -81,8 +81,8 @@ const Homepage = () => {
     <div className="min-h-screen relative overflow-x-hidden page-enter">
       <BsiataDishmaya />
 
-      <header className="sticky top-0 z-50">
-  <div className="relative flex items-start justify-center px-4 pt-3 pb-2 md:pt-4 md:pb-3">
+    <header className="sticky top-0 z-50">
+  <div className="relative flex items-start justify-center px-4 pt-2 pb-1 md:pt-3 md:pb-2">
     <div className="absolute left-4 top-3">
       <ThemeToggle />
     </div>
@@ -90,8 +90,8 @@ const Homepage = () => {
     <div
       className="
         relative mx-auto overflow-hidden
-        w-[260px] sm:w-[320px] md:w-[460px] lg:w-[620px]
-        h-[85px] sm:h-[105px] md:h-[145px] lg:h-[190px]
+        w-[420px] sm:w-[520px] md:w-[760px] lg:w-[980px]
+        h-[120px] sm:h-[150px] md:h-[210px] lg:h-[260px]
       "
     >
       <img
@@ -100,8 +100,8 @@ const Homepage = () => {
         className="
           absolute left-1/2 top-1/2
           w-full h-full object-contain drop-shadow-2xl
-          -translate-x-1/2 -translate-y-1/2
-          scale-[2.15]
+          -translate-x-1/2 -translate-y-[52%]
+          scale-[3.6]
         "
       />
     </div>
