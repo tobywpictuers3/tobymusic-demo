@@ -98,7 +98,7 @@ const Homepage = () => {
         src={ASSETS.logos.noBackground}
         alt="Toby Music Logo"
         className="
-          absolute left-1/2 top-1/2
+          absolute left-1/2 top-[54%]
           w-full h-full object-contain drop-shadow-2xl
           -translate-x-1/2 -translate-y-[50%]
           scale-[2.45]
