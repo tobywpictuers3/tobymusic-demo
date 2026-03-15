@@ -1,4 +1,4 @@
-import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, PerLessonPayment, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase, YearlyLeaderboardEntry } from './types';
+import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, PerLessonPayment, PerLessonLedger, PerLessonLedgerRow, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase, YearlyLeaderboardEntry } from './types';
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 import { isDevMode, setDevMode } from './devMode';
@@ -865,6 +865,8 @@ export const deleteOneTimePayment = async (id: string): Promise<boolean> => {
 };
 
 // Per-Lesson Payments
+const roundTo2 = (value: number): number => Number(value.toFixed(2));
+
 export const getPerLessonPayments = (): PerLessonPayment[] => {
   if (isDevMode()) return devData['perLessonPayments'] || [];
   return inMemoryStorage['perLessonPayments'] || [];
@@ -887,38 +889,179 @@ export const addPerLessonPayment = (payment: Omit<PerLessonPayment, 'id'>): PerL
   return newPayment;
 };
 
+export const getStudentPerLessonPayments = (studentId: string): PerLessonPayment[] => {
+  return getPerLessonPayments().filter(p => p.studentId === studentId);
+};
+
+export const getCompletedLessonsForStudent = (studentId: string): Lesson[] => {
+  return getLessons()
+    .filter(l => l.studentId === studentId && l.status === 'completed')
+    .sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.startTime.localeCompare(b.startTime);
+    });
+};
+
+export const recalculatePerLessonStudentSummary = (studentId: string): Student | undefined => {
+  const student = getStudents().find(s => s.id === studentId);
+  if (!student || !student.lessonPrice || student.lessonPrice <= 0) return student;
+
+  const totalPaid = roundTo2(
+    getStudentPerLessonPayments(studentId).reduce((sum, payment) => sum + (payment.amount || 0), 0)
+  );
+  const paidLessonsCount = Math.floor(totalPaid / student.lessonPrice);
+  const perLessonBalance = roundTo2(totalPaid - (paidLessonsCount * student.lessonPrice));
+
+  return updateStudent(studentId, {
+    paidLessonsCount,
+    perLessonBalance,
+  });
+};
+
+export const getStudentPerLessonLedger = (studentId: string): PerLessonLedger => {
+  const student = getStudents().find(s => s.id === studentId);
+  const lessonPrice = student?.lessonPrice || 0;
+  const lessons = getCompletedLessonsForStudent(studentId);
+  const payments = getStudentPerLessonPayments(studentId)
+    .slice()
+    .sort((a, b) => {
+      const dateCompare = (a.paymentDate || '').localeCompare(b.paymentDate || '');
+      if (dateCompare !== 0) return dateCompare;
+      return a.id.localeCompare(b.id);
+    });
+
+  const paymentPools = payments.map(payment => ({
+    id: payment.id,
+    paymentDate: payment.paymentDate,
+    remaining: roundTo2(payment.amount || 0),
+  }));
+
+  const rows: PerLessonLedgerRow[] = [];
+  let runningBalance = 0;
+
+  for (const lesson of lessons) {
+    let remainingDue = roundTo2(lessonPrice);
+    let amountPaid = 0;
+    const paymentDates: string[] = [];
+
+    for (const payment of paymentPools) {
+      if (remainingDue <= 0) break;
+      if (payment.remaining <= 0) continue;
+
+      const allocated = roundTo2(Math.min(payment.remaining, remainingDue));
+      if (allocated <= 0) continue;
+
+      payment.remaining = roundTo2(payment.remaining - allocated);
+      remainingDue = roundTo2(remainingDue - allocated);
+      amountPaid = roundTo2(amountPaid + allocated);
+
+      if (!paymentDates.includes(payment.paymentDate)) {
+        paymentDates.push(payment.paymentDate);
+      }
+    }
+
+    const balance = roundTo2(amountPaid - lessonPrice);
+    runningBalance = roundTo2(runningBalance + amountPaid - lessonPrice);
+
+    rows.push({
+      id: lesson.id,
+      rowType: 'lesson',
+      lessonId: lesson.id,
+      lessonDate: lesson.date,
+      amountDue: roundTo2(lessonPrice),
+      amountPaid,
+      paymentDates,
+      balance,
+      runningBalance,
+    });
+  }
+
+  const remainingCreditPayments = paymentPools.filter(payment => payment.remaining > 0);
+  const remainingCredit = roundTo2(remainingCreditPayments.reduce((sum, payment) => sum + payment.remaining, 0));
+
+  if (remainingCredit > 0) {
+    runningBalance = roundTo2(runningBalance + remainingCredit);
+
+    rows.push({
+      id: `credit-${studentId}`,
+      rowType: 'credit',
+      amountDue: 0,
+      amountPaid: remainingCredit,
+      paymentDates: Array.from(new Set(remainingCreditPayments.map(payment => payment.paymentDate))),
+      balance: remainingCredit,
+      runningBalance,
+    });
+  }
+
+  const totalPaid = roundTo2(payments.reduce((sum, payment) => sum + (payment.amount || 0), 0));
+  const totalDue = roundTo2(lessons.length * lessonPrice);
+  const totalBalance = roundTo2(totalPaid - totalDue);
+
+  return {
+    lessonPrice,
+    completedLessonsCount: lessons.length,
+    totalDue,
+    totalPaid,
+    totalBalance,
+    rows,
+  };
+};
+
 export const updatePerLessonPayment = (id: string, updates: Partial<PerLessonPayment>): PerLessonPayment | undefined => {
   const payments = getPerLessonPayments();
   const index = payments.findIndex(p => p.id === id);
   if (index === -1) return undefined;
-  
-  payments[index] = { ...payments[index], ...updates };
-  
+
+  const previousPayment = payments[index];
+  const nextStudentId = updates.studentId || previousPayment.studentId;
+  const nextPaymentDate = updates.paymentDate || previousPayment.paymentDate;
+  const nextAmount = typeof updates.amount === 'number' ? updates.amount : previousPayment.amount;
+  const nextStudent = getStudents().find(s => s.id === nextStudentId);
+
+  payments[index] = {
+    ...previousPayment,
+    ...updates,
+    paymentDate: nextPaymentDate,
+    month: nextPaymentDate.substring(0, 7),
+    lessonsCount: nextStudent?.lessonPrice ? Math.floor(nextAmount / nextStudent.lessonPrice) : previousPayment.lessonsCount,
+  };
+
   if (isDevMode()) {
     devData['perLessonPayments'] = payments;
   } else {
     inMemoryStorage['perLessonPayments'] = payments;
     hybridSync.onDataChange();
   }
+
+  recalculatePerLessonStudentSummary(previousPayment.studentId);
+  if (nextStudentId !== previousPayment.studentId) {
+    recalculatePerLessonStudentSummary(nextStudentId);
+  }
+
   return payments[index];
 };
 
 export const deletePerLessonPayment = async (id: string): Promise<boolean> => {
   const payments = getPerLessonPayments();
+  const paymentToDelete = payments.find(p => p.id === id);
+  if (!paymentToDelete) return false;
+
   const updated = payments.filter(p => p.id !== id);
-  if (updated.length === payments.length) return false;
-  
+
   if (isDevMode()) {
     devData['perLessonPayments'] = updated;
   } else {
     inMemoryStorage['perLessonPayments'] = updated;
+  }
+
+  recalculatePerLessonStudentSummary(paymentToDelete.studentId);
+
+  if (!isDevMode()) {
     await hybridSync.onDestructiveChange();
   }
-  return true;
-};
 
-export const getStudentPerLessonPayments = (studentId: string): PerLessonPayment[] => {
-  return getPerLessonPayments().filter(p => p.studentId === studentId);
+  return true;
 };
 
 // Record a per-lesson payment with balance tracking
@@ -930,17 +1073,16 @@ export const recordPerLessonPayment = (
 ): { payment: PerLessonPayment; newBalance: number; lessonsCovered: number } | null => {
   const student = getStudents().find(s => s.id === studentId);
   if (!student || !student.lessonPrice) return null;
-  
+
   const lessonPrice = student.lessonPrice;
-  const completedLessons = getCompletedLessonsCount(studentId);
   const currentPaidLessons = student.paidLessonsCount || 0;
   const currentBalance = student.perLessonBalance || 0;
-  
+
   // Calculate how many lessons this payment covers
   const totalAvailable = amount + currentBalance;
   const lessonsCovered = Math.floor(totalAvailable / lessonPrice);
-  const newBalance = totalAvailable - (lessonsCovered * lessonPrice);
-  
+  const newBalance = roundTo2(totalAvailable - (lessonsCovered * lessonPrice));
+
   // Create payment record
   const payment = addPerLessonPayment({
     studentId,
@@ -950,14 +1092,14 @@ export const recordPerLessonPayment = (
     month: paymentDate.substring(0, 7), // YYYY-MM
     notes,
   });
-  
-  // Update student
-  updateStudent(studentId, {
-    paidLessonsCount: currentPaidLessons + lessonsCovered,
-    perLessonBalance: newBalance,
-  });
-  
-  return { payment, newBalance, lessonsCovered };
+
+  const updatedStudent = recalculatePerLessonStudentSummary(studentId);
+
+  return {
+    payment,
+    newBalance: updatedStudent?.perLessonBalance ?? newBalance,
+    lessonsCovered: Math.max(0, (updatedStudent?.paidLessonsCount ?? currentPaidLessons) - currentPaidLessons),
+  };
 };
 
 // Convert annual student to per-lesson and migrate existing payments
@@ -2068,8 +2210,7 @@ export const purchaseStoreItem = async (
 
 // Get count of completed lessons for a student
 export const getCompletedLessonsCount = (studentId: string): number => {
-  const lessons = getLessons();
-  return lessons.filter(l => l.studentId === studentId && l.status === 'completed').length;
+  return getCompletedLessonsForStudent(studentId).length;
 };
 
 // Update paid lessons count for a student
