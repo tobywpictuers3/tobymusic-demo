@@ -91,9 +91,9 @@ const AdminDashboard = () => {
 
   const getTabName = (tab: string) => {
     const tabNames: Record<string, string> = {
-      students: 'תלמידות', journal: 'יומן שיעורים', 'fixed-schedule': 'מערכת קבועה',
+      journal: 'יומן שיעורים', students: 'תלמידות', 
       payments: 'תשלומים', performances: 'הופעות', practice: 'נתוני אימונים',
-      messages: 'תקשורת', backup: 'גיבוי', history: 'היסטוריה'
+      messages: 'תקשורת', backup: 'גיבוי', 'fixed-schedule': 'מערכת קבועה', history: 'היסטוריה'
     };
     return tabNames[tab] || 'תצוגה';
   };
