@@ -172,44 +172,52 @@ const AdminDashboard = () => {
       <div className="max-h-screen overflow-y-auto">
         <div id="main-content" className="container mx-auto p-4 space-y-6 pt-2">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-10 card-gradient card-shadow">
-              <TabsTrigger value="students" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                תלמידות
-              </TabsTrigger>
-              <TabsTrigger value="journal" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                יומן שיעורים
-              </TabsTrigger>
-              <TabsTrigger value="fixed-schedule" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                מערכת קבועה
-              </TabsTrigger>
-              <TabsTrigger value="payments" className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                תשלומים
-              </TabsTrigger>
-              <TabsTrigger value="performances" className="flex items-center gap-2">
-                <Music className="h-4 w-4" />
-                הופעות
-              </TabsTrigger>
-              <TabsTrigger value="practice" className="flex items-center gap-2">
-                <Trophy className="h-4 w-4" />
-                נתוני אימונים
-              </TabsTrigger>
-              <TabsTrigger value="messages" className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                תקשורת
-              </TabsTrigger>
-              <TabsTrigger value="backup" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                גיבוי
-              </TabsTrigger>
-              <TabsTrigger value="history" className="flex items-center gap-2">
-                <History className="h-4 w-4" />
-                היסטוריה
-              </TabsTrigger>
-            </TabsList>
+            <TabsList className="grid w-full grid-cols-9 card-gradient card-shadow">
+  <TabsTrigger value="journal" className="flex items-center gap-2">
+    <Calendar className="h-4 w-4" />
+    יומן שיעורים
+  </TabsTrigger>
+
+  <TabsTrigger value="students" className="flex items-center gap-2">
+    <Users className="h-4 w-4" />
+    תלמידות
+  </TabsTrigger>
+
+  <TabsTrigger value="payments" className="flex items-center gap-2">
+    <CreditCard className="h-4 w-4" />
+    תשלומים
+  </TabsTrigger>
+
+  <TabsTrigger value="performances" className="flex items-center gap-2">
+    <Music className="h-4 w-4" />
+    הופעות
+  </TabsTrigger>
+
+  <TabsTrigger value="practice" className="flex items-center gap-2">
+    <Trophy className="h-4 w-4" />
+    נתוני אימונים
+  </TabsTrigger>
+
+  <TabsTrigger value="messages" className="flex items-center gap-2">
+    <MessageSquare className="h-4 w-4" />
+    תקשורת
+  </TabsTrigger>
+
+  <TabsTrigger value="backup" className="flex items-center gap-2">
+    <FileText className="h-4 w-4" />
+    גיבוי
+  </TabsTrigger>
+
+  <TabsTrigger value="fixed-schedule" className="flex items-center gap-2">
+    <Settings className="h-4 w-4" />
+    מערכת קבועה
+  </TabsTrigger>
+
+  <TabsTrigger value="history" className="flex items-center gap-2">
+    <History className="h-4 w-4" />
+    היסטוריה
+  </TabsTrigger>
+</TabsList>
 
             <TabsContent value="students" className="fade-slide-in">
               <BrandSection index={0}>
