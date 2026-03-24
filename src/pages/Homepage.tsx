@@ -69,7 +69,7 @@ const Homepage = () => {
     } else {
       toast({
         title: "שגיאה",
-        description: "קוד אישי שגוי. יש לפנות למנהלת לקבלת הקוד הנכון",
+        description: "קוד אישי שגוי. פני למנהלת לקבלת הקוד הנכון",
         variant: "destructive",
       });
     }
