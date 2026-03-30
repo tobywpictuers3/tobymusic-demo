@@ -515,8 +515,10 @@ class HybridSyncManager {
     }
 
     if (this.isSyncingInternal) {
-      logger.info('⏳ Sync already in progress');
-      return false;
+      // Don't drop — mark that we need a resync after current one finishes
+      logger.info('⏳ Sync in progress — marking pending resync');
+      this.pendingResync = true;
+      return true; // optimistic: it will be synced
     }
 
     this.isSyncingInternal = true;
@@ -569,11 +571,14 @@ class HybridSyncManager {
     } finally {
       this.isSyncingInternal = false;
       this.setSyncing(false);
-    }
-  }
 
-  private gatherAllData(): any {
-    return exportAllData();
+      // If another change came in while we were syncing, run one more sync
+      if (this.pendingResync) {
+        this.pendingResync = false;
+        logger.info('🔄 Running pending resync (data changed during sync)...');
+        await this.syncToWorker();
+      }
+    }
   }
 
   private async processPendingQueue() {
