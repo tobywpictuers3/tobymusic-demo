@@ -1,161 +1,75 @@
 
 
-## תוכנית: עדכון עיצוב כולל -- כרטיסים, כפתורים, טבלאות, אפקטים
+## ניתוח בעיית סנכרון נתונים ותוכנית תיקון
 
-### שלב 0: תיקון שגיאת בנייה (קריטי)
+### הבעיה שזוהתה
 
-**קובץ:** `src/pages/Homepage.tsx` שורה 86
+**שורש הבעיה:** כשקוראים ל-`hybridSync.onDataChange()` בלי `await`, הקריאה מתחילה סנכרון אסינכרוני. אם קריאה שנייה מגיעה בזמן שהראשונה עדיין פעילה, היא נדחית בשקט (שורה 496-498: `if (this.isSyncingInternal) return false`). הנתונים נשארים בזיכרון אבל לא עולים לענן.
 
-`ASSETS.backgrounds.pianoflute` לא קיים. הנכס הנכון הוא `ASSETS.hero.pianoFlute`. מחליפים את הרקע בדף הבית בהתאם.
+**תרחיש לדוגמה:**
+1. מעדכנים תשלום → `onDataChange()` מתחיל סנכרון (download + merge + upload = ~2-4 שניות)
+2. תוך שנייה מעדכנים חופשה → `onDataChange()` נקרא שוב → `isSyncingInternal=true` → **נדחה בשקט**
+3. רענון דף → החופשה לא קיימת כי לא עלתה לענן
+
+**היקף:** ~30 פונקציות כתיבה קוראות `hybridSync.onDataChange()` בלי await, כולל: תשלומים, שיעורים, חופשות, ביצועים, חנות, ועוד.
 
 ---
 
-### שלב 1: כרטיסים -- בורדו-זהב 80% אטימות
+### תוכנית תיקון
 
-**קובץ:** `src/index.css`
+#### שלב 1: הוספת מנגנון debounce עם סנכרון מובטח
 
-עדכון `.card-wine-gold-70` (או יצירת מחלקה חדשה `.card-brand`) עם gradient בורדו-זהב ב-80% אטימות:
+**קובץ:** `src/lib/hybridSync.ts`
 
-```css
-.card-brand {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--wine-main) 80%, transparent) 0%,
-    color-mix(in srgb, var(--gold-main) 80%, transparent) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--gold-main) 50%, transparent);
-}
+במקום לחסום קריאות נוספות, נוסיף מנגנון debounce שמבטיח שסנכרון אחרון תמיד יתבצע:
+
+- כל קריאה ל-`onDataChange()` תסמן `pendingSync = true`
+- אם סנכרון כבר רץ, לא נדחה — רק נסמן שצריך סנכרון נוסף
+- בסוף כל סנכרון, נבדוק אם `pendingSync = true` ונריץ סנכרון נוסף
+- זה מבטיח שהמצב האחרון בזיכרון תמיד יעלה לענן
+
+```text
+onDataChange() called
+  ├── sync NOT running → start sync, set pendingSync=false
+  │     └── sync done → check pendingSync?
+  │           ├── yes → run sync again (with latest data)
+  │           └── no  → done
+  └── sync IS running → set pendingSync=true (don't drop!)
 ```
 
-החלה על כל Card ברחבי האפליקציה (Homepage, Dashboards).
+#### שלב 2: הוספת דיליי קצר (debounce 500ms)
+
+למניעת סנכרונים מיותרים כשיש פעולות מהירות ברצף (למשל עדכון כמה שדות), נוסיף debounce של 500ms:
+
+- כל קריאה ל-`onDataChange()` מאפסת טיימר של 500ms
+- הסנכרון האמיתי מתבצע אחרי 500ms ללא קריאה נוספת
+- זה חוסך קריאות רשת מיותרות בלי לסכן אובדן נתונים
+
+#### שלב 3: עדכון `beforeunload` לבדיקת dirty state
+
+אם המשתמשת סוגרת דפדפן בזמן שיש debounce ממתין — ננסה `sendBeacon` אחרון.
 
 ---
 
-### שלב 2: קומפוננטות ראשיות -- לבן/שחור עם fade לשקיפות
+### פרטים טכניים
 
-**קובץ:** `src/index.css`
+**קובץ שישתנה:** `src/lib/hybridSync.ts` בלבד
 
-מחלקה חדשה `.section-fade`:
+שינויים ב-`syncToWorker()`:
+- הסרת `return false` כש-`isSyncingInternal=true`
+- הוספת `private pendingResync = false`
+- בלוק finally: `if (this.pendingResync) { this.pendingResync = false; await this.syncToWorker(); }`
 
-```css
-.section-fade {
-  background: linear-gradient(
-    to bottom,
-    hsl(var(--background)) 0%,
-    hsl(var(--background) / 0.8) 60%,
-    transparent 100%
-  );
-}
-```
+שינויים ב-`onDataChange()`:
+- הוספת `private debounceTimer: ReturnType<typeof setTimeout> | null`
+- עטיפת הקריאה ל-`syncToWorker()` ב-debounce של 500ms
+- Promise חדש שמחזיר תוצאה אחרי שהסנכרון באמת מסתיים
 
-כך שהחלק העליון (עם טקסט) אטום, ובסוף הקומפוננטה -- שקיפות מלאה שמגלה את הרקע מאחור.
+**לא נדרש שינוי** ב-`storage.ts` — כל הפונקציות הקיימות ימשיכו לקרוא `hybridSync.onDataChange()` כרגיל, והמנגנון החדש ידאג שהסנכרון האחרון תמיד יתבצע.
 
----
+### סיכום
 
-### שלב 3: כפתורים -- צבעי מותג
-
-**קובץ:** `src/index.css`
-
-מחלקות כפתורים חדשות:
-
-```css
-.btn-gold {
-  background: var(--gold-main);
-  color: var(--wine-main);
-}
-.btn-confirm {
-  background: var(--brand-red, #b71c1c);
-  color: white;
-}
-.btn-delete {
-  background: var(--wine-main);
-  color: white;
-}
-.btn-edit-theme {
-  /* light: black, dark: gold */
-  background: black;
-  color: white;
-}
-.dark .btn-edit-theme {
-  background: var(--gold-main);
-  color: var(--wine-main);
-}
-```
-
-עדכון כפתורים ב-Homepage (כניסה = gold, כניסה כמנהל = red), AdminDashboard (מחיקה = burgundy, עריכה = theme-aware), StudentDashboard (בהתאם).
-
----
-
-### שלב 4: ביטול fade בתמונת pianoflute
-
-**קובץ:** `src/components/ui/PageBackground.tsx`
-
-הסרת `maskImage` ו-`WebkitMaskImage` מהרכיב התחתון. התמונה תוצג ללא כל fade -- חתך ישיר.
-
----
-
-### שלב 5: טבלאות -- gold בבהיר, red בכהה
-
-**קובץ:** `src/index.css`
-
-```css
-table, .table-brand {
-  background-image: url(...gold...);
-}
-.dark table, .dark .table-brand {
-  background-image: url(...red...);
-}
-```
-
-מכיוון שה-URL מגיע מ-ASSETS (runtime), נשתמש ב-CSS custom properties שנקבעים ב-JS:
-
-**קובץ:** `src/components/ui/PageBackground.tsx` (או BrandProvider)
-
-הגדרת `--table-bg-light` ו-`--table-bg-dark` כ-CSS variables, ואז בטבלאות:
-
-```css
-table {
-  background-image: var(--table-bg);
-  background-size: cover;
-}
-```
-
----
-
-### שלב 6: אפקטים -- גלילה, מעברי עמודים, נצנוץ בריחוף
-
-**קובץ:** `src/index.css`
-
-**נצנוץ בריחוף:**
-```css
-.hover-sparkle {
-  transition: box-shadow 0.3s, transform 0.2s;
-}
-.hover-sparkle:hover {
-  box-shadow: 0 0 20px rgba(230, 182, 92, 0.5),
-              0 0 40px rgba(230, 182, 92, 0.3);
-  transform: translateY(-2px);
-}
-```
-
-**אפקט גלילה (scroll reveal):**
-
-מחלקת `.scroll-reveal` עם `opacity: 0; transform: translateY(20px)` שמופעלת עם IntersectionObserver ב-JS. קומפוננטה קטנה `ScrollReveal` שעוטפת תוכן.
-
-**מעברי עמודים:**
-
-עדכון `.fade-slide-in` הקיימת להיות חלקה יותר (0.4s) והחלה על כל `TabsContent` ו-route transitions.
-
----
-
-### סיכום קבצים
-
-| פעולה | קובץ |
-|-------|------|
-| עריכה | `src/index.css` -- מחלקות חדשות: card-brand, section-fade, btn-*, hover-sparkle, scroll-reveal, טבלאות |
-| עריכה | `src/pages/Homepage.tsx` -- תיקון build error (pianoflute), החלת card-brand, btn-gold/btn-confirm |
-| עריכה | `src/components/ui/PageBackground.tsx` -- הסרת mask/fade מ-pianoflute, הוספת CSS vars לטבלאות |
-| עריכה | `src/pages/AdminDashboard.tsx` -- החלת card-brand, section-fade, btn-delete/btn-edit-theme, hover-sparkle |
-| עריכה | `src/pages/StudentDashboard.tsx` -- החלת card-brand, section-fade, hover-sparkle על כרטיסים |
-| יצירה | `src/components/ui/ScrollReveal.tsx` -- wrapper קומפוננטה עם IntersectionObserver לאפקט גלילה |
+| קובץ | שינוי |
+|---|---|
+| `src/lib/hybridSync.ts` | debounce 500ms + pending-resync loop שמבטיח סנכרון אחרון |
 
