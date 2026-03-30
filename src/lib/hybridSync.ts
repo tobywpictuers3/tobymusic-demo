@@ -193,7 +193,10 @@ class HybridSyncManager {
         return;
       }
 
-      if (this.syncState.pendingChanges > 0) {
+      // If there's a pending debounce, treat it as pending changes
+      const hasPendingDebounce = this.debounceTimer !== null;
+
+      if (this.syncState.pendingChanges > 0 || hasPendingDebounce) {
         const warningMessage =
           'יש שינויים שטרם נשמרו בדרופבוקס! האם את בטוחה שאת רוצה לצאת?';
         e.preventDefault();
