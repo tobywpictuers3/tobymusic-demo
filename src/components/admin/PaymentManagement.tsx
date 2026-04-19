@@ -779,11 +779,29 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
 
   const getPerformancesForMonthDetailed = (monthNum: string) => {
     const monthKey = getAcademicMonthKey(monthNum);
-
-    return getPerformances()
-      .filter(performance => performance.paidDate && performance.paidDate.startsWith(monthKey))
-      .slice()
-      .sort((a, b) => (b.paidDate || '').localeCompare(a.paidDate || ''));
+    const out: Array<{
+      paymentId: string;
+      performance: Performance;
+      paymentDate: string;
+      paidAmount: number;
+      method?: string;
+      paymentNotes?: string;
+    }> = [];
+    getPerformances().forEach(perf => {
+      (perf.performancePayments || []).forEach(pp => {
+        if (pp.date && pp.date.startsWith(monthKey)) {
+          out.push({
+            paymentId: pp.id,
+            performance: perf,
+            paymentDate: pp.date,
+            paidAmount: pp.amount || 0,
+            method: pp.method,
+            paymentNotes: pp.notes,
+          });
+        }
+      });
+    });
+    return out.sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
   };
 
   const getDailyAllPaymentsRows = () => {
@@ -837,9 +855,11 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
     });
 
     getPerformances().forEach(performance => {
-      const paidDate = performance.paidDate?.slice(0, 10) || '';
-      if (!paidDate.startsWith(monthKey)) return;
-      ensureRow(paidDate).performances += (performance.amount || 0) + (performance.travel || 0);
+      (performance.performancePayments || []).forEach(pp => {
+        const d = (pp.date || '').slice(0, 10);
+        if (!d.startsWith(monthKey)) return;
+        ensureRow(d).performances += pp.amount || 0;
+      });
     });
 
     return Array.from(map.entries())
