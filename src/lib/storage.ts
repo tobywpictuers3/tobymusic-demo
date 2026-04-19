@@ -1,4 +1,4 @@
-import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, OneTimePayment, PerLessonPayment, PerLessonLedger, PerLessonLedgerRow, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase, YearlyLeaderboardEntry } from './types';
+import { Student, Lesson, Payment, SwapRequest, FileEntry, ScheduleTemplate, IntegrationSettings, Performance, PerformancePayment, OneTimePayment, PerLessonPayment, PerLessonLedger, PerLessonLedgerRow, Holiday, PracticeSession, MonthlyAchievement, LeaderboardEntry, MedalRecord, StoreItem, StorePurchase, YearlyLeaderboardEntry } from './types';
 import { hybridSync } from './hybridSync';
 import { logger } from './logger';
 import { isDevMode, setDevMode } from './devMode';
@@ -764,9 +764,115 @@ export const calculateLessonNumber = (studentId: string, lessonDate: string, les
 };
 
 // Performances
+
+/**
+ * Migrate legacy performance records: if there are no performancePayments[]
+ * but there is a paidDate + amount + a "paid" status, synthesize a single
+ * payment entry from the legacy fields. Pure function — does not persist.
+ */
+const migratePerformanceShape = (perf: Performance): Performance => {
+  if (perf.performancePayments && perf.performancePayments.length > 0) return perf;
+  if (perf.paidDate && perf.amount && perf.amount > 0 && perf.paymentStatus !== 'not_paid') {
+    return {
+      ...perf,
+      performancePayments: [
+        {
+          id: `${perf.id}-legacy`,
+          date: perf.paidDate.slice(0, 10),
+          amount: perf.amount,
+          method: perf.paymentStatus === 'not_paid' ? undefined : perf.paymentStatus,
+          notes: 'מיגרציה אוטומטית מתשלום ישן',
+        },
+      ],
+    };
+  }
+  return { ...perf, performancePayments: perf.performancePayments || [] };
+};
+
 export const getPerformances = (): Performance[] => {
-  if (isDevMode()) return devData['performances'] || [];
-  return inMemoryStorage['performances'] || [];
+  const raw: Performance[] = isDevMode() ? (devData['performances'] || []) : (inMemoryStorage['performances'] || []);
+  return raw.map(migratePerformanceShape);
+};
+
+/** Sum of all recorded payments for a performance (excludes travel). */
+export const getPerformancePaidTotal = (perf: Performance): number => {
+  const migrated = migratePerformanceShape(perf);
+  return (migrated.performancePayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+};
+
+/** Derived status from performancePayments[]. */
+export const getPerformancePaymentStatus = (perf: Performance): 'not_paid' | 'partial' | 'paid' => {
+  const total = (perf.amount || 0);
+  const paid = getPerformancePaidTotal(perf);
+  if (paid <= 0) return 'not_paid';
+  if (total > 0 && paid < total) return 'partial';
+  return 'paid';
+};
+
+/** Add a payment entry to a performance (source of truth for income). */
+export const addPerformancePayment = (
+  performanceId: string,
+  payment: Omit<PerformancePayment, 'id'>
+): Performance | undefined => {
+  const performances = getPerformances();
+  const idx = performances.findIndex(p => p.id === performanceId);
+  if (idx === -1) return undefined;
+  const newEntry: PerformancePayment = { ...payment, id: generateId() };
+  const existing = performances[idx].performancePayments || [];
+  performances[idx] = {
+    ...performances[idx],
+    performancePayments: [...existing, newEntry],
+    lastModified: new Date().toISOString(),
+  };
+  if (isDevMode()) {
+    devData['performances'] = performances;
+  } else {
+    inMemoryStorage['performances'] = performances;
+    hybridSync.onDataChange();
+  }
+  return performances[idx];
+};
+
+export const updatePerformancePayment = (
+  performanceId: string,
+  paymentId: string,
+  updates: Partial<Omit<PerformancePayment, 'id'>>
+): Performance | undefined => {
+  const performances = getPerformances();
+  const idx = performances.findIndex(p => p.id === performanceId);
+  if (idx === -1) return undefined;
+  const list = performances[idx].performancePayments || [];
+  const updated = list.map(p => (p.id === paymentId ? { ...p, ...updates } : p));
+  performances[idx] = { ...performances[idx], performancePayments: updated, lastModified: new Date().toISOString() };
+  if (isDevMode()) {
+    devData['performances'] = performances;
+  } else {
+    inMemoryStorage['performances'] = performances;
+    hybridSync.onDataChange();
+  }
+  return performances[idx];
+};
+
+export const deletePerformancePayment = (
+  performanceId: string,
+  paymentId: string
+): Performance | undefined => {
+  const performances = getPerformances();
+  const idx = performances.findIndex(p => p.id === performanceId);
+  if (idx === -1) return undefined;
+  const list = performances[idx].performancePayments || [];
+  performances[idx] = {
+    ...performances[idx],
+    performancePayments: list.filter(p => p.id !== paymentId),
+    lastModified: new Date().toISOString(),
+  };
+  if (isDevMode()) {
+    devData['performances'] = performances;
+  } else {
+    inMemoryStorage['performances'] = performances;
+    hybridSync.onDataChange();
+  }
+  return performances[idx];
 };
 
 export const addPerformance = (performance: Omit<Performance, 'id' | 'createdAt'>): Performance => {
