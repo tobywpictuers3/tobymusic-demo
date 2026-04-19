@@ -99,7 +99,8 @@ export interface PerLessonLedger {
 export interface PerformancePayment {
   id: string;
   date: string;     // YYYY-MM-DD - actual date money received
-  amount: number;   // Amount in NIS (excludes travel reimbursement)
+  amount: number;   // Income amount in NIS — EXCLUDES travel. Source of truth for income/tithe.
+  travel?: number;  // Travel reimbursement received in this payment (info only — NEVER counted as income)
   method?: 'bank' | 'check' | 'cash';
   notes?: string;
 }

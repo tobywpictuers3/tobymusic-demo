@@ -780,6 +780,7 @@ const migratePerformanceShape = (perf: Performance): Performance => {
           id: `${perf.id}-legacy`,
           date: perf.paidDate.slice(0, 10),
           amount: perf.amount,
+          travel: perf.travel || 0,
           method: (perf.paymentStatus as any) === 'not_paid' ? undefined : (perf.paymentStatus as 'bank' | 'check' | 'cash'),
           notes: 'מיגרציה אוטומטית מתשלום ישן',
         },
@@ -794,10 +795,16 @@ export const getPerformances = (): Performance[] => {
   return raw.map(migratePerformanceShape);
 };
 
-/** Sum of all recorded payments for a performance (excludes travel). */
+/** Sum of all recorded INCOME payments for a performance (excludes travel — source of truth for income/tithe). */
 export const getPerformancePaidTotal = (perf: Performance): number => {
   const migrated = migratePerformanceShape(perf);
   return (migrated.performancePayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+};
+
+/** Sum of all travel reimbursements received. Info only — NEVER counted as income. */
+export const getPerformancePaidTravelTotal = (perf: Performance): number => {
+  const migrated = migratePerformanceShape(perf);
+  return (migrated.performancePayments || []).reduce((sum, p) => sum + (p.travel || 0), 0);
 };
 
 /** Derived status from performancePayments[]. */
