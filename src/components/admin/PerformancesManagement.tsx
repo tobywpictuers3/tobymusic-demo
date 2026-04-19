@@ -9,12 +9,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/s
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/safe-ui/table';
 import { Calendar } from '@/components/safe-ui/calendar';
 import { Music, Download, Plus, Edit, Trash2, Check } from 'lucide-react';
-import { getPerformances, addPerformance, updatePerformance, deletePerformance } from '@/lib/storage';
+import {
+  getPerformances,
+  addPerformance,
+  updatePerformance,
+  deletePerformance,
+  addPerformancePayment,
+  deletePerformancePayment,
+  getPerformancePaidTotal,
+  getPerformancePaymentStatus,
+} from '@/lib/storage';
 import { Performance } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { syncManager } from '@/lib/syncManager';
 
 const PerformancesManagement = () => {
   const [performances, setPerformances] = useState<Performance[]>([]);
@@ -23,6 +31,9 @@ const PerformancesManagement = () => {
   const [showSelectionDialog, setShowSelectionDialog] = useState(false);
   const [editingPerformance, setEditingPerformance] = useState<Performance | null>(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState<Performance[]>([]);
+
+  // Collection / payment status filter for the closed performances table
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'not_paid' | 'partial' | 'paid'>('all');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -36,11 +47,15 @@ const PerformancesManagement = () => {
     travel: '',
     invoiceNumber: '',
     receiptNumber: '',
-    paymentStatus: 'not_paid' as Performance['paymentStatus'],
-    paidDate: '',
     notes: '',
     status: 'open' as Performance['status']
   });
+
+  // Inline new-payment editor (used inside Edit dialog)
+  const [newPpDate, setNewPpDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newPpAmount, setNewPpAmount] = useState('');
+  const [newPpMethod, setNewPpMethod] = useState<'bank' | 'check' | 'cash'>('bank');
+  const [newPpNotes, setNewPpNotes] = useState('');
 
   useEffect(() => {
     loadData();
@@ -49,6 +64,8 @@ const PerformancesManagement = () => {
   const loadData = () => {
     setPerformances(getPerformances());
   };
+
+  const formatCurrencyAmount = (n: number) => Number.isInteger(n) ? n.toString() : n.toFixed(2);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
@@ -79,11 +96,12 @@ const PerformancesManagement = () => {
       travel: '',
       invoiceNumber: '',
       receiptNumber: '',
-      paymentStatus: 'not_paid',
-      paidDate: '',
       notes: '',
       status: 'open'
     });
+    setNewPpAmount('');
+    setNewPpNotes('');
+    setNewPpDate(new Date().toISOString().split('T')[0]);
     setShowEventDialog(true);
     setShowSelectionDialog(false);
   };
@@ -102,11 +120,12 @@ const PerformancesManagement = () => {
       travel: performance.travel?.toString() || '',
       invoiceNumber: performance.invoiceNumber || '',
       receiptNumber: performance.receiptNumber || '',
-      paymentStatus: performance.paymentStatus,
-      paidDate: performance.paidDate || '',
       notes: performance.notes || '',
       status: performance.status
     });
+    setNewPpAmount('');
+    setNewPpNotes('');
+    setNewPpDate(new Date().toISOString().split('T')[0]);
     setShowEventDialog(true);
     setShowSelectionDialog(false);
   };
@@ -133,15 +152,13 @@ const PerformancesManagement = () => {
       travel: formData.travel ? parseFloat(formData.travel) : undefined,
       invoiceNumber: formData.invoiceNumber || undefined,
       receiptNumber: formData.receiptNumber || undefined,
-      paymentStatus: formData.paymentStatus,
-      paidDate: formData.paidDate || undefined,
+      // Legacy fields kept for back-compat; not used as source of truth
+      paymentStatus: 'not_paid' as Performance['paymentStatus'],
       notes: formData.notes || undefined,
       status: formData.status
     };
 
-    const isUpdate = !!editingPerformance;
-
-    if (isUpdate) {
+    if (editingPerformance) {
       updatePerformance(editingPerformance.id, performanceData);
       toast({ description: 'ההופעה עודכנה בהצלחה' });
     } else {
@@ -155,11 +172,41 @@ const PerformancesManagement = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('האם למחוק הופעה זו?')) {
-      const performance = performances.find(p => p.id === id);
-      
       deletePerformance(id);
       loadData();
       toast({ description: 'ההופעה נמחקה' });
+    }
+  };
+
+  const handleAddPaymentInline = () => {
+    if (!editingPerformance) return;
+    const amt = parseFloat(newPpAmount);
+    if (!amt || amt <= 0) {
+      toast({ title: 'שגיאה', description: 'יש להזין סכום תשלום חיובי', variant: 'destructive' });
+      return;
+    }
+    const updated = addPerformancePayment(editingPerformance.id, {
+      date: newPpDate,
+      amount: amt,
+      method: newPpMethod,
+      notes: newPpNotes || undefined,
+    });
+    if (updated) {
+      setEditingPerformance(updated);
+      loadData();
+      setNewPpAmount('');
+      setNewPpNotes('');
+      toast({ description: 'תשלום נוסף' });
+    }
+  };
+
+  const handleDeletePaymentInline = (paymentId: string) => {
+    if (!editingPerformance) return;
+    const updated = deletePerformancePayment(editingPerformance.id, paymentId);
+    if (updated) {
+      setEditingPerformance(updated);
+      loadData();
+      toast({ description: 'תשלום נמחק' });
     }
   };
 
@@ -176,12 +223,8 @@ const PerformancesManagement = () => {
 
   const closedPerformances = performances
     .filter(p => p.status === 'closed')
+    .filter(p => paymentStatusFilter === 'all' ? true : getPerformancePaymentStatus(p) === paymentStatusFilter)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  const getPerformancesForDate = (date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return performances.filter(p => p.date === dateStr);
-  };
 
   const modifiers = {
     hasEvent: (date: Date) => {
@@ -206,6 +249,23 @@ const PerformancesManagement = () => {
     { value: 'evening', label: 'ערב' },
     { value: 'night', label: 'לילה' }
   ];
+
+  const renderStatusBadge = (perf: Performance) => {
+    const status = getPerformancePaymentStatus(perf);
+    const paid = getPerformancePaidTotal(perf);
+    const due = perf.amount || 0;
+    const cls = status === 'paid'
+      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+      : status === 'partial'
+        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+        : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200';
+    const label = status === 'paid'
+      ? 'שולם'
+      : status === 'partial'
+        ? `חלקי ₪${formatCurrencyAmount(paid)}/₪${formatCurrencyAmount(due)}`
+        : 'לא שולם';
+    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
+  };
 
   return (
     <div className="space-y-6">
@@ -253,51 +313,70 @@ const PerformancesManagement = () => {
 
           {/* Closed Performances Table */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">הופעות סגורות</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h3 className="text-lg font-semibold">הופעות סגורות</h3>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">סינון לגביה:</Label>
+                <Select value={paymentStatusFilter} onValueChange={(v: 'all' | 'not_paid' | 'partial' | 'paid') => setPaymentStatusFilter(v)}>
+                  <SelectTrigger className="h-9 w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">הכל</SelectItem>
+                    <SelectItem value="not_paid">לא שולם</SelectItem>
+                    <SelectItem value="partial">שולם חלקית</SelectItem>
+                    <SelectItem value="paid">שולם</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="overflow-x-auto" dir="rtl">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-right w-[150px]">שם ההופעה</TableHead>
+                    <TableHead className="text-right w-[160px]">שם ההופעה</TableHead>
                     <TableHead className="text-right w-[120px]">מזמינה</TableHead>
                     <TableHead className="text-right w-[100px]">תאריך</TableHead>
-                    <TableHead className="text-right w-[80px]">סכום</TableHead>
-                    <TableHead className="text-right w-[110px]">סכום + נסיעות</TableHead>
-                    <TableHead className="text-right w-[100px]">תאריך תשלום</TableHead>
+                    <TableHead className="text-right w-[90px]">סכום</TableHead>
+                    <TableHead className="text-right w-[90px]">נסיעות</TableHead>
+                    <TableHead className="text-right w-[170px]">סטטוס תשלום</TableHead>
+                    <TableHead className="text-right w-[110px]">יתרה</TableHead>
                     <TableHead className="text-right w-auto">הערות</TableHead>
                     <TableHead className="text-right w-[100px]">פעולות</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {closedPerformances.map(perf => (
-                    <TableRow key={perf.id}>
-                      <TableCell className="text-right">{perf.name}</TableCell>
-                      <TableCell className="text-right">{perf.client || '-'}</TableCell>
-                      <TableCell className="text-right">{format(new Date(perf.date), 'dd/MM/yyyy')}</TableCell>
-                      <TableCell className="text-right">{perf.amount ? `₪${perf.amount}` : '-'}</TableCell>
-                      <TableCell className="text-right">
-                        {perf.amount && perf.travel ? `₪${perf.amount + perf.travel}` : perf.amount ? `₪${perf.amount}` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {perf.paidDate ? format(new Date(perf.paidDate), 'dd/MM/yyyy') : '-'}
-                      </TableCell>
-                      <TableCell className="text-right max-w-[200px] truncate">{perf.notes || '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(perf)}>
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDelete(perf.id)}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {closedPerformances.map(perf => {
+                    const due = perf.amount || 0;
+                    const paid = getPerformancePaidTotal(perf);
+                    const balance = due - paid;
+                    return (
+                      <TableRow key={perf.id}>
+                        <TableCell className="text-right">{perf.name}</TableCell>
+                        <TableCell className="text-right">{perf.client || '-'}</TableCell>
+                        <TableCell className="text-right">{format(new Date(perf.date), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell className="text-right">{perf.amount ? `₪${perf.amount}` : '-'}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{perf.travel ? `₪${perf.travel}` : '-'}</TableCell>
+                        <TableCell className="text-right">{renderStatusBadge(perf)}</TableCell>
+                        <TableCell className={`text-right font-semibold ${balance > 0 ? 'text-amber-700 dark:text-amber-300' : balance < 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}>
+                          {balance > 0 ? `₪${formatCurrencyAmount(balance)}` : balance < 0 ? `+₪${formatCurrencyAmount(Math.abs(balance))}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right max-w-[200px] truncate">{perf.notes || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(perf)}>
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => handleDelete(perf.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {closedPerformances.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground">
-                        אין הופעות סגורות
+                      <TableCell colSpan={9} className="text-center text-muted-foreground">
+                        אין הופעות להצגה
                       </TableCell>
                     </TableRow>
                   )}
@@ -343,7 +422,7 @@ const PerformancesManagement = () => {
       </Dialog>
 
       {/* Event Dialog */}
-      <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
+      <Dialog open={showEventDialog} onOpenChange={(o) => { setShowEventDialog(o); if (!o) setEditingPerformance(null); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPerformance ? 'עריכת הופעה' : 'הופעה חדשה'}</DialogTitle>
@@ -446,7 +525,7 @@ const PerformancesManagement = () => {
             </div>
 
             <div>
-              <Label htmlFor="travel">נסיעות</Label>
+              <Label htmlFor="travel">נסיעות (לא נכלל בהכנסה)</Label>
               <Input
                 id="travel"
                 type="number"
@@ -474,35 +553,7 @@ const PerformancesManagement = () => {
             </div>
 
             <div>
-              <Label htmlFor="paymentStatus">צורת תשלום</Label>
-              <Select
-                value={formData.paymentStatus}
-                onValueChange={(val: Performance['paymentStatus']) => setFormData({ ...formData, paymentStatus: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="not_paid">לא שולם</SelectItem>
-                  <SelectItem value="bank">בנק</SelectItem>
-                  <SelectItem value="check">צ'ק</SelectItem>
-                  <SelectItem value="cash">מזומן</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="paidDate">תאריך תשלום</Label>
-              <Input
-                id="paidDate"
-                type="date"
-                value={formData.paidDate}
-                onChange={(e) => setFormData({ ...formData, paidDate: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="status">סטטוס</Label>
+              <Label htmlFor="status">סטטוס הופעה</Label>
               <Select
                 value={formData.status}
                 onValueChange={(val: Performance['status']) => setFormData({ ...formData, status: val })}
@@ -525,6 +576,73 @@ const PerformancesManagement = () => {
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               />
             </div>
+
+            {/* Partial payments editor — only for existing performances */}
+            {editingPerformance && (() => {
+              const totalDue = editingPerformance.amount || 0;
+              const totalPaid = getPerformancePaidTotal(editingPerformance);
+              const status = getPerformancePaymentStatus(editingPerformance);
+              const balance = totalDue - totalPaid;
+              return (
+                <div className="col-span-2 rounded-md border bg-muted/30 p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold text-sm">תשלומים שהתקבלו</div>
+                    {renderStatusBadge(editingPerformance)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    שולם ₪{formatCurrencyAmount(totalPaid)} מתוך ₪{formatCurrencyAmount(totalDue)}
+                    {balance > 0 && <span className="text-amber-700 dark:text-amber-300 mr-2">• יתרה ₪{formatCurrencyAmount(balance)}</span>}
+                    {balance < 0 && <span className="text-emerald-700 dark:text-emerald-300 mr-2">• עודף ₪{formatCurrencyAmount(Math.abs(balance))}</span>}
+                  </div>
+
+                  {(editingPerformance.performancePayments || []).length > 0 && (
+                    <div className="space-y-1">
+                      {(editingPerformance.performancePayments || []).slice().sort((a, b) => b.date.localeCompare(a.date)).map(pp => (
+                        <div key={pp.id} className="flex items-center gap-2 text-sm bg-background rounded px-2 py-1.5 border">
+                          <span className="font-mono">{format(new Date(pp.date), 'dd/MM/yyyy')}</span>
+                          <span className="font-semibold">₪{formatCurrencyAmount(pp.amount)}</span>
+                          {pp.method && <span className="text-xs text-muted-foreground">({pp.method === 'bank' ? 'בנק' : pp.method === 'check' ? 'צ׳ק' : 'מזומן'})</span>}
+                          {pp.notes && <span className="text-xs text-muted-foreground truncate flex-1">{pp.notes}</span>}
+                          <Button size="sm" variant="ghost" className="h-7 px-2 mr-auto" onClick={() => handleDeletePaymentInline(pp.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t">
+                    <div>
+                      <Label className="text-xs">תאריך</Label>
+                      <Input type="date" value={newPpDate} onChange={(e) => setNewPpDate(e.target.value)} className="h-9" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">סכום</Label>
+                      <Input type="number" value={newPpAmount} onChange={(e) => setNewPpAmount(e.target.value)} className="h-9" placeholder="₪" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">אמצעי</Label>
+                      <Select value={newPpMethod} onValueChange={(v: 'bank' | 'check' | 'cash') => setNewPpMethod(v)}>
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bank">בנק</SelectItem>
+                          <SelectItem value="check">צ׳ק</SelectItem>
+                          <SelectItem value="cash">מזומן</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button onClick={handleAddPaymentInline} className="w-full h-9">
+                        <Plus className="h-4 w-4 ml-1" /> הוסף תשלום
+                      </Button>
+                    </div>
+                    <div className="col-span-2 md:col-span-4">
+                      <Input value={newPpNotes} onChange={(e) => setNewPpNotes(e.target.value)} placeholder="הערות לתשלום (אופציונלי)" className="h-9" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="flex gap-2 justify-end mt-4">
