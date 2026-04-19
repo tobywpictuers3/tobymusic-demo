@@ -17,9 +17,11 @@ import { format } from 'date-fns';
 const PaymentManagement = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [activePaymentsTab, setActivePaymentsTab] = useState<'fixed' | 'perLesson' | 'all'>('all');
+  const [activePaymentsTab, setActivePaymentsTab] = useState<'all' | 'fixed' | 'perLesson' | 'performances' | 'other'>('all');
   const [fixedPaymentsView, setFixedPaymentsView] = useState<'annual' | 'monthly'>('annual');
   const [allPaymentsView, setAllPaymentsView] = useState<'annual' | 'monthly' | 'daily'>('annual');
+  const [performancesView, setPerformancesView] = useState<'annual' | 'monthly'>('annual');
+  const [otherView, setOtherView] = useState<'annual' | 'monthly'>('annual');
   const [regularMonthFilter, setRegularMonthFilter] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
