@@ -96,6 +96,14 @@ export interface PerLessonLedger {
   rows: PerLessonLedgerRow[];
 }
 
+export interface PerformancePayment {
+  id: string;
+  date: string;     // YYYY-MM-DD - actual date money received
+  amount: number;   // Amount in NIS (excludes travel reimbursement)
+  method?: 'bank' | 'check' | 'cash';
+  notes?: string;
+}
+
 export interface Performance {
   id: string;
   name: string;
@@ -109,8 +117,12 @@ export interface Performance {
   travel?: number;
   invoiceNumber?: string;
   receiptNumber?: string;
+  /** @deprecated kept for backward compatibility — actual status is derived from performancePayments[] */
   paymentStatus: 'not_paid' | 'bank' | 'check' | 'cash';
+  /** @deprecated kept for backward compatibility — actual payment dates live in performancePayments[] */
   paidDate?: string; // YYYY-MM-DD format
+  /** Source of truth for income & status. Each entry counts in its own date/month/year. */
+  performancePayments?: PerformancePayment[];
   notes?: string;
   status: 'open' | 'closed'; // open = not finalized, closed = finalized
   createdAt: string;
