@@ -1292,29 +1292,38 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                       <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[160px] w-[160px]">לקוחה</TableHead>
                       <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[120px] w-[120px]">תאריך הופעה</TableHead>
                       <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[120px] w-[120px]">תאריך תשלום</TableHead>
-                      <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[100px] w-[100px]">סכום</TableHead>
-                      <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[100px] w-[100px]">נסיעות</TableHead>
-                      <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[110px] w-[110px]">סה"כ</TableHead>
+                      <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[110px] w-[110px]">סכום ששולם</TableHead>
+                      <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[110px] w-[110px]">סטטוס</TableHead>
+                      <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-right min-w-[140px] w-[140px]">נסיעות (מידע)</TableHead>
                       <TableHead className="sticky top-0 bg-muted/95 dark:bg-muted/80 text-foreground border-b border-border text-center min-w-[90px] w-[90px]">עריכה</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {monthPerformances.map(performance => (
-                      <TableRow key={performance.id} className="hover:bg-muted/40">
-                        <TableCell className="sticky right-0 z-20 bg-accent/55 dark:bg-accent/35 text-foreground text-right shadow-[-1px_0_0_0_hsl(var(--border))] font-semibold">{performance.name}</TableCell>
-                        <TableCell className="text-right">{performance.client || '-'}</TableCell>
-                        <TableCell className="text-right">{formatDisplayDate(performance.date)}</TableCell>
-                        <TableCell className="text-right">{formatDisplayDate(performance.paidDate)}</TableCell>
-                        <TableCell className="text-right">₪{formatCurrencyAmount(performance.amount || 0)}</TableCell>
-                        <TableCell className="text-right">₪{formatCurrencyAmount(performance.travel || 0)}</TableCell>
-                        <TableCell className="text-right font-semibold">₪{formatCurrencyAmount((performance.amount || 0) + (performance.travel || 0))}</TableCell>
-                        <TableCell className="text-center">
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingPerformance(performance); setShowEditPerformanceDialog(true); }}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {monthPerformances.map(row => {
+                      const status = getPerformancePaymentStatus(row.performance);
+                      const totalDue = row.performance.amount || 0;
+                      const totalPaid = getPerformancePaidTotal(row.performance);
+                      return (
+                        <TableRow key={row.paymentId} className="hover:bg-muted/40">
+                          <TableCell className="sticky right-0 z-20 bg-accent/55 dark:bg-accent/35 text-foreground text-right shadow-[-1px_0_0_0_hsl(var(--border))] font-semibold">{row.performance.name}</TableCell>
+                          <TableCell className="text-right">{row.performance.client || '-'}</TableCell>
+                          <TableCell className="text-right">{formatDisplayDate(row.performance.date)}</TableCell>
+                          <TableCell className="text-right">{formatDisplayDate(row.paymentDate)}</TableCell>
+                          <TableCell className="text-right font-semibold">₪{formatCurrencyAmount(row.paidAmount)}</TableCell>
+                          <TableCell className="text-right">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${status === 'paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' : status === 'partial' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'}`}>
+                              {status === 'paid' ? 'שולם' : status === 'partial' ? `חלקי ₪${formatCurrencyAmount(totalPaid)}/₪${formatCurrencyAmount(totalDue)}` : 'לא שולם'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">{row.performance.travel ? `₪${formatCurrencyAmount(row.performance.travel)}` : '-'}</TableCell>
+                          <TableCell className="text-center">
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingPerformance(row.performance); setShowEditPerformanceDialog(true); }}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
