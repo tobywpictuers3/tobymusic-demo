@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/safe-ui/dialog';
 import { Label } from '@/components/safe-ui/label';
 import { CreditCard, ChevronRight, ChevronLeft, Download, Coins, Plus, Pencil, Trash2, Calendar } from 'lucide-react';
-import { getStudents, getPayments, savePayments, updateStudent, getPerformances, getOneTimePayments, saveOneTimePayments, updateOneTimePayment, deleteOneTimePayment, getTithePaid, saveTithePaid, getCompletedLessonsCount, recordPerLessonPayment, getPerLessonPayments, getStudentPerLessonPayments, getStudentPerLessonLedger, updatePerLessonPayment, deletePerLessonPayment, updatePerformance, deletePerformance } from '@/lib/storage';
+import { getStudents, getPayments, savePayments, updateStudent, getPerformances, getOneTimePayments, saveOneTimePayments, updateOneTimePayment, deleteOneTimePayment, getTithePaid, saveTithePaid, getCompletedLessonsCount, recordPerLessonPayment, getPerLessonPayments, getStudentPerLessonPayments, getStudentPerLessonLedger, updatePerLessonPayment, deletePerLessonPayment, updatePerformance, deletePerformance, getPerformancePaidTotal, getPerformancePaymentStatus, addPerformancePayment, updatePerformancePayment, deletePerformancePayment } from '@/lib/storage';
 import { Payment, Student, OneTimePayment, Performance, PerLessonPayment } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/safe-ui/badge';
