@@ -1583,9 +1583,11 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button variant={activePaymentsTab === 'all' ? 'default' : 'outline'} onClick={() => setActivePaymentsTab('all')}>כל התשלומים</Button>
             <Button variant={activePaymentsTab === 'fixed' ? 'default' : 'outline'} onClick={() => setActivePaymentsTab('fixed')}>תשלומים קבועים</Button>
             <Button variant={activePaymentsTab === 'perLesson' ? 'default' : 'outline'} onClick={() => setActivePaymentsTab('perLesson')}>תשלומים ח"פ</Button>
-            <Button variant={activePaymentsTab === 'all' ? 'default' : 'outline'} onClick={() => setActivePaymentsTab('all')}>כל התשלומים</Button>
+            <Button variant={activePaymentsTab === 'performances' ? 'default' : 'outline'} onClick={() => setActivePaymentsTab('performances')}>תשלומי הופעות</Button>
+            <Button variant={activePaymentsTab === 'other' ? 'default' : 'outline'} onClick={() => setActivePaymentsTab('other')}>תשלומים אחרים</Button>
           </div>
 
           {activePaymentsTab === 'fixed' && (
@@ -1652,12 +1654,56 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
               <div className="flex items-center rounded-md border px-3 text-sm text-muted-foreground">שנה"ל {selectedYear}-{String(selectedYear + 1).slice(-2)}</div>
             </div>
           )}
+
+          {activePaymentsTab === 'performances' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Select value={performancesView} onValueChange={(v: 'annual' | 'monthly') => setPerformancesView(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="annual">תצוגה שנתית</SelectItem>
+                  <SelectItem value="monthly">תצוגה חודשית</SelectItem>
+                </SelectContent>
+              </Select>
+              {performancesView === 'monthly' && (
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger><SelectValue placeholder="בחר חודש" /></SelectTrigger>
+                  <SelectContent>
+                    {academicMonths.map(month => <SelectItem key={month.key} value={month.key}>{month.fullName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              <div className="flex items-center rounded-md border px-3 text-sm text-muted-foreground">שנה"ל {selectedYear}-{String(selectedYear + 1).slice(-2)} · נסיעות לא נכללות בהכנסה</div>
+            </div>
+          )}
+
+          {activePaymentsTab === 'other' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Select value={otherView} onValueChange={(v: 'annual' | 'monthly') => setOtherView(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="annual">תצוגה שנתית</SelectItem>
+                  <SelectItem value="monthly">תצוגה חודשית</SelectItem>
+                </SelectContent>
+              </Select>
+              {otherView === 'monthly' && (
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger><SelectValue placeholder="בחר חודש" /></SelectTrigger>
+                  <SelectContent>
+                    {academicMonths.map(month => <SelectItem key={month.key} value={month.key}>{month.fullName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              <div className="flex items-center rounded-md border px-3 text-sm text-muted-foreground">שנה"ל {selectedYear}-{String(selectedYear + 1).slice(-2)}</div>
+            </div>
+          )}
         </CardHeader>
 
         <CardContent>
           {activePaymentsTab === 'fixed' && (fixedPaymentsView === 'annual' ? renderFixedAnnualView() : renderFixedMonthlyView())}
           {activePaymentsTab === 'perLesson' && renderPerLessonView()}
           {activePaymentsTab === 'all' && (allPaymentsView === 'annual' ? renderAllPaymentsAnnualView() : allPaymentsView === 'monthly' ? renderAllPaymentsMonthlyView() : renderAllPaymentsDailyView())}
+          {activePaymentsTab === 'performances' && (performancesView === 'annual' ? renderPerformancesAnnualTab() : renderPerformancesMonthlyTab())}
+          {activePaymentsTab === 'other' && (otherView === 'annual' ? renderOtherAnnualTab() : renderOtherMonthlyTab())}
         </CardContent>
       </Card>
 
