@@ -645,15 +645,54 @@ const handleAddOneTimePayment = () => {
       client: editingPerformance.client,
       amount: editingPerformance.amount,
       travel: editingPerformance.travel,
-      paidDate: editingPerformance.paidDate,
       notes: editingPerformance.notes,
-      paymentStatus: editingPerformance.paymentStatus,
+      // Keep performancePayments updates from inline editor (already saved via dedicated handlers)
+      performancePayments: editingPerformance.performancePayments,
     });
 
     loadData();
-    setShowEditPerformanceDialog(false);
-    setEditingPerformance(null);
+    // Refresh editing snapshot from storage so newly added payments stick across re-opens
+    const updated = getPerformances().find(p => p.id === editingPerformance.id);
+    if (updated) setEditingPerformance(updated);
     toast({ description: 'תשלום ההופעה עודכן בהצלחה' });
+  };
+
+  // Partial-payment editor state (used inside Edit Performance dialog)
+  const [newPpDate, setNewPpDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newPpAmount, setNewPpAmount] = useState('');
+  const [newPpMethod, setNewPpMethod] = useState<'bank' | 'check' | 'cash'>('bank');
+  const [newPpNotes, setNewPpNotes] = useState('');
+
+  const handleAddPerformancePaymentInline = () => {
+    if (!editingPerformance) return;
+    const amt = parseFloat(newPpAmount);
+    if (!amt || amt <= 0) {
+      toast({ title: 'שגיאה', description: 'יש להזין סכום תשלום חיובי', variant: 'destructive' });
+      return;
+    }
+    const updated = addPerformancePayment(editingPerformance.id, {
+      date: newPpDate,
+      amount: amt,
+      method: newPpMethod,
+      notes: newPpNotes || undefined,
+    });
+    if (updated) {
+      setEditingPerformance(updated);
+      loadData();
+      setNewPpAmount('');
+      setNewPpNotes('');
+      toast({ description: 'תשלום נוסף' });
+    }
+  };
+
+  const handleDeletePerformancePaymentInline = (paymentId: string) => {
+    if (!editingPerformance) return;
+    const updated = deletePerformancePayment(editingPerformance.id, paymentId);
+    if (updated) {
+      setEditingPerformance(updated);
+      loadData();
+      toast({ description: 'תשלום נמחק' });
+    }
   };
 
   const handleDeletePerformancePayment = async (id: string) => {
