@@ -1867,11 +1867,13 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
 
       <div className="space-y-2">
         <Label htmlFor="payment-amount">סכום</Label>
-        <Input
+        <NumberStepper
           id="payment-amount"
-          type="number"
-          value={newOneTimePayment.amount}
-          onChange={(e) => setNewOneTimePayment({ ...newOneTimePayment, amount: e.target.value })}
+          value={Number(newOneTimePayment.amount) || 0}
+          onValueChange={(n) => setNewOneTimePayment({ ...newOneTimePayment, amount: String(n) })}
+          step={10}
+          allowDecimals
+          unit="₪"
           placeholder="0"
         />
       </div>
@@ -1989,12 +1991,14 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                 
                 <div className="space-y-2">
                   <Label htmlFor="payment-amount">סכום ששולם</Label>
-                  <Input
+                  <NumberStepper
                     id="payment-amount"
-                    type="number"
+                    value={Number(perLessonPaymentAmount) || 0}
+                    onValueChange={(n) => setPerLessonPaymentAmount(String(n))}
+                    step={10}
                     min={0}
-                    value={perLessonPaymentAmount}
-                    onChange={(e) => setPerLessonPaymentAmount(e.target.value)}
+                    allowDecimals
+                    unit="₪"
                     placeholder="הזן סכום"
                   />
                   {amount > 0 && lessonPrice > 0 && (
@@ -2050,9 +2054,14 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                 <Input
                   id="edit-amount"
                   type="number"
+                  inputMode="decimal"
                   value={editingOneTimePayment.amount}
                   onChange={(e) => setEditingOneTimePayment({ ...editingOneTimePayment, amount: parseFloat(e.target.value) || 0 })}
                 />
+                <div className="flex gap-2 mt-2">
+                  <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => setEditingOneTimePayment({ ...editingOneTimePayment, amount: (editingOneTimePayment.amount || 0) - 10 })}>−10</Button>
+                  <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => setEditingOneTimePayment({ ...editingOneTimePayment, amount: (editingOneTimePayment.amount || 0) + 10 })}>+10</Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-date">תאריך</Label>
