@@ -9,6 +9,7 @@ import { Label } from '@/components/safe-ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/safe-ui/select';
 import { Badge } from '@/components/safe-ui/badge';
 import { Grid, List, UserPlus, Edit, Trash2, Users, History, Coins } from 'lucide-react';
+import { NumberStepper } from '@/components/ui/number-stepper';
 import { getStudents, addStudent, updateStudent, deleteStudentCascade, getCompletedLessonsCount, convertAnnualToPerLesson, getPayments } from '@/lib/storage';
 import { deleteMessagesForStudentCascade } from '@/lib/messages';
 import { Student } from '@/lib/types';
