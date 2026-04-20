@@ -18,7 +18,21 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['"Assistant"', 'system-ui', '-apple-system', 'sans-serif'],
+				serif: ['"Playfair Display"', 'Georgia', 'serif'],
+				display: ['"Playfair Display"', 'Georgia', 'serif'],
+			},
 			colors: {
+				gold: {
+					DEFAULT: 'hsl(var(--gold-main))',
+					dark: 'hsl(var(--gold-dark))',
+					light: 'hsl(var(--gold-light))',
+				},
+				wine: {
+					DEFAULT: 'hsl(var(--wine-main))',
+					light: 'hsl(var(--wine-light))',
+				},
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -79,7 +93,9 @@ export default {
 			boxShadow: {
 				'musical': 'var(--shadow-musical)',
 				'card': 'var(--shadow-card)',
-				'hover': 'var(--shadow-hover)'
+				'soft': 'var(--shadow-soft)',
+				'hover': 'var(--shadow-hover)',
+				'glow-gold': 'var(--glow-gold)'
 			},
 			transitionTimingFunction: {
 				'bounce-gentle': 'var(--bounce-gentle)'
