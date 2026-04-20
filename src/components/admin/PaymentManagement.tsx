@@ -2123,20 +2123,26 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-performance-amount">סכום ההזמנה</Label>
-                    <Input
+                    <NumberStepper
                       id="edit-performance-amount"
-                      type="number"
-                      value={editingPerformance.amount ?? ''}
-                      onChange={(e) => setEditingPerformance({ ...editingPerformance, amount: parseFloat(e.target.value) || 0 })}
+                      value={editingPerformance.amount ?? 0}
+                      onValueChange={(n) => setEditingPerformance({ ...editingPerformance, amount: n })}
+                      step={50}
+                      allowDecimals
+                      min={0}
+                      unit="₪"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-performance-travel">נסיעות (לא נכלל בהכנסה)</Label>
-                    <Input
+                    <NumberStepper
                       id="edit-performance-travel"
-                      type="number"
-                      value={editingPerformance.travel ?? ''}
-                      onChange={(e) => setEditingPerformance({ ...editingPerformance, travel: parseFloat(e.target.value) || 0 })}
+                      value={editingPerformance.travel ?? 0}
+                      onValueChange={(n) => setEditingPerformance({ ...editingPerformance, travel: n })}
+                      step={10}
+                      allowDecimals
+                      min={0}
+                      unit="₪"
                     />
                   </div>
                 </div>
@@ -2261,11 +2267,14 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-plp-amount">סכום</Label>
-                  <Input
+                  <NumberStepper
                     id="edit-plp-amount"
-                    type="number"
                     value={editingPerLessonPayment.amount}
-                    onChange={(e) => setEditingPerLessonPayment({ ...editingPerLessonPayment, amount: parseFloat(e.target.value) || 0 })}
+                    onValueChange={(n) => setEditingPerLessonPayment({ ...editingPerLessonPayment, amount: n })}
+                    step={10}
+                    allowDecimals
+                    min={0}
+                    unit="₪"
                   />
                 </div>
                 <div className="space-y-2">
