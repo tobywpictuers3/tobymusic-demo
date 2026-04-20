@@ -9,6 +9,7 @@ import { Label } from '@/components/safe-ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/safe-ui/select';
 import { Badge } from '@/components/safe-ui/badge';
 import { Grid, List, UserPlus, Edit, Trash2, Users, History, Coins } from 'lucide-react';
+import { NumberStepper } from '@/components/ui/number-stepper';
 import { getStudents, addStudent, updateStudent, deleteStudentCascade, getCompletedLessonsCount, convertAnnualToPerLesson, getPayments } from '@/lib/storage';
 import { deleteMessagesForStudentCascade } from '@/lib/messages';
 import { Student } from '@/lib/types';
@@ -565,18 +566,20 @@ const StudentsManagement = () => {
               {studentForm.paymentType === 'per_lesson' && (
                 <div className="mt-3">
                   <Label htmlFor="lessonPrice">מחיר לשיעור (₪)</Label>
-                  <Input
+                  <NumberStepper
                     id="lessonPrice"
-                    type="number"
                     value={studentForm.lessonPrice}
-                    onChange={(e) => setStudentForm({...studentForm, lessonPrice: parseInt(e.target.value) || 0})}
+                    onValueChange={(n) => setStudentForm({...studentForm, lessonPrice: n})}
+                    step={10}
+                    min={0}
                     placeholder="150"
+                    unit="₪"
                   />
                 </div>
               )}
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="startDate">תאריך התחלה</Label>
                 <Input
@@ -588,34 +591,39 @@ const StudentsManagement = () => {
               </div>
               <div>
                 <Label htmlFor="startingLessonNumber">מספר שיעור התחלתי</Label>
-                <Input
+                <NumberStepper
                   id="startingLessonNumber"
-                  type="number"
                   value={studentForm.startingLessonNumber}
-                  onChange={(e) => setStudentForm({...studentForm, startingLessonNumber: parseInt(e.target.value) || 1})}
+                  onValueChange={(n) => setStudentForm({...studentForm, startingLessonNumber: Math.max(1, n)})}
+                  step={1}
+                  min={1}
                 />
               </div>
             </div>
             
             {/* Annual payment fields - only show for annual payment type */}
             {studentForm.paymentType === 'annual' && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="annualAmount">תשלום שנתי</Label>
-                <Input
+                <NumberStepper
                   id="annualAmount"
-                  type="number"
                   value={studentForm.annualAmount}
-                  onChange={(e) => setStudentForm({...studentForm, annualAmount: parseInt(e.target.value) || 0})}
+                  onValueChange={(n) => setStudentForm({...studentForm, annualAmount: Math.max(0, n)})}
+                  step={100}
+                  min={0}
+                  unit="₪"
                 />
               </div>
               <div>
                 <Label htmlFor="paymentMonths">מס' חודשי תשלום</Label>
-                <Input
+                <NumberStepper
                   id="paymentMonths"
-                  type="number"
                   value={studentForm.paymentMonths}
-                  onChange={(e) => setStudentForm({...studentForm, paymentMonths: parseInt(e.target.value) || 12})}
+                  onValueChange={(n) => setStudentForm({...studentForm, paymentMonths: Math.min(12, Math.max(1, n))})}
+                  step={1}
+                  min={1}
+                  max={12}
                 />
               </div>
             </div>
@@ -665,11 +673,13 @@ const StudentsManagement = () => {
               />
               <div>
                 <Label htmlFor="calculatedAmount">מחיר מחושב (קובע לתשלום)</Label>
-                <Input
+                <NumberStepper
                   id="calculatedAmount"
-                  type="number"
-                  value={studentForm.calculatedAmount || ''}
-                  onChange={(e) => setStudentForm({...studentForm, calculatedAmount: parseInt(e.target.value) || undefined})}
+                  value={studentForm.calculatedAmount ?? 0}
+                  onValueChange={(n) => setStudentForm({...studentForm, calculatedAmount: n || undefined})}
+                  step={100}
+                  min={0}
+                  unit="₪"
                   placeholder="הזן סכום או השתמש במחשבון למעלה"
                 />
               </div>

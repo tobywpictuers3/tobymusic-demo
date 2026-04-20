@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, ChevronLeft, Check, X, Plus, Edit, Trash2, Undo2, Clock, Download, AlertTriangle } from 'lucide-react';
+import { NumberStepper } from '@/components/ui/number-stepper';
 import { getStudents, getLessons, addLesson, updateLesson, deleteLesson, getActiveScheduleTemplate, getPerformances, getHolidays, addHoliday, deleteHoliday, isHoliday } from '@/lib/storage';
 import { Student, Lesson, Performance } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
@@ -950,13 +951,15 @@ const LessonJournal = () => {
             </div>
             
             <div>
-              <Label>שינוי בדקות (+ או -)</Label>
-              <Input
-                type="number"
+              <Label>שינוי בדקות (+ הוספה / − הפחתה)</Label>
+              <NumberStepper
                 value={bankTimeChange}
-                onChange={(e) => setBankTimeChange(parseInt(e.target.value) || 0)}
-                placeholder="לדוגמה: 15 או -10"
+                onValueChange={(n) => setBankTimeChange(n)}
+                step={5}
+                allowNegative
                 disabled={markAsNoShow}
+                placeholder="לדוגמה: 15 או -10"
+                unit="דק׳"
               />
             </div>
 

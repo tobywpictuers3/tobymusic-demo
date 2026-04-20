@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/safe-ui/dialog';
 import { Label } from '@/components/safe-ui/label';
 import { CreditCard, ChevronRight, ChevronLeft, Download, Coins, Plus, Pencil, Trash2, Calendar } from 'lucide-react';
+import { NumberStepper } from '@/components/ui/number-stepper';
 import { getStudents, getPayments, savePayments, updateStudent, getPerformances, getOneTimePayments, saveOneTimePayments, updateOneTimePayment, deleteOneTimePayment, getTithePaid, saveTithePaid, getCompletedLessonsCount, recordPerLessonPayment, getPerLessonPayments, getStudentPerLessonPayments, getStudentPerLessonLedger, updatePerLessonPayment, deletePerLessonPayment, updatePerformance, deletePerformance, getPerformancePaidTotal, getPerformancePaymentStatus, addPerformancePayment, updatePerformancePayment, deletePerformancePayment } from '@/lib/storage';
 import { Payment, Student, OneTimePayment, Performance, PerLessonPayment } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
@@ -1866,11 +1867,13 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
 
       <div className="space-y-2">
         <Label htmlFor="payment-amount">סכום</Label>
-        <Input
+        <NumberStepper
           id="payment-amount"
-          type="number"
-          value={newOneTimePayment.amount}
-          onChange={(e) => setNewOneTimePayment({ ...newOneTimePayment, amount: e.target.value })}
+          value={Number(newOneTimePayment.amount) || 0}
+          onValueChange={(n) => setNewOneTimePayment({ ...newOneTimePayment, amount: String(n) })}
+          step={10}
+          allowDecimals
+          unit="₪"
           placeholder="0"
         />
       </div>
@@ -1988,12 +1991,14 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                 
                 <div className="space-y-2">
                   <Label htmlFor="payment-amount">סכום ששולם</Label>
-                  <Input
+                  <NumberStepper
                     id="payment-amount"
-                    type="number"
+                    value={Number(perLessonPaymentAmount) || 0}
+                    onValueChange={(n) => setPerLessonPaymentAmount(String(n))}
+                    step={10}
                     min={0}
-                    value={perLessonPaymentAmount}
-                    onChange={(e) => setPerLessonPaymentAmount(e.target.value)}
+                    allowDecimals
+                    unit="₪"
                     placeholder="הזן סכום"
                   />
                   {amount > 0 && lessonPrice > 0 && (
@@ -2049,9 +2054,14 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                 <Input
                   id="edit-amount"
                   type="number"
+                  inputMode="decimal"
                   value={editingOneTimePayment.amount}
                   onChange={(e) => setEditingOneTimePayment({ ...editingOneTimePayment, amount: parseFloat(e.target.value) || 0 })}
                 />
+                <div className="flex gap-2 mt-2">
+                  <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => setEditingOneTimePayment({ ...editingOneTimePayment, amount: (editingOneTimePayment.amount || 0) - 10 })}>−10</Button>
+                  <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => setEditingOneTimePayment({ ...editingOneTimePayment, amount: (editingOneTimePayment.amount || 0) + 10 })}>+10</Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-date">תאריך</Label>
@@ -2113,20 +2123,26 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-performance-amount">סכום ההזמנה</Label>
-                    <Input
+                    <NumberStepper
                       id="edit-performance-amount"
-                      type="number"
-                      value={editingPerformance.amount ?? ''}
-                      onChange={(e) => setEditingPerformance({ ...editingPerformance, amount: parseFloat(e.target.value) || 0 })}
+                      value={editingPerformance.amount ?? 0}
+                      onValueChange={(n) => setEditingPerformance({ ...editingPerformance, amount: n })}
+                      step={50}
+                      allowDecimals
+                      min={0}
+                      unit="₪"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-performance-travel">נסיעות (לא נכלל בהכנסה)</Label>
-                    <Input
+                    <NumberStepper
                       id="edit-performance-travel"
-                      type="number"
-                      value={editingPerformance.travel ?? ''}
-                      onChange={(e) => setEditingPerformance({ ...editingPerformance, travel: parseFloat(e.target.value) || 0 })}
+                      value={editingPerformance.travel ?? 0}
+                      onValueChange={(n) => setEditingPerformance({ ...editingPerformance, travel: n })}
+                      step={10}
+                      allowDecimals
+                      min={0}
+                      unit="₪"
                     />
                   </div>
                 </div>
@@ -2251,11 +2267,14 @@ const getStudentFullName = (student: Student) => `${student.firstName} ${student
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-plp-amount">סכום</Label>
-                  <Input
+                  <NumberStepper
                     id="edit-plp-amount"
-                    type="number"
                     value={editingPerLessonPayment.amount}
-                    onChange={(e) => setEditingPerLessonPayment({ ...editingPerLessonPayment, amount: parseFloat(e.target.value) || 0 })}
+                    onValueChange={(n) => setEditingPerLessonPayment({ ...editingPerLessonPayment, amount: n })}
+                    step={10}
+                    allowDecimals
+                    min={0}
+                    unit="₪"
                   />
                 </div>
                 <div className="space-y-2">

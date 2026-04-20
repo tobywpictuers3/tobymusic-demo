@@ -153,14 +153,15 @@ const AdminDashboard = () => {
     <div className="relative z-10 min-h-screen musical-gradient overflow-hidden page-enter">
       {/* Sticky Header */}
       <div className="sticky top-0 z-50 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-sm border-b border-primary/20 shadow-lg">
-        <div className="container mx-auto p-4">
-          <div className="card-gradient card-shadow rounded-xl p-4">
-            <div className="flex justify-between items-center">
-              <h1 className="text-2xl md:text-3xl font-bold text-gold title-glow">
-                דשבורד ניהול - מערכת שיעורי נגינה
+        <div className="container mx-auto p-2 sm:p-4">
+          <div className="card-gradient card-shadow rounded-xl p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gold title-glow text-center sm:text-right leading-tight">
+                <span className="block sm:inline">דשבורד ניהול</span>
+                <span className="hidden sm:inline"> - מערכת שיעורי נגינה</span>
               </h1>
 
-              <div className="flex gap-2 items-center">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center justify-center sm:justify-end">
                 <ThemeToggle />
                 <UnreadMessagesBadge userId="admin" />
                 <SyncStatusBadge />
@@ -178,10 +179,11 @@ const AdminDashboard = () => {
                 <Button
                   onClick={handleLogout}
                   variant="outline"
-                  className="border-gold text-wine hover:bg-destructive hover:text-primary-foreground"
+                  size="sm"
+                  className="border-gold text-wine hover:bg-destructive hover:text-primary-foreground h-9 sm:h-10"
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  התנתק
+                  <LogOut className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">התנתק</span>
                 </Button>
               </div>
             </div>
@@ -194,49 +196,49 @@ const AdminDashboard = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList
               dir="ltr"
-              className="w-full h-auto card-gradient card-shadow rounded-xl justify-start overflow-x-auto p-1 gap-1"
+              className="w-full h-auto card-gradient card-shadow rounded-xl justify-start overflow-x-auto overflow-y-hidden p-1 gap-1 scrollbar-thin"
             >
-              <TabsTrigger value="journal" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="journal" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <Calendar className="h-4 w-4" />
                 יומן שיעורים
               </TabsTrigger>
 
-              <TabsTrigger value="students" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="students" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <Users className="h-4 w-4" />
                 תלמידות
               </TabsTrigger>
 
-              <TabsTrigger value="payments" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="payments" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <CreditCard className="h-4 w-4" />
                 תשלומים
               </TabsTrigger>
 
-              <TabsTrigger value="performances" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="performances" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <Music className="h-4 w-4" />
                 הופעות
               </TabsTrigger>
 
-              <TabsTrigger value="practice" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="practice" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <Trophy className="h-4 w-4" />
                 נתוני אימונים
               </TabsTrigger>
 
-              <TabsTrigger value="messages" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="messages" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <MessageSquare className="h-4 w-4" />
                 תקשורת
               </TabsTrigger>
 
-              <TabsTrigger value="backup" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="backup" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <FileText className="h-4 w-4" />
                 גיבוי
               </TabsTrigger>
 
-              <TabsTrigger value="fixed-schedule" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="fixed-schedule" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <Settings className="h-4 w-4" />
                 מערכת קבועה
               </TabsTrigger>
 
-              <TabsTrigger value="history" className="shrink-0 flex items-center gap-2 whitespace-nowrap">
+              <TabsTrigger value="history" className="shrink-0 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-2 min-h-[40px]">
                 <History className="h-4 w-4" />
                 היסטוריה
               </TabsTrigger>
