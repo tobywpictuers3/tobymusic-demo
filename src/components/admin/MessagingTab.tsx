@@ -70,6 +70,30 @@ const formatMessageDate = (createdAt: string): string => {
     : msgDate.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
 };
 
+// Strip HTML tags to plain text for Gmail compose body
+const htmlToPlain = (html: string): string => {
+  if (!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+};
+
+// Build a Gmail web compose URL pre-filled with recipients/subject/body.
+// Opens the teacher's Gmail account in a new tab (mailto-style, no backend).
+export const buildGmailComposeUrl = (
+  toEmails: string[],
+  subject: string,
+  body: string
+): string => {
+  const params = new URLSearchParams();
+  params.set('view', 'cm');
+  params.set('fs', '1');
+  if (toEmails.length > 0) params.set('to', toEmails.join(','));
+  if (subject) params.set('su', subject);
+  if (body) params.set('body', body);
+  return `https://mail.google.com/mail/?${params.toString()}`;
+};
+
 type FolderType = 'inbox' | 'sent' | 'drafts' | 'starred' | 'trash' | 'swap_requests';
 
 const LAYOUT_STORAGE_KEY = 'admin-messages-layout';
