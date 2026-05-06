@@ -48,7 +48,8 @@ import {
   ChevronRight,
   ChevronLeft,
   ArrowLeft,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MessageTypeBadge } from "../student/MessageTypeBadge";
