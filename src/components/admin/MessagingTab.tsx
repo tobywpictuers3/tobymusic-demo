@@ -1160,7 +1160,7 @@ function ComposeForm({
       <div className="flex gap-2">
         <Button onClick={onSend}>
           <Send className="w-4 h-4 mr-2" />
-          שלח
+          שמור ופתח ב-Gmail
         </Button>
         <Button variant="outline" onClick={onSaveDraft}>
           <Save className="w-4 h-4 mr-2" />
