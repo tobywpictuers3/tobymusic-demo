@@ -5,10 +5,13 @@ const durabilityPath = 'src/lib/financialDurability.ts';
 
 let payment = fs.readFileSync(paymentPath, 'utf8');
 const importLine = "import PriorYearBalancesCard from '@/components/admin/PriorYearBalancesCard';";
+const ledgerImportLine = "import { getPerLessonSchoolYearLedger } from '@/lib/priorYearBalances';";
 if (!payment.includes(importLine)) {
   const anchor = "import { format } from 'date-fns';";
   if (!payment.includes(anchor)) throw new Error('prior-year-balances: PaymentManagement import anchor not found');
-  payment = payment.replace(anchor, `${anchor}\n${importLine}`);
+  payment = payment.replace(anchor, `${anchor}\n${importLine}\n${ledgerImportLine}`);
+} else if (!payment.includes(ledgerImportLine)) {
+  payment = payment.replace(importLine, `${importLine}\n${ledgerImportLine}`);
 }
 
 const jerusalemHelper = `const todayInJerusalem = () => {\n  const parts = new Intl.DateTimeFormat('en-CA', {\n    timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit'\n  }).formatToParts(new Date());\n  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));\n  return \`${'${values.year}'}-${'${values.month}'}-${'${values.day}'}\`;\n};\n`;
@@ -25,12 +28,26 @@ const currentYearFilter = "const studentPayments = updatedPayments.filter(p => p
 if (payment.includes(allHistoryFilter)) payment = payment.replace(allHistoryFilter, currentYearFilter);
 if (payment.includes(allHistoryFilter)) throw new Error('prior-year-balances: historical payment-method rewrite still present');
 
-// Payment-method display must also come from the selected school year, not an
-// arbitrary old payment row belonging to the same student.
+// Payment-method display and filters must come from the selected school year,
+// not an arbitrary old payment row belonging to the same student.
 const oldMethodLookup = "return payments.find(p => p.studentId === studentId)?.paymentMethod || 'inactive';";
 const currentMethodLookup = "return payments.find(p => p.studentId === studentId && p.month >= `${selectedYear}-09` && p.month <= `${selectedYear + 1}-08`)?.paymentMethod || 'inactive';";
 if (payment.includes(oldMethodLookup)) payment = payment.replace(oldMethodLookup, currentMethodLookup);
-if (payment.includes(oldMethodLookup)) throw new Error('prior-year-balances: cross-year payment-method lookup still present');
+
+const oldFilterMethodLookup = "const studentMethod = payments.find(p => p.studentId === student.id)?.paymentMethod || 'inactive';";
+const currentFilterMethodLookup = "const studentMethod = payments.find(p => p.studentId === student.id && p.month >= `${selectedYear}-09` && p.month <= `${selectedYear + 1}-08`)?.paymentMethod || 'inactive';";
+if (payment.includes(oldFilterMethodLookup)) payment = payment.replace(oldFilterMethodLookup, currentFilterMethodLookup);
+
+if (payment.includes(oldMethodLookup) || payment.includes(oldFilterMethodLookup)) {
+  throw new Error('prior-year-balances: cross-year payment-method lookup still present');
+}
+
+// The active per-lesson card is school-year scoped. Historical rows remain
+// available in history, but do not contaminate the new year's running balance.
+const lifetimeLedger = 'const ledger = getStudentPerLessonLedger(student.id);';
+const schoolYearLedger = 'const ledger = getPerLessonSchoolYearLedger(student.id, selectedYear + 1);';
+if (payment.includes(lifetimeLedger)) payment = payment.replace(lifetimeLedger, schoolYearLedger);
+if (!payment.includes(schoolYearLedger)) throw new Error('prior-year-balances: per-lesson summary did not become school-year scoped');
 
 // Business dates are Jerusalem dates. UTC ISO dates can be one calendar day off
 // around local midnight.
