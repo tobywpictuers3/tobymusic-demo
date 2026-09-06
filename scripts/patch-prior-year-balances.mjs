@@ -11,6 +11,31 @@ if (!payment.includes(importLine)) {
   payment = payment.replace(anchor, `${anchor}\n${importLine}`);
 }
 
+const jerusalemHelper = `const todayInJerusalem = () => {\n  const parts = new Intl.DateTimeFormat('en-CA', {\n    timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit'\n  }).formatToParts(new Date());\n  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));\n  return \`${'${values.year}'}-${'${values.month}'}-${'${values.day}'}\`;\n};\n`;
+if (!payment.includes('const todayInJerusalem = () =>')) {
+  const componentAnchor = 'const PaymentManagement = () => {';
+  if (!payment.includes(componentAnchor)) throw new Error('prior-year-balances: component anchor not found');
+  payment = payment.replace(componentAnchor, `${jerusalemHelper}\n${componentAnchor}`);
+}
+
+// Never rewrite historical payment methods when the manager changes the method
+// for the selected school year.
+const allHistoryFilter = "const studentPayments = updatedPayments.filter(p => p.studentId === studentId);";
+const currentYearFilter = "const studentPayments = updatedPayments.filter(p => p.studentId === studentId && p.month >= `${selectedYear}-09` && p.month <= `${selectedYear + 1}-08`);";
+if (payment.includes(allHistoryFilter)) payment = payment.replace(allHistoryFilter, currentYearFilter);
+if (payment.includes(allHistoryFilter)) throw new Error('prior-year-balances: historical payment-method rewrite still present');
+
+// Payment-method display must also come from the selected school year, not an
+// arbitrary old payment row belonging to the same student.
+const oldMethodLookup = "return payments.find(p => p.studentId === studentId)?.paymentMethod || 'inactive';";
+const currentMethodLookup = "return payments.find(p => p.studentId === studentId && p.month >= `${selectedYear}-09` && p.month <= `${selectedYear + 1}-08`)?.paymentMethod || 'inactive';";
+if (payment.includes(oldMethodLookup)) payment = payment.replace(oldMethodLookup, currentMethodLookup);
+if (payment.includes(oldMethodLookup)) throw new Error('prior-year-balances: cross-year payment-method lookup still present');
+
+// Business dates are Jerusalem dates. UTC ISO dates can be one calendar day off
+// around local midnight.
+payment = payment.replaceAll("new Date().toISOString().split('T')[0]", 'todayInJerusalem()');
+
 const oldOther = "{activePaymentsTab === 'other' && (otherView === 'annual' ? renderOtherAnnualTab() : renderOtherMonthlyTab())}";
 const newOther = "{activePaymentsTab === 'other' && (<>\n            {otherView === 'annual' ? renderOtherAnnualTab() : renderOtherMonthlyTab()}\n            <PriorYearBalancesCard selectedBaseYear={selectedYear} />\n          </>)}";
 if (payment.includes(oldOther)) payment = payment.replace(oldOther, newOther);
@@ -34,6 +59,7 @@ if (payment.includes(monthlyOtherPlain)) payment = payment.replace(monthlyOtherP
 
 if (payment.includes(dailyOtherPositiveOnly)) throw new Error('prior-year-balances: daily refund renderer still hides negatives');
 if (payment.includes(monthlyOtherPlain)) throw new Error('prior-year-balances: monthly refund renderer not patched');
+if (payment.includes("new Date().toISOString().split('T')[0]")) throw new Error('prior-year-balances: UTC business date remains in PaymentManagement');
 
 fs.writeFileSync(paymentPath, payment);
 
