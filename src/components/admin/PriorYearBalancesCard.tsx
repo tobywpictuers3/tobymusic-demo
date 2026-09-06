@@ -33,13 +33,11 @@ const todayInJerusalem = () => {
 export default function PriorYearBalancesCard({ selectedBaseYear }: Props) {
   const targetSchoolYear = selectedBaseYear + 1;
   const [rows, setRows] = useState<PriorYearBalanceRecord[]>([]);
-  const [studentsRevision, setStudentsRevision] = useState(0);
   const students = getStudents();
 
   const reload = () => {
     ensurePriorYearBalanceRows(targetSchoolYear);
     setRows(getPriorYearBalanceRecords().filter(row => row.targetSchoolYear === targetSchoolYear));
-    setStudentsRevision(value => value + 1);
   };
 
   useEffect(() => {
@@ -58,13 +56,22 @@ export default function PriorYearBalancesCard({ selectedBaseYear }: Props) {
     reload();
   };
 
+  const commitBalance = (row: PriorYearBalanceRecord, rawValue: string) => {
+    const amount = Number(rawValue);
+    if (!Number.isFinite(amount)) {
+      toast({ title: 'סכום לא תקין', description: 'יש להזין מספר חוקי', variant: 'destructive' });
+      reload();
+      return;
+    }
+    if (Math.abs(amount - row.signedBalance) < 0.005 && !row.requiresVerification) return;
+    update(row, { signedBalance: amount });
+  };
+
   const labelForBalance = (amount: number) => {
     if (amount > 0) return `זכות לתלמידה +₪${money(amount)}`;
     if (amount < 0) return `חוב של התלמידה -₪${money(Math.abs(amount))}`;
     return 'מאוזן ₪0';
   };
-
-  void studentsRevision;
 
   return (
     <Card className="mt-5 border-primary/20" data-prior-year-balances>
@@ -102,11 +109,15 @@ export default function PriorYearBalancesCard({ selectedBaseYear }: Props) {
                           <div className="text-xs text-amber-700 dark:text-amber-300">נדרש אימות — הזיני את היתרה ההיסטורית</div>
                         )}
                         <Input
+                          key={`${row.id}:${row.updatedAt}`}
                           type="number"
                           step="1"
-                          value={row.signedBalance}
+                          defaultValue={row.signedBalance}
                           aria-label="סכום חוב או זכות"
-                          onChange={event => update(row, { signedBalance: Number(event.target.value || 0) })}
+                          onBlur={event => commitBalance(row, event.currentTarget.value)}
+                          onKeyDown={event => {
+                            if (event.key === 'Enter') event.currentTarget.blur();
+                          }}
                           className="h-8"
                         />
                       </div>
