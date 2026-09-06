@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/safe-ui/card';
 import { Input } from '@/components/safe-ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/safe-ui/select';
@@ -19,14 +19,27 @@ interface Props {
 
 const money = (value: number) => Number.isInteger(value) ? String(value) : value.toFixed(2);
 
+const todayInJerusalem = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
 export default function PriorYearBalancesCard({ selectedBaseYear }: Props) {
   const targetSchoolYear = selectedBaseYear + 1;
   const [rows, setRows] = useState<PriorYearBalanceRecord[]>([]);
-  const students = useMemo(() => getStudents(), []);
+  const [studentsRevision, setStudentsRevision] = useState(0);
+  const students = getStudents();
 
   const reload = () => {
     ensurePriorYearBalanceRows(targetSchoolYear);
     setRows(getPriorYearBalanceRecords().filter(row => row.targetSchoolYear === targetSchoolYear));
+    setStudentsRevision(value => value + 1);
   };
 
   useEffect(() => {
@@ -47,16 +60,18 @@ export default function PriorYearBalancesCard({ selectedBaseYear }: Props) {
 
   const labelForBalance = (amount: number) => {
     if (amount > 0) return `זכות לתלמידה +₪${money(amount)}`;
-    if (amount < 0) return `חוב לתלמידה -₪${money(Math.abs(amount))}`;
+    if (amount < 0) return `חוב של התלמידה -₪${money(Math.abs(amount))}`;
     return 'מאוזן ₪0';
   };
+
+  void studentsRevision;
 
   return (
     <Card className="mt-5 border-primary/20" data-prior-year-balances>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">חובות / זכויות משנה״ל הקודמת</CardTitle>
         <p className="text-xs text-muted-foreground">
-          פלוס = זכות לתלמידה. מינוס = חוב של התלמידה. מזומן נרשם בתשלומים אחרים בחודש הפירעון; זכות מזומן נרשמת כהוצאה שלילית וחוב ששולם כהכנסה חיובית.
+          פלוס = זכות לתלמידה. מינוס = חוב של התלמידה. מזומן נרשם בתשלומים אחרים בחודש הפירעון; החזר לתלמידה נרשם במינוס ומקטין את סך ההכנסות של אותו חודש.
         </p>
       </CardHeader>
       <CardContent>
@@ -83,6 +98,9 @@ export default function PriorYearBalancesCard({ selectedBaseYear }: Props) {
                         <div className={row.signedBalance > 0 ? 'text-emerald-700 dark:text-emerald-300' : row.signedBalance < 0 ? 'text-rose-700 dark:text-rose-300' : 'text-muted-foreground'}>
                           {labelForBalance(row.signedBalance)}
                         </div>
+                        {row.requiresVerification && (
+                          <div className="text-xs text-amber-700 dark:text-amber-300">נדרש אימות — הזיני את היתרה ההיסטורית</div>
+                        )}
                         <Input
                           type="number"
                           step="1"
@@ -114,9 +132,9 @@ export default function PriorYearBalancesCard({ selectedBaseYear }: Props) {
                         value={row.settled ? 'yes' : 'no'}
                         onValueChange={value => update(row, {
                           settled: value === 'yes',
-                          settlementDate: value === 'yes' && isCash ? (row.settlementDate || new Date().toISOString().slice(0, 10)) : row.settlementDate,
+                          settlementDate: value === 'yes' && isCash ? (row.settlementDate || todayInJerusalem()) : row.settlementDate,
                         })}
-                        disabled={row.signedBalance === 0 || row.settlementMethod === 'lessons'}
+                        disabled={row.signedBalance === 0 || row.settlementMethod === 'lessons' || row.requiresVerification}
                       >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -129,8 +147,8 @@ export default function PriorYearBalancesCard({ selectedBaseYear }: Props) {
                       <Input
                         type="date"
                         value={row.settlementDate || ''}
-                        disabled={!isCash || !row.settled || row.signedBalance === 0}
-                        onChange={event => update(row, { settlementDate: event.target.value })}
+                        disabled={!isCash || !row.settled || row.signedBalance === 0 || row.requiresVerification}
+                        onChange={event => update(row, { settlementDate: event.target.value || undefined })}
                       />
                     </TableCell>
                   </TableRow>
