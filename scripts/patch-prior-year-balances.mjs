@@ -18,12 +18,22 @@ if (!payment.includes('<PriorYearBalancesCard selectedBaseYear={selectedYear} />
   throw new Error('prior-year-balances: failed to mount table inside Other payments tab');
 }
 
-// Negative one-time cash settlements are real refunds and must remain visible in
-// yearly breakdowns rather than disappearing behind a positive-only renderer.
-payment = payment.replace(
-  "{value > 0 ? `₪${formatCurrencyAmount(value)}` : '-'}",
-  "{value !== 0 ? `${value < 0 ? '-' : ''}₪${formatCurrencyAmount(Math.abs(value))}` : '-'}",
-);
+// Refunds are signed negative cash flow. They must remain visible in every
+// summary and must reduce the monthly/yearly total rather than disappear.
+const annualPositiveOnly = "{value > 0 ? `₪${formatCurrencyAmount(value)}` : '-'}";
+const annualSigned = "{value !== 0 ? `${value < 0 ? '-' : ''}₪${formatCurrencyAmount(Math.abs(value))}` : '-'}";
+if (payment.includes(annualPositiveOnly)) payment = payment.replace(annualPositiveOnly, annualSigned);
+
+const dailyOtherPositiveOnly = "{row.other > 0 ? `₪${formatCurrencyAmount(row.other)}` : '-'}";
+const dailyOtherSigned = "{row.other !== 0 ? `${row.other < 0 ? '-' : ''}₪${formatCurrencyAmount(Math.abs(row.other))}` : '-'}";
+if (payment.includes(dailyOtherPositiveOnly)) payment = payment.replace(dailyOtherPositiveOnly, dailyOtherSigned);
+
+const monthlyOtherPlain = '<div className="rounded-lg border p-3 bg-background"><div className="text-xs text-muted-foreground">אחר</div><div className="font-bold">₪{formatCurrencyAmount(breakdown.other)}</div></div>';
+const monthlyOtherSigned = '<div className="rounded-lg border p-3 bg-background"><div className="text-xs text-muted-foreground">אחר</div><div className="font-bold">{breakdown.other < 0 ? `-₪${formatCurrencyAmount(Math.abs(breakdown.other))}` : `₪${formatCurrencyAmount(breakdown.other)}`}</div></div>';
+if (payment.includes(monthlyOtherPlain)) payment = payment.replace(monthlyOtherPlain, monthlyOtherSigned);
+
+if (payment.includes(dailyOtherPositiveOnly)) throw new Error('prior-year-balances: daily refund renderer still hides negatives');
+if (payment.includes(monthlyOtherPlain)) throw new Error('prior-year-balances: monthly refund renderer not patched');
 
 fs.writeFileSync(paymentPath, payment);
 
