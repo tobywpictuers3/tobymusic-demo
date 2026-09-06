@@ -1,9 +1,7 @@
-import { getLessons, getOneTimePayments, getPerLessonPayments, getStudents, isDevMode, saveOneTimePayments, updateStudent } from './storage';
+import { getDevStore, getOneTimePayments, getStudents, isDevMode, saveOneTimePayments, updateStudent } from './storage';
 import { hybridSync } from './hybridSync';
 import {
-  getSchoolYearBounds,
   getStudentSchoolYearRecord,
-  isPriorYearDebtMakeupLesson,
   upsertStudentSchoolYearTerms,
 } from './schoolYear';
 import type { Student } from './types';
@@ -20,7 +18,9 @@ export interface PriorYearBalanceRecord {
   settlementMethod: PriorYearSettlementMethod;
   settled: boolean;
   settlementDate?: string;
-  source: 'annual_rollover' | 'per_lesson_calculation' | 'manual';
+  source: 'annual_rollover' | 'manual';
+  /** Legacy per-lesson years do not store a historical lesson price snapshot. */
+  requiresVerification?: boolean;
   updatedAt: string;
 }
 
@@ -28,6 +28,7 @@ const BUCKET = 'priorYearBalances';
 const roundMoney = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 const mutableStore = (): Record<string, any> => {
+  if (isDevMode()) return getDevStore();
   if (typeof window === 'undefined') return {};
   return (window as any).__musicSystemStorage || {};
 };
@@ -43,33 +44,26 @@ export const getPriorYearBalanceRecords = (): PriorYearBalanceRecord[] => {
   return Array.isArray(store[BUCKET]) ? store[BUCKET].map((row: PriorYearBalanceRecord) => ({ ...row })) : [];
 };
 
-const perLessonPriorYearBalance = (student: Student, sourceSchoolYear: number): number => {
-  const { start, end } = getSchoolYearBounds(sourceSchoolYear);
-  const startMonth = start.slice(0, 7);
-  const endMonth = end.slice(0, 7);
-  const completedLessons = getLessons().filter(lesson =>
-    lesson.studentId === student.id &&
-    lesson.status === 'completed' &&
-    lesson.date >= start &&
-    lesson.date <= end &&
-    !isPriorYearDebtMakeupLesson(lesson),
-  ).length;
-  const paid = getPerLessonPayments()
-    .filter(payment => payment.studentId === student.id && payment.month >= startMonth && payment.month <= endMonth)
-    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-  const due = completedLessons * Number(student.lessonPrice || 0);
-  return roundMoney(paid - due);
-};
-
-const calculatedSourceBalance = (student: Student, targetSchoolYear: number): { amount: number; source: PriorYearBalanceRecord['source'] } => {
+const calculatedSourceBalance = (student: Student, targetSchoolYear: number): Pick<PriorYearBalanceRecord, 'signedBalance' | 'source' | 'requiresVerification'> => {
   const sourceSchoolYear = targetSchoolYear - 1;
+
+  // Historical per-lesson records do not persist the lesson price that was in
+  // force for each prior-year lesson. Recomputing with today's lessonPrice could
+  // silently invent a debt/credit. For legacy years we therefore create the row
+  // but require an explicit verified amount instead of guessing.
   if (student.paymentType === 'per_lesson') {
-    return { amount: perLessonPriorYearBalance(student, sourceSchoolYear), source: 'per_lesson_calculation' };
+    return { signedBalance: 0, source: 'manual', requiresVerification: true };
   }
+
   const previous = getStudentSchoolYearRecord(student.id, sourceSchoolYear);
+  if (!previous || previous.status !== 'closed') {
+    return { signedBalance: 0, source: 'manual', requiresVerification: true };
+  }
+
   return {
-    amount: roundMoney(Number(previous?.closingFinancialBalance || 0)),
+    signedBalance: roundMoney(Number(previous.closingFinancialBalance || 0)),
     source: 'annual_rollover',
+    requiresVerification: false,
   };
 };
 
@@ -87,10 +81,11 @@ export const ensurePriorYearBalanceRows = (targetSchoolYear: number): PriorYearB
       studentId: student.id,
       sourceSchoolYear: targetSchoolYear - 1,
       targetSchoolYear,
-      signedBalance: inferred.amount,
+      signedBalance: inferred.signedBalance,
       settlementMethod: 'lessons',
-      settled: inferred.amount === 0,
+      settled: inferred.signedBalance === 0 && !inferred.requiresVerification,
       source: inferred.source,
+      requiresVerification: inferred.requiresVerification,
       updatedAt: new Date().toISOString(),
     });
     changed = true;
@@ -107,7 +102,16 @@ const syncCashSettlementPayment = (record: PriorYearBalanceRecord, student: Stud
   const id = settlementPaymentId(record);
   const existing = getOneTimePayments();
   const without = existing.filter(payment => payment.id !== id);
-  if (record.settlementMethod === 'cash' && record.settled && record.settlementDate && record.signedBalance !== 0) {
+
+  if (
+    record.settlementMethod === 'cash' &&
+    record.settled &&
+    !record.requiresVerification &&
+    record.settlementDate &&
+    record.signedBalance !== 0
+  ) {
+    // Balance sign is from the student's perspective; cash flow is the reverse:
+    // debt -100 => teacher receives +100; credit +100 => teacher refunds -100.
     const signedCashFlow = roundMoney(-record.signedBalance);
     without.push({
       id,
@@ -117,10 +121,12 @@ const syncCashSettlementPayment = (record: PriorYearBalanceRecord, student: Stud
       paidDate: record.settlementDate,
     });
   }
+
   saveOneTimePayments(without);
 };
 
 const applyToCurrentStudentCard = (record: PriorYearBalanceRecord, student: Student) => {
+  if (record.requiresVerification) return;
   const carryForward = record.settlementMethod === 'lessons' ? record.signedBalance : 0;
 
   if (student.paymentType === 'per_lesson') {
@@ -157,20 +163,26 @@ export const updatePriorYearBalanceRecord = (
   if (index < 0) return undefined;
 
   const previous = records[index];
+  const hasSettlementDate = Object.prototype.hasOwnProperty.call(updates, 'settlementDate');
+  const amountWasExplicitlyEdited = Object.prototype.hasOwnProperty.call(updates, 'signedBalance');
   const next: PriorYearBalanceRecord = {
     ...previous,
     ...updates,
     signedBalance: roundMoney(updates.signedBalance ?? previous.signedBalance),
-    settlementDate: updates.settlementDate ?? previous.settlementDate,
+    settlementDate: hasSettlementDate ? updates.settlementDate : previous.settlementDate,
+    // An explicit human-entered amount resolves a legacy "requires verification" row.
+    requiresVerification: amountWasExplicitlyEdited ? false : previous.requiresVerification,
+    source: amountWasExplicitlyEdited ? 'manual' : previous.source,
     updatedAt: new Date().toISOString(),
   };
 
-  // A lesson/annual carry-forward is effective immediately; cash affects current-year
-  // accounting only after an actual settlement date is recorded and marked paid.
-  if (next.settlementMethod === 'cash' && (!next.settled || !next.settlementDate)) {
+  if (next.settlementMethod === 'lessons') {
+    next.settled = !next.requiresVerification;
+    next.settlementDate = undefined;
+  } else if (!next.settlementDate || next.requiresVerification) {
     next.settled = false;
   }
-  if (next.signedBalance === 0) next.settled = true;
+  if (next.signedBalance === 0 && !next.requiresVerification) next.settled = true;
 
   records[index] = next;
   storeRecords(records);
@@ -182,8 +194,3 @@ export const updatePriorYearBalanceRecord = (
   }
   return next;
 };
-
-export const getPriorYearBalanceCashFlowForMonth = (monthKey: string): number =>
-  getOneTimePayments()
-    .filter(payment => payment.id.startsWith('prior-year-balance:') && payment.month === monthKey)
-    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
