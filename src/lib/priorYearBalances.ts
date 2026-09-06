@@ -1,10 +1,12 @@
-import { getDevStore, getOneTimePayments, getStudents, isDevMode, saveOneTimePayments, updateStudent } from './storage';
+import { getDevStore, getLessons, getOneTimePayments, getPerLessonPayments, getStudents, isDevMode, saveOneTimePayments, updateStudent } from './storage';
 import { hybridSync } from './hybridSync';
 import {
+  getSchoolYearBounds,
   getStudentSchoolYearRecord,
+  isPriorYearDebtMakeupLesson,
   upsertStudentSchoolYearTerms,
 } from './schoolYear';
-import type { Student } from './types';
+import type { PerLessonLedger, Student } from './types';
 
 export type PriorYearSettlementMethod = 'cash' | 'lessons';
 
@@ -122,17 +124,14 @@ const syncCashSettlementPayment = (record: PriorYearBalanceRecord, student: Stud
     });
   }
 
-  saveOneTimePayments(without);
+  const previousSerialized = JSON.stringify(existing);
+  const nextSerialized = JSON.stringify(without);
+  if (previousSerialized !== nextSerialized) saveOneTimePayments(without);
 };
 
 const applyToCurrentStudentCard = (record: PriorYearBalanceRecord, student: Student) => {
-  if (record.requiresVerification) return;
+  if (record.requiresVerification || student.paymentType === 'per_lesson') return;
   const carryForward = record.settlementMethod === 'lessons' ? record.signedBalance : 0;
-
-  if (student.paymentType === 'per_lesson') {
-    updateStudent(student.id, { perLessonBalance: roundMoney(carryForward) });
-    return;
-  }
 
   const current = getStudentSchoolYearRecord(student.id, record.targetSchoolYear);
   if (!current || current.status !== 'open') return;
@@ -152,6 +151,44 @@ const applyToCurrentStudentCard = (record: PriorYearBalanceRecord, student: Stud
     calculatedAmount: Math.abs(netTarget - current.annualAmountFull) > 0.009 ? netTarget : undefined,
     monthlyAmount: student.paymentMonths > 0 ? roundMoney(netTarget / student.paymentMonths) : netTarget,
   });
+};
+
+export const getPerLessonSchoolYearLedger = (studentId: string, schoolYear: number): PerLessonLedger => {
+  const student = getStudents().find(item => item.id === studentId);
+  const lessonPrice = Number(student?.lessonPrice || 0);
+  const { start, end } = getSchoolYearBounds(schoolYear);
+  const startMonth = start.slice(0, 7);
+  const endMonth = end.slice(0, 7);
+
+  const completedLessonsCount = getLessons().filter(lesson =>
+    lesson.studentId === studentId &&
+    lesson.status === 'completed' &&
+    lesson.date >= start &&
+    lesson.date <= end &&
+    !isPriorYearDebtMakeupLesson(lesson),
+  ).length;
+
+  const totalPaid = roundMoney(getPerLessonPayments()
+    .filter(payment => payment.studentId === studentId && payment.month >= startMonth && payment.month <= endMonth)
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
+
+  const openingRow = getPriorYearBalanceRecords().find(row =>
+    row.studentId === studentId && row.targetSchoolYear === schoolYear,
+  );
+  const openingBalance = openingRow && !openingRow.requiresVerification && openingRow.settlementMethod === 'lessons'
+    ? Number(openingRow.signedBalance || 0)
+    : 0;
+  const totalDue = roundMoney(completedLessonsCount * lessonPrice);
+  const totalBalance = roundMoney(openingBalance + totalPaid - totalDue);
+
+  return {
+    lessonPrice,
+    completedLessonsCount,
+    totalDue,
+    totalPaid,
+    totalBalance,
+    rows: [],
+  };
 };
 
 export const updatePriorYearBalanceRecord = (
