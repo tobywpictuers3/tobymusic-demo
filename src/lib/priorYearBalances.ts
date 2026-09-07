@@ -34,8 +34,8 @@ const BUCKET = 'priorYearBalances';
 /**
  * School year 2026 predates the clean per-lesson year-close model, so its
  * historical lesson price cannot be reconstructed safely. From school year
- * 2027 onward the row is captured at the first admin load after rollover,
- * before the new year's price can be edited in the UI.
+ * 2027 onward the row is captured when the new-year Payments area first opens,
+ * before that closing balance can participate in the new-year ledger.
  */
 export const FIRST_AUTOMATED_PER_LESSON_CLOSE_YEAR = 2027;
 const roundMoney = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -79,8 +79,6 @@ const calculatePerLessonSourceBalance = (
     row.studentId === student.id && row.targetSchoolYear === sourceSchoolYear,
   );
 
-  // A still-unverified previous-year opening balance makes the next closing
-  // balance unknowable. Do not guess; keep the row explicitly unresolved.
   if (openingRow?.requiresVerification) {
     return {
       signedBalance: 0,
@@ -155,8 +153,15 @@ const calculatedSourceBalance = (
 
 export const ensurePriorYearBalanceRows = (targetSchoolYear: number): PriorYearBalanceRecord[] => {
   const current = getPriorYearBalanceRecords();
-  const byId = new Map(current.map(row => [row.id, row]));
   let changed = false;
+  const normalized = current.map(row => {
+    if (row.settlementMethod === 'lessons' && !row.requiresVerification && (!row.settled || row.settlementDate)) {
+      changed = true;
+      return { ...row, settled: true, settlementDate: undefined, updatedAt: new Date().toISOString() };
+    }
+    return row;
+  });
+  const byId = new Map(normalized.map(row => [row.id, row]));
 
   getStudents().forEach(student => {
     const id = `${student.id}:${targetSchoolYear}`;
@@ -169,7 +174,7 @@ export const ensurePriorYearBalanceRows = (targetSchoolYear: number): PriorYearB
       targetSchoolYear,
       signedBalance: inferred.signedBalance,
       settlementMethod: 'lessons',
-      settled: inferred.signedBalance === 0 && !inferred.requiresVerification,
+      settled: !inferred.requiresVerification,
       source: inferred.source,
       requiresVerification: inferred.requiresVerification,
       paymentTrack: inferred.paymentTrack,
@@ -200,8 +205,6 @@ const syncCashSettlementPayment = (record: PriorYearBalanceRecord, student: Stud
     record.settlementDate &&
     record.signedBalance !== 0
   ) {
-    // Balance sign is from the student's perspective; cash flow is the reverse:
-    // debt -100 => teacher receives +100; credit +100 => teacher refunds -100.
     const signedCashFlow = roundMoney(-record.signedBalance);
     without.push({
       id,
@@ -293,7 +296,6 @@ export const updatePriorYearBalanceRecord = (
     ...updates,
     signedBalance: roundMoney(updates.signedBalance ?? previous.signedBalance),
     settlementDate: hasSettlementDate ? updates.settlementDate : previous.settlementDate,
-    // An explicit human-entered amount resolves a legacy "requires verification" row.
     requiresVerification: amountWasExplicitlyEdited ? false : previous.requiresVerification,
     source: amountWasExplicitlyEdited ? 'manual' : previous.source,
     updatedAt: new Date().toISOString(),
