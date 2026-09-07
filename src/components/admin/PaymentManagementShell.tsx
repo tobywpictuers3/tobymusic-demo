@@ -3,14 +3,21 @@ import PaymentManagement from '@/components/admin/PaymentManagement';
 import AnnualSchoolYearReport from '@/components/admin/AnnualSchoolYearReport';
 import { getTithePaid, isDevMode } from '@/lib/storage';
 import { hydrateTithePaidFromHistory, persistTitheMonthDurably } from '@/lib/titheDurability';
+import { ensurePriorYearBalanceRows } from '@/lib/priorYearBalances';
+import { ensureSchoolYearRollover, getSchoolYearForDate } from '@/lib/schoolYear';
 import { toast } from '@/hooks/use-toast';
 
 /**
  * Keeps the existing payment calculations untouched, fixes the annual table
- * viewport, and adds a durability boundary around the existing tithe buttons.
+ * viewport, and adds durability boundaries around financial operations.
  * PaymentManagement keeps its legacy tithePaid map for old JSON compatibility;
  * the shell records each explicit change in append-only titheHistory and waits
  * for Dropbox verification in normal mode.
+ *
+ * On entry to Payments we also complete the idempotent school-year rollover and
+ * materialize one immutable prior-year settlement row per student. This makes
+ * the closing balance a year-owned record before any current-year payment UI is
+ * used, so old and new school years cannot bleed into each other.
  */
 export default function PaymentManagementShell() {
   const [ready, setReady] = useState(false);
@@ -19,12 +26,26 @@ export default function PaymentManagementShell() {
 
   useLayoutEffect(() => {
     hydrateTithePaidFromHistory();
-    setReady(true);
+
+    let active = true;
+    void (async () => {
+      try {
+        await ensureSchoolYearRollover();
+        ensurePriorYearBalanceRows(getSchoolYearForDate());
+      } finally {
+        if (active) setReady(true);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
     const handleImport = () => {
       hydrateTithePaidFromHistory();
+      ensurePriorYearBalanceRows(getSchoolYearForDate());
       setRevision(value => value + 1);
     };
 
