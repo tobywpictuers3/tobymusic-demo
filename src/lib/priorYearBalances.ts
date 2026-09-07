@@ -20,13 +20,24 @@ export interface PriorYearBalanceRecord {
   settlementMethod: PriorYearSettlementMethod;
   settled: boolean;
   settlementDate?: string;
-  source: 'annual_rollover' | 'manual';
+  source: 'annual_rollover' | 'per_lesson_rollover' | 'manual';
   /** Legacy per-lesson years do not store a historical lesson price snapshot. */
   requiresVerification?: boolean;
+  paymentTrack?: 'annual' | 'per_lesson';
+  lessonPriceSnapshot?: number;
+  totalDueSnapshot?: number;
+  totalPaidSnapshot?: number;
   updatedAt: string;
 }
 
 const BUCKET = 'priorYearBalances';
+/**
+ * School year 2026 predates the clean per-lesson year-close model, so its
+ * historical lesson price cannot be reconstructed safely. From school year
+ * 2027 onward the row is captured at the first admin load after rollover,
+ * before the new year's price can be edited in the UI.
+ */
+export const FIRST_AUTOMATED_PER_LESSON_CLOSE_YEAR = 2027;
 const roundMoney = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 const mutableStore = (): Record<string, any> => {
@@ -46,26 +57,99 @@ export const getPriorYearBalanceRecords = (): PriorYearBalanceRecord[] => {
   return Array.isArray(store[BUCKET]) ? store[BUCKET].map((row: PriorYearBalanceRecord) => ({ ...row })) : [];
 };
 
-const calculatedSourceBalance = (student: Student, targetSchoolYear: number): Pick<PriorYearBalanceRecord, 'signedBalance' | 'source' | 'requiresVerification'> => {
+const calculatePerLessonSourceBalance = (
+  student: Student,
+  targetSchoolYear: number,
+): Pick<
+  PriorYearBalanceRecord,
+  'signedBalance' | 'source' | 'requiresVerification' | 'paymentTrack' | 'lessonPriceSnapshot' | 'totalDueSnapshot' | 'totalPaidSnapshot'
+> => {
   const sourceSchoolYear = targetSchoolYear - 1;
 
-  // Historical per-lesson records do not persist the lesson price that was in
-  // force for each prior-year lesson. Recomputing with today's lessonPrice could
-  // silently invent a debt/credit. For legacy years we therefore create the row
-  // but require an explicit verified amount instead of guessing.
+  if (sourceSchoolYear < FIRST_AUTOMATED_PER_LESSON_CLOSE_YEAR) {
+    return {
+      signedBalance: 0,
+      source: 'manual',
+      requiresVerification: true,
+      paymentTrack: 'per_lesson',
+    };
+  }
+
+  const openingRow = getPriorYearBalanceRecords().find(row =>
+    row.studentId === student.id && row.targetSchoolYear === sourceSchoolYear,
+  );
+
+  // A still-unverified previous-year opening balance makes the next closing
+  // balance unknowable. Do not guess; keep the row explicitly unresolved.
+  if (openingRow?.requiresVerification) {
+    return {
+      signedBalance: 0,
+      source: 'manual',
+      requiresVerification: true,
+      paymentTrack: 'per_lesson',
+    };
+  }
+
+  const { start, end } = getSchoolYearBounds(sourceSchoolYear);
+  const startMonth = start.slice(0, 7);
+  const endMonth = end.slice(0, 7);
+  const lessonPrice = roundMoney(Number(student.lessonPrice || 0));
+  const completedLessonsCount = getLessons().filter(lesson =>
+    lesson.studentId === student.id &&
+    lesson.status === 'completed' &&
+    lesson.date >= start &&
+    lesson.date <= end &&
+    !isPriorYearDebtMakeupLesson(lesson),
+  ).length;
+  const totalDue = roundMoney(completedLessonsCount * lessonPrice);
+  const totalPaid = roundMoney(getPerLessonPayments()
+    .filter(payment => payment.studentId === student.id && payment.month >= startMonth && payment.month <= endMonth)
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
+  const openingBalance = openingRow && openingRow.settlementMethod === 'lessons'
+    ? Number(openingRow.signedBalance || 0)
+    : 0;
+
+  return {
+    signedBalance: roundMoney(openingBalance + totalPaid - totalDue),
+    source: 'per_lesson_rollover',
+    requiresVerification: false,
+    paymentTrack: 'per_lesson',
+    lessonPriceSnapshot: lessonPrice,
+    totalDueSnapshot: totalDue,
+    totalPaidSnapshot: totalPaid,
+  };
+};
+
+const calculatedSourceBalance = (
+  student: Student,
+  targetSchoolYear: number,
+): Pick<
+  PriorYearBalanceRecord,
+  'signedBalance' | 'source' | 'requiresVerification' | 'paymentTrack' | 'lessonPriceSnapshot' | 'totalDueSnapshot' | 'totalPaidSnapshot'
+> => {
+  const sourceSchoolYear = targetSchoolYear - 1;
+
   if (student.paymentType === 'per_lesson') {
-    return { signedBalance: 0, source: 'manual', requiresVerification: true };
+    return calculatePerLessonSourceBalance(student, targetSchoolYear);
   }
 
   const previous = getStudentSchoolYearRecord(student.id, sourceSchoolYear);
   if (!previous || previous.status !== 'closed') {
-    return { signedBalance: 0, source: 'manual', requiresVerification: true };
+    return {
+      signedBalance: 0,
+      source: 'manual',
+      requiresVerification: true,
+      paymentTrack: 'annual',
+    };
   }
 
   return {
     signedBalance: roundMoney(Number(previous.closingFinancialBalance || 0)),
     source: 'annual_rollover',
     requiresVerification: false,
+    paymentTrack: 'annual',
+    totalDueSnapshot: roundMoney(Number(previous.finalTarget || previous.baseTarget || 0)),
+    totalPaidSnapshot: roundMoney(Number(previous.paidTotal || 0)),
   };
 };
 
@@ -88,6 +172,10 @@ export const ensurePriorYearBalanceRows = (targetSchoolYear: number): PriorYearB
       settled: inferred.signedBalance === 0 && !inferred.requiresVerification,
       source: inferred.source,
       requiresVerification: inferred.requiresVerification,
+      paymentTrack: inferred.paymentTrack,
+      lessonPriceSnapshot: inferred.lessonPriceSnapshot,
+      totalDueSnapshot: inferred.totalDueSnapshot,
+      totalPaidSnapshot: inferred.totalPaidSnapshot,
       updatedAt: new Date().toISOString(),
     });
     changed = true;
@@ -124,9 +212,7 @@ const syncCashSettlementPayment = (record: PriorYearBalanceRecord, student: Stud
     });
   }
 
-  const previousSerialized = JSON.stringify(existing);
-  const nextSerialized = JSON.stringify(without);
-  if (previousSerialized !== nextSerialized) saveOneTimePayments(without);
+  if (JSON.stringify(existing) !== JSON.stringify(without)) saveOneTimePayments(without);
 };
 
 const applyToCurrentStudentCard = (record: PriorYearBalanceRecord, student: Student) => {
