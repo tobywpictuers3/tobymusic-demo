@@ -151,6 +151,8 @@ On rollover it:
 
 Inactive students receive the archive but no new annual card.
 
+For per-lesson students, the admin startup is additionally gated on `ensurePriorYearBalanceRows(currentSchoolYear)`. The prior-year per-lesson price, completed-lesson count, due total, paid total, verified opening balance and signed close are frozen before the editable admin UI is unlocked. This prevents a new-year price edit after September 1 from rewriting the finished year's close. The Payments shell keeps its own call only as an idempotent fallback.
+
 ### Lesson numbering
 
 `src/lib/lessonNumbering.ts` is the central school-year-aware numbering source. Numbering counts completed lessons only within the lesson's Sep–Aug school year and uses the corresponding year record's starting number. A marked prior-year debt-makeup lesson is excluded from current-year numbering.
@@ -164,13 +166,18 @@ The payment data model already contains all 12 academic months, September throug
 - `musicSystem_priorYearBalances` is the operational settlement bucket for balances brought from the immediately preceding school year.
 - Sign convention is from the student's perspective: positive means money/value owed to the student; negative means debt owed by the student.
 - The settlement table is a year-closing table for both annual and per-lesson students. It shows the payment track, signed balance, settlement method, completion state and execution date. Positive/credit cells are green; negative/debt cells are red.
-- The payments shell completes the idempotent rollover before materializing the closing rows, so the closing record belongs to the finished year before the new-year payment UI is used.
+- The admin startup completes the date-gated annual rollover and freezes prior-year per-lesson closing inputs before editable admin screens are unlocked. A failed close blocks the admin UI with an explicit retry state instead of allowing new-year edits to race ahead of the close.
 - Each new school year gets a clean Sep–Aug payment view. Historical recurring and per-lesson payment rows remain preserved, but active calculations and filters are scoped to the selected school year and do not mix old rows into the new year.
 - `lessons` means the verified signed balance is carried only into the next-year student card/ledger as an opening balance. It does not copy prior-year payment rows into the new year.
 - `cash` means the balance is settled on an explicit execution date. Cash flow reverses the student-perspective sign: student debt creates positive teacher income; student credit/refund creates a negative `oneTimePayments` cash flow. That signed cash row belongs to the month of the execution date, even when it settles an older school year.
 - The deterministic cash row id is scoped by target school year and student, so repeated edits update the same settlement instead of creating duplicates.
-- Per-lesson closing is snapshotted from completed lessons, the lesson price in force at close, year-scoped payments and any verified opening balance. The snapshot stores lesson price, due and paid totals so later price changes cannot rewrite the historical close.
-- School year 2026 is legacy for per-lesson pricing: historical lesson price was not persisted reliably. Those rows must remain `נדרש אימות` and require an explicit amount; the system must not guess from the 2027 price. Automated per-lesson closing begins with school year 2027.
+- Per-lesson closing is snapshotted from completed lessons, the lesson price in force at close, year-scoped payments and any verified opening balance. The snapshot stores source lesson price, completed-lesson count, opening balance, due, paid totals, provenance and cutoff so later price changes cannot rewrite the historical close.
+- Special 2026 rule: `/Apps/lovale db/backups/2026/08/30.json` is the approved historical source for per-lesson pricing and activity for school year 2026 (`2025-09-01..2026-08-31`). The migration must never reconstruct 2026 from a current/2027 lesson price and must not use or reconsider `31.json`.
+- The approved 2026 migration computes `sourceTotalDue = completed lessons in 2026 × sourceLessonPrice`, filters per-lesson payments to the exact 2026 date range (using `paymentDate` when present), includes an opening balance only when that opening is independently verified, and computes `signedBalance = opening + paid - due`.
+- Reliable 2026 rows are written with `requiresVerification=false` and provenance `approved_2026_snapshot`. Only a specific record whose inputs cannot be verified may remain `requiresVerification=true`; the system must not turn all 2026 per-lesson rows into legacy/manual rows.
+- The approved 2026 snapshot is calculation input only. Before any production mutation, the migration reads canonical Dropbox latest and creates an identical versioned backup. It then modifies only the operational prior-year-balance bucket on top of current live data, syncs through the canonical path, and reads canonical latest back to verify the migrated values. Current 2027 data must never be replaced by the historical `30.json` snapshot.
+- The 2026 migration is idempotent and must not overwrite a manually verified close, an already-settled cash close, or a row already proven to come from the approved snapshot.
+- From school year 2027 onward, normal admin rollover freezes the same per-lesson source fields with `live_rollover` provenance before the admin can edit the new year's price/terms.
 - If a prior per-lesson opening balance is itself unresolved, the next closing remains unresolved rather than compounding an invented value.
 - Payment-method changes and payment-method filters are scoped to the selected school year; they must never rewrite or infer from arbitrary historical payment rows.
 - Payment business dates generated by the payment screen use `Asia/Jerusalem`, not UTC day boundaries.
