@@ -1,0 +1,31 @@
+name: Temporary PR lock repair
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  repair-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Regenerate lock only
+        run: npm install --package-lock-only --no-audit --no-fund
+      - name: Clean install
+        run: npm ci --no-audit --no-fund
+      - name: Production build
+        run: npm run build
+      - name: Upload corrected lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: corrected-package-lock
+          path: package-lock.json
+          if-no-files-found: error
