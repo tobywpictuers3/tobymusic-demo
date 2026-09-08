@@ -17,17 +17,22 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Regenerate missing Vite plugin lock entry
-        run: npm install --package-lock-only --save-dev '@vitejs/plugin-react-swc@^3.11.0' --no-audit --no-fund
+      - name: Rebuild package lock from manifest
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only --no-audit --no-fund
       - name: Upload corrected lock
         uses: actions/upload-artifact@v4
         with:
           name: corrected-package-lock
           path: package-lock.json
           if-no-files-found: error
-      - name: Clean install
+      - name: Clean install from rebuilt lock
         run: npm ci --no-audit --no-fund
-      - name: Verify Vite plugin installed
-        run: npm ls @vitejs/plugin-react-swc
+      - name: Verify critical build dependencies
+        run: |
+          npm ls @vitejs/plugin-react-swc
+          npm ls autoprefixer
+          npm ls postcss
       - name: Production build
         run: npm run build
