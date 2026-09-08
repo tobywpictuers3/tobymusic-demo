@@ -21,9 +21,21 @@ export interface PriorYearBalanceRecord {
   settled: boolean;
   settlementDate?: string;
   source: 'annual_rollover' | 'per_lesson_rollover' | 'manual';
-  /** Legacy per-lesson years do not store a historical lesson price snapshot. */
   requiresVerification?: boolean;
   paymentTrack?: 'annual' | 'per_lesson';
+
+  /** Frozen source inputs used for a closed per-lesson year. */
+  sourceLessonPrice?: number;
+  sourceCompletedLessons?: number;
+  sourceOpeningBalance?: number;
+  sourceTotalDue?: number;
+  sourceTotalPaid?: number;
+  sourceProvenance?: 'live_rollover' | 'approved_2026_snapshot';
+  sourceSnapshotPath?: string;
+  sourceSnapshotTimestamp?: string;
+  sourceCutoff?: string;
+
+  /** Backward-compatible aliases kept for the existing UI. */
   lessonPriceSnapshot?: number;
   totalDueSnapshot?: number;
   totalPaidSnapshot?: number;
@@ -32,10 +44,9 @@ export interface PriorYearBalanceRecord {
 
 const BUCKET = 'priorYearBalances';
 /**
- * School year 2026 predates the clean per-lesson year-close model, so its
- * historical lesson price cannot be reconstructed safely. From school year
- * 2027 onward the row is captured when the new-year Payments area first opens,
- * before that closing balance can participate in the new-year ledger.
+ * 2026 is closed only by the explicitly approved 30.json migration. It must
+ * never be reconstructed from a current student.lessonPrice. From 2027 onward
+ * the inputs are frozen by the normal rollover before the admin UI is unlocked.
  */
 export const FIRST_AUTOMATED_PER_LESSON_CLOSE_YEAR = 2027;
 const roundMoney = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -46,15 +57,32 @@ const mutableStore = (): Record<string, any> => {
   return (window as any).__musicSystemStorage || {};
 };
 
-const storeRecords = (records: PriorYearBalanceRecord[]) => {
+export const replacePriorYearBalanceRecords = (
+  records: PriorYearBalanceRecord[],
+  options: { sync?: boolean } = {},
+) => {
   const store = mutableStore();
-  store[BUCKET] = records;
-  if (!isDevMode()) void hybridSync.onDataChange();
+  store[BUCKET] = records.map(row => ({ ...row }));
+  if (!isDevMode() && options.sync !== false) void hybridSync.onDataChange();
 };
+
+const storeRecords = (records: PriorYearBalanceRecord[]) =>
+  replacePriorYearBalanceRecords(records, { sync: true });
 
 export const getPriorYearBalanceRecords = (): PriorYearBalanceRecord[] => {
   const store = mutableStore();
   return Array.isArray(store[BUCKET]) ? store[BUCKET].map((row: PriorYearBalanceRecord) => ({ ...row })) : [];
+};
+
+const paymentBelongsToSchoolYear = (
+  payment: { paymentDate?: string; month?: string },
+  start: string,
+  end: string,
+) => {
+  const date = typeof payment.paymentDate === 'string' ? payment.paymentDate.slice(0, 10) : '';
+  if (date) return date >= start && date <= end;
+  const month = typeof payment.month === 'string' ? payment.month.slice(0, 7) : '';
+  return month >= start.slice(0, 7) && month <= end.slice(0, 7);
 };
 
 const calculatePerLessonSourceBalance = (
@@ -62,10 +90,26 @@ const calculatePerLessonSourceBalance = (
   targetSchoolYear: number,
 ): Pick<
   PriorYearBalanceRecord,
-  'signedBalance' | 'source' | 'requiresVerification' | 'paymentTrack' | 'lessonPriceSnapshot' | 'totalDueSnapshot' | 'totalPaidSnapshot'
+  | 'signedBalance'
+  | 'source'
+  | 'requiresVerification'
+  | 'paymentTrack'
+  | 'sourceLessonPrice'
+  | 'sourceCompletedLessons'
+  | 'sourceOpeningBalance'
+  | 'sourceTotalDue'
+  | 'sourceTotalPaid'
+  | 'sourceProvenance'
+  | 'sourceCutoff'
+  | 'lessonPriceSnapshot'
+  | 'totalDueSnapshot'
+  | 'totalPaidSnapshot'
 > => {
   const sourceSchoolYear = targetSchoolYear - 1;
 
+  // School year 2026 has an approved historical snapshot and is intentionally
+  // handled only by approved2026PerLessonClose.ts. Never infer it from today's
+  // lessonPrice.
   if (sourceSchoolYear < FIRST_AUTOMATED_PER_LESSON_CLOSE_YEAR) {
     return {
       signedBalance: 0,
@@ -89,8 +133,6 @@ const calculatePerLessonSourceBalance = (
   }
 
   const { start, end } = getSchoolYearBounds(sourceSchoolYear);
-  const startMonth = start.slice(0, 7);
-  const endMonth = end.slice(0, 7);
   const lessonPrice = roundMoney(Number(student.lessonPrice || 0));
   const completedLessonsCount = getLessons().filter(lesson =>
     lesson.studentId === student.id &&
@@ -101,7 +143,7 @@ const calculatePerLessonSourceBalance = (
   ).length;
   const totalDue = roundMoney(completedLessonsCount * lessonPrice);
   const totalPaid = roundMoney(getPerLessonPayments()
-    .filter(payment => payment.studentId === student.id && payment.month >= startMonth && payment.month <= endMonth)
+    .filter(payment => payment.studentId === student.id && paymentBelongsToSchoolYear(payment, start, end))
     .reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
   const openingBalance = openingRow && openingRow.settlementMethod === 'lessons'
     ? Number(openingRow.signedBalance || 0)
@@ -110,8 +152,15 @@ const calculatePerLessonSourceBalance = (
   return {
     signedBalance: roundMoney(openingBalance + totalPaid - totalDue),
     source: 'per_lesson_rollover',
-    requiresVerification: false,
+    requiresVerification: lessonPrice <= 0,
     paymentTrack: 'per_lesson',
+    sourceLessonPrice: lessonPrice,
+    sourceCompletedLessons: completedLessonsCount,
+    sourceOpeningBalance: roundMoney(openingBalance),
+    sourceTotalDue: totalDue,
+    sourceTotalPaid: totalPaid,
+    sourceProvenance: 'live_rollover',
+    sourceCutoff: `${end}T23:59:59+03:00`,
     lessonPriceSnapshot: lessonPrice,
     totalDueSnapshot: totalDue,
     totalPaidSnapshot: totalPaid,
@@ -123,7 +172,20 @@ const calculatedSourceBalance = (
   targetSchoolYear: number,
 ): Pick<
   PriorYearBalanceRecord,
-  'signedBalance' | 'source' | 'requiresVerification' | 'paymentTrack' | 'lessonPriceSnapshot' | 'totalDueSnapshot' | 'totalPaidSnapshot'
+  | 'signedBalance'
+  | 'source'
+  | 'requiresVerification'
+  | 'paymentTrack'
+  | 'sourceLessonPrice'
+  | 'sourceCompletedLessons'
+  | 'sourceOpeningBalance'
+  | 'sourceTotalDue'
+  | 'sourceTotalPaid'
+  | 'sourceProvenance'
+  | 'sourceCutoff'
+  | 'lessonPriceSnapshot'
+  | 'totalDueSnapshot'
+  | 'totalPaidSnapshot'
 > => {
   const sourceSchoolYear = targetSchoolYear - 1;
 
@@ -146,6 +208,8 @@ const calculatedSourceBalance = (
     source: 'annual_rollover',
     requiresVerification: false,
     paymentTrack: 'annual',
+    sourceTotalDue: roundMoney(Number(previous.finalTarget || previous.baseTarget || 0)),
+    sourceTotalPaid: roundMoney(Number(previous.paidTotal || 0)),
     totalDueSnapshot: roundMoney(Number(previous.finalTarget || previous.baseTarget || 0)),
     totalPaidSnapshot: roundMoney(Number(previous.paidTotal || 0)),
   };
@@ -166,6 +230,12 @@ export const ensurePriorYearBalanceRows = (targetSchoolYear: number): PriorYearB
   getStudents().forEach(student => {
     const id = `${student.id}:${targetSchoolYear}`;
     if (byId.has(id)) return;
+
+    // 2026 per-lesson rows are created only from the approved historical
+    // snapshot. This also prevents a student who joined only in 2027 from
+    // receiving a fake 2026 legacy row.
+    if (student.paymentType === 'per_lesson' && targetSchoolYear - 1 === 2026) return;
+
     const inferred = calculatedSourceBalance(student, targetSchoolYear);
     byId.set(id, {
       id,
@@ -178,6 +248,13 @@ export const ensurePriorYearBalanceRows = (targetSchoolYear: number): PriorYearB
       source: inferred.source,
       requiresVerification: inferred.requiresVerification,
       paymentTrack: inferred.paymentTrack,
+      sourceLessonPrice: inferred.sourceLessonPrice,
+      sourceCompletedLessons: inferred.sourceCompletedLessons,
+      sourceOpeningBalance: inferred.sourceOpeningBalance,
+      sourceTotalDue: inferred.sourceTotalDue,
+      sourceTotalPaid: inferred.sourceTotalPaid,
+      sourceProvenance: inferred.sourceProvenance,
+      sourceCutoff: inferred.sourceCutoff,
       lessonPriceSnapshot: inferred.lessonPriceSnapshot,
       totalDueSnapshot: inferred.totalDueSnapshot,
       totalPaidSnapshot: inferred.totalPaidSnapshot,
@@ -244,10 +321,16 @@ const applyToCurrentStudentCard = (record: PriorYearBalanceRecord, student: Stud
 
 export const getPerLessonSchoolYearLedger = (studentId: string, schoolYear: number): PerLessonLedger => {
   const student = getStudents().find(item => item.id === studentId);
-  const lessonPrice = Number(student?.lessonPrice || 0);
+  const closingRow = getPriorYearBalanceRecords().find(row =>
+    row.studentId === studentId &&
+    row.sourceSchoolYear === schoolYear &&
+    row.paymentTrack === 'per_lesson' &&
+    !row.requiresVerification,
+  );
+  const lessonPrice = Number(
+    closingRow?.sourceLessonPrice ?? closingRow?.lessonPriceSnapshot ?? student?.lessonPrice ?? 0,
+  );
   const { start, end } = getSchoolYearBounds(schoolYear);
-  const startMonth = start.slice(0, 7);
-  const endMonth = end.slice(0, 7);
 
   const completedLessonsCount = getLessons().filter(lesson =>
     lesson.studentId === studentId &&
@@ -258,7 +341,7 @@ export const getPerLessonSchoolYearLedger = (studentId: string, schoolYear: numb
   ).length;
 
   const totalPaid = roundMoney(getPerLessonPayments()
-    .filter(payment => payment.studentId === studentId && payment.month >= startMonth && payment.month <= endMonth)
+    .filter(payment => payment.studentId === studentId && paymentBelongsToSchoolYear(payment, start, end))
     .reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
 
   const openingRow = getPriorYearBalanceRecords().find(row =>
